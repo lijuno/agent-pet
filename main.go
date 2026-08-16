@@ -101,10 +101,14 @@ func main() {
 	}
 
 	app := NewApp(eng, log, cfgPath, srv.Addr())
+	// Only as big as the character. The window grows when a panel opens and
+	// shrinks again when it closes — see App.OpenOverlay for why it must not
+	// simply stay large.
+	winW, winH := WindowSize(cfg.Pet.Scale)
 	err := wails.Run(&options.App{
 		Title:  "Digital Pet",
-		Width:  300,
-		Height: 368,
+		Width:  winW,
+		Height: winH,
 
 		Frameless:     true,
 		DisableResize: true,

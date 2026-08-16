@@ -28,17 +28,48 @@ type App struct {
 	alwaysOnTop bool
 	muted       bool
 	addr        string
+
+	// The character-only window size, and how far the window is currently
+	// grown past it to make room for a panel.
+	baseW, baseH int
+	grewBy       int
+	grewUp       bool
 }
 
 func NewApp(eng *engine.Engine, log *slog.Logger, cfgPath, addr string) *App {
 	cfg := eng.Config()
+	w, h := WindowSize(cfg.Pet.Scale)
 	return &App{
 		eng:         eng,
 		log:         log,
 		cfgPath:     cfgPath,
 		addr:        addr,
 		alwaysOnTop: cfg.Pet.AlwaysOnTop,
+		baseW:       w,
+		baseH:       h,
 	}
+}
+
+// WindowSize is the window the character alone needs: the sprite at its
+// rendered size, the gap the speech bubble sits in above it, and the shadow
+// below. main.go opens the window at this size and OpenOverlay grows it from
+// here.
+func WindowSize(scale float64) (int, int) {
+	if scale <= 0 {
+		scale = 1
+	}
+	// 40px frames drawn at 3x, times the user's scale — this mirrors the
+	// frontend's own sizing in renderAnimation.
+	sprite := int(40 * 3 * scale)
+	// bubbleRoom keeps a two-line bubble on screen even with the pet pushed to
+	// the very top of the display.
+	const bubbleRoom = 56
+	const shadow = 8
+	w := 300
+	if sprite+80 > w {
+		w = sprite + 80
+	}
+	return w, sprite + bubbleRoom + shadow
 }
 
 func (a *App) startup(ctx context.Context) {
@@ -73,7 +104,76 @@ func (a *App) startup(ctx context.Context) {
 	}()
 }
 
+// The window is normally only as tall as the character and the speech bubble
+// above it. Every extra pixel is transparent dead space that the user cannot
+// get rid of: macOS keeps a dragged window's top edge below the menu bar, so
+// space reserved above the pet is screen the pet can never reach. Reserving a
+// panel's worth of it put the whole top third of a display out of bounds.
+//
+// The panel gets its room when it is opened, and gives it back on close.
+
+// menuBarInset is how much of the top of the screen a dragged window cannot
+// enter. The Wails screen API reports size but not the usable area, so this is
+// an estimate; being wrong only costs one panel opening downward when it could
+// have opened upward.
+const menuBarInset = 28
+
+// overlaySide decides which way the window should grow to fit an overlay of
+// `needed` points, given the window's distance from the top of the screen.
+// Pulled out of the runtime calls so the decision itself can be tested.
+func overlaySide(windowY, needed int) string {
+	if windowY-menuBarInset >= needed {
+		return "above"
+	}
+	return "below"
+}
+
+// OpenOverlay grows the window to fit a panel of h points and reports which
+// side of the character it should be drawn on.
+//
+// Either way the character must not move. It is anchored to the bottom of the
+// window, so growing upward means moving the top edge up by exactly the amount
+// the window grew, leaving the bottom edge — and the pet — where they were.
+// Growing downward leaves the top edge alone, and the frontend anchors the pet
+// to the top instead, which holds it still for the same reason in reverse.
+//
+// Size and position are both set explicitly rather than relying on which edge
+// a resize happens to anchor to, which is a platform detail.
+func (a *App) OpenOverlay(h int) string {
+	if a.ctx == nil || h <= 0 {
+		return "above"
+	}
+	a.CloseOverlay() // never stack two growths
+	x, y := wruntime.WindowGetPosition(a.ctx)
+	side := overlaySide(y, h)
+	top := y
+	if side == "above" {
+		top = y - h
+	}
+	wruntime.WindowSetSize(a.ctx, a.baseW, a.baseH+h)
+	wruntime.WindowSetPosition(a.ctx, x, top)
+	a.grewBy, a.grewUp = h, side == "above"
+	return side
+}
+
+// CloseOverlay returns the window to the size of the character alone.
+func (a *App) CloseOverlay() {
+	if a.ctx == nil || a.grewBy == 0 {
+		return
+	}
+	x, y := wruntime.WindowGetPosition(a.ctx)
+	if a.grewUp {
+		y += a.grewBy
+	}
+	wruntime.WindowSetSize(a.ctx, a.baseW, a.baseH)
+	wruntime.WindowSetPosition(a.ctx, x, y)
+	a.grewBy, a.grewUp = 0, false
+}
+
 func (a *App) shutdown(ctx context.Context) {
+	// Save where the character is, not where a grown window happens to start.
+	a.CloseOverlay()
+
 	// Remember where the user parked the pet.
 	x, y := wruntime.WindowGetPosition(ctx)
 	cfg := a.eng.Config()

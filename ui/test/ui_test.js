@@ -79,18 +79,21 @@ function session(over) {
 // withPet loads a fresh copy of the real UI and hands the test its window and
 // document. A fresh frame per test keeps leaked state (an open panel, a mute
 // flag, a pending timer) from one test out of the next.
-// Keep in step with wails.Run in main.go.
+// Keep in step with WindowSize in app.go: the window is only as tall as the
+// character until an overlay opens, because space above the pet is screen the
+// pet can never be dragged to.
 const WINDOW_W = 300;
-const WINDOW_H = 368;
+const WINDOW_H = 184;
+// What the window grows to with a full-height panel open.
+const GROWN_H = WINDOW_H + 238;
 
 let frameSeq = 0;
 
-function withPet(fn) {
+function withPet(fn, height) {
   return async function () {
     const frame = document.createElement("iframe");
-    // The real window, from wails.Run in main.go. Layout assertions are only
-    // meaningful at the size the pet actually ships at.
-    frame.style.cssText = `width:${WINDOW_W}px;height:${WINDOW_H}px;border:0;position:absolute;left:-9999px;top:0`;
+    // Layout assertions are only meaningful at the size the pet ships at.
+    frame.style.cssText = `width:${WINDOW_W}px;height:${height || WINDOW_H}px;border:0;position:absolute;left:-9999px;top:0`;
     // Cache-bust every load. Without this the browser happily serves a cached
     // index.html to each frame and the whole suite passes against a file that
     // is no longer on disk — which it did, until this line existed.
@@ -401,33 +404,122 @@ test("an open panel refreshes when state arrives", withPet(async (w, d) => {
   assert(d.getElementById("panel").textContent.includes("claude/abc"), "an open panel should follow the state");
 }));
 
-test("a full panel never covers the pet", withPet(async (w, d) => {
-  // The CSS says so in as many words: overlays are anchored to the top and the
-  // pet lives at the bottom, "which is the whole point of having one". That
-  // only holds while the panel's max-height fits the gap above the character,
-  // so it breaks silently if either the window or the panel is ever resized.
+function crowdedView() {
   const sessions = [];
   for (let i = 0; i < 20; i++) {
     sessions.push(session({ key: { source: "claude", id: "session-" + i } }));
   }
-  w.apply(view({ snapshot: { state: "working", forced: false, stats: {}, sessions } }));
+  return view({ snapshot: { state: "working", forced: false, stats: {}, sessions } });
+}
+
+// Whichever way the window grew, the panel must not end up on top of the
+// character — the entire reason the pet and the panel are separated at all.
+test("a full panel never covers the pet, opening upward", withPet(async (w, d) => {
+  stubBackend(w, { OpenOverlay: () => "above" });
+  w.apply(crowdedView());
   w.togglePanel("status");
+  await tick();
 
   const panel = d.getElementById("panel").getBoundingClientRect();
   const pet = d.getElementById("pet").getBoundingClientRect();
   assert(panel.height > 0, "precondition: the panel should be open");
   assert(panel.bottom <= pet.top,
     `the panel covers the pet: panel ends at ${Math.round(panel.bottom)}, pet starts at ${Math.round(pet.top)}`);
-}));
+}, GROWN_H));
+
+test("a full panel never covers the pet, opening downward", withPet(async (w, d) => {
+  stubBackend(w, { OpenOverlay: () => "below" });
+  w.apply(crowdedView());
+  w.togglePanel("status");
+  await tick();
+
+  assert(d.body.classList.contains("overlay-below"), "the frontend should flip when told to");
+  const panel = d.getElementById("panel").getBoundingClientRect();
+  const pet = d.getElementById("pet").getBoundingClientRect();
+  assert(panel.height > 0, "precondition: the panel should be open");
+  assert(panel.top >= pet.bottom,
+    `the panel covers the pet: panel starts at ${Math.round(panel.top)}, pet ends at ${Math.round(pet.bottom)}`);
+}, GROWN_H));
 
 test("the menu also stays clear of the pet", withPet(async (w, d) => {
+  stubBackend(w, { OpenOverlay: () => "above" });
   w.apply(view());
   w.openMenu();
+  await tick();
   const menu = d.getElementById("menu").getBoundingClientRect();
   const pet = d.getElementById("pet").getBoundingClientRect();
   assert(menu.bottom <= pet.top,
     `the menu covers the pet: menu ends at ${Math.round(menu.bottom)}, pet starts at ${Math.round(pet.top)}`);
-}));
+}, GROWN_H));
+
+// The pet must not jump when a panel opens. Growing downward leaves the
+// window's top edge alone, so the character has to be measured from the top
+// instead of the bottom to stay put.
+test("flipping the overlay does not move the pet", withPet(async (w, d, frame) => {
+  // The frame has to grow the way the real window does, or this proves
+  // nothing: with a fixed-height frame the pet cannot move whether the flip
+  // works or not, and the test passes for the wrong reason. Growing downward
+  // keeps the window's top edge and extends the bottom, which is exactly what
+  // changing the frame's height does.
+  stubBackend(w, {
+    OpenOverlay: (h) => {
+      frame.style.height = (WINDOW_H + h) + "px";
+      return "below";
+    },
+  });
+  w.apply(view());
+  const before = d.getElementById("pet").getBoundingClientRect().top;
+  w.togglePanel("status");
+  await tick();
+  const after = d.getElementById("pet").getBoundingClientRect().top;
+  assert(Math.abs(after - before) < 1,
+    `the pet moved ${Math.round(after - before)}px when the panel opened`);
+}, WINDOW_H));
+
+test("opening an overlay asks the window for exactly the room it needs", withPet(async (w, d) => {
+  const calls = stubBackend(w, { OpenOverlay: () => "above" });
+  w.apply(crowdedView());
+  w.togglePanel("status");
+  await tick();
+
+  const asked = called(calls, "OpenOverlay");
+  assert(asked.length === 1, `want one request for room, got ${asked.length}`);
+  const wanted = asked[0].args[0];
+  const panel = d.getElementById("panel").getBoundingClientRect();
+  assert(wanted >= panel.height,
+    `asked for ${wanted} but the panel is ${Math.round(panel.height)} tall`);
+  assert(wanted <= panel.height + 24,
+    `asked for ${wanted} for a ${Math.round(panel.height)} panel — the surplus is dead space`);
+}, GROWN_H));
+
+test("closing an overlay gives the room back", withPet(async (w, d) => {
+  const calls = stubBackend(w, { OpenOverlay: () => "above" });
+  w.apply(view());
+  w.togglePanel("status");
+  await tick();
+  w.togglePanel("status");
+  await tick();
+  assert(called(calls, "CloseOverlay").length === 1,
+    "the window must shrink again, or the dead space comes straight back");
+  assert(!d.body.classList.contains("overlay-below"), "the flip should be cleared on close");
+}, GROWN_H));
+
+// An open panel is rebuilt on every state change. Asking the window to resize
+// each time would thrash it several times a second under a busy agent.
+test("a rebuild that does not change height does not resize the window", withPet(async (w, d) => {
+  const calls = stubBackend(w, { OpenOverlay: () => "above" });
+  w.apply(crowdedView());
+  w.togglePanel("status");
+  await tick();
+  const first = called(calls, "OpenOverlay").length;
+
+  for (let i = 0; i < 5; i++) {
+    w.apply(crowdedView());
+    await tick();
+  }
+  eq(called(calls, "OpenOverlay").length, first,
+    "the window was resized again for a panel that did not change size");
+}, GROWN_H));
 
 /* --- menu ---------------------------------------------------------------- */
 

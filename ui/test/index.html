@@ -32,9 +32,23 @@
 <div id="summary" class="running">running…</div>
 <ul id="results"></ul>
 
-<script src="ui_test.js"></script>
 <script>
-(async () => {
+// Load the suite with a cache-buster. A plain <script src> is served from
+// cache, and a stale suite reports a confident green against tests that are no
+// longer the ones on disk — which it did, until this existed. The frames the
+// tests open are cache-busted for the same reason.
+(() => {
+  const s = document.createElement("script");
+  s.src = "ui_test.js?cachebust=" + Date.now();
+  s.onload = () => window.__start();
+  s.onerror = () => {
+    document.getElementById("summary").className = "bad";
+    document.getElementById("summary").textContent = "could not load ui_test.js";
+  };
+  document.head.appendChild(s);
+})();
+
+window.__start = async () => {
   const list = document.getElementById("results");
   const summary = document.getElementById("summary");
 
@@ -61,7 +75,7 @@
   document.title = out.fail === 0
     ? `PASS ${out.pass}/${out.total}`
     : `FAIL ${out.fail}/${out.total}`;
-})();
+};
 </script>
 </body>
 </html>

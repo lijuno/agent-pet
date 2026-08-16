@@ -80,9 +80,15 @@
   /* --- panels and menu ----------------------------------------------- */
 
   /*
-    Overlays are anchored to the TOP of the window and the pet lives at the
-    bottom, so opening the status panel never hides the character — which is
-    the whole point of having one. The window is sized to fit both.
+    Overlays never cover the character — which is the whole point of having
+    one. Normally the pet sits at the bottom of the window and the overlay is
+    anchored to the top, above it.
+
+    The window is only as tall as the pet until an overlay opens, because a
+    window taller than the character is dead space the user cannot drag off
+    the top of the screen. The backend grows the window to make room and says
+    which side it found the room on; `overlay-below` is that answer, and flips
+    the pair so the pet is anchored to the top and the overlay sits under it.
   */
   .panel, #menu {
     position: absolute; left: 50%; transform: translateX(-50%);
@@ -123,6 +129,20 @@
   .mi .check { color: #8fd0ff; width: 10px; text-align: right; }
   .msep { height: 1px; margin: 5px 8px; background: rgba(255,255,255,.09); }
   .mtitle { padding: 4px 10px 6px; color: #77777f; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; }
+
+  /*
+    Grown downward: the window's top edge did not move, so the pet has to be
+    measured from the top to stay where it was. BUBBLE_ROOM here is the same
+    gap WindowSize reserves in app.go — the two have to agree or the character
+    jumps the moment a panel opens.
+  */
+  body.overlay-below #stage {
+    justify-content: flex-start;
+    padding-bottom: 0; padding-top: 56px;
+  }
+  body.overlay-below .panel, body.overlay-below #menu {
+    top: auto; bottom: 6px;
+  }
 
   .hidden { display: none !important; }
 
@@ -273,13 +293,49 @@ function overlayOpen() {
 }
 
 function closeOverlays() {
+  const wasOpen = overlayOpen();
   el.panel.classList.add("hidden");
   el.menu.classList.add("hidden");
+  if (wasOpen) {
+    reserved = 0;
+    document.body.classList.remove("overlay-below");
+    call("CloseOverlay");
+  }
+}
+
+// reserved is how much room the window is currently grown by, so a rebuild
+// that did not change the overlay's height costs nothing.
+let reserved = 0;
+
+// reveal shows an overlay that has already been built, after asking the
+// backend to make room for it.
+//
+// The height is measured rather than assumed: a fixed worst-case would grow
+// the window further than a short menu needs, and the surplus is dead space
+// sitting over the desktop. On the first open the node is laid out invisibly
+// to measure it — `visibility`, not `hidden`, because a display:none element
+// has no height to measure.
+//
+// An open panel is rebuilt on every state change, so this is also the refit
+// path: if the height has not meaningfully moved it returns without touching
+// the window, which keeps a busy agent from resizing it several times a second.
+async function reveal(node) {
+  const first = node.classList.contains("hidden");
+  node.classList.remove("hidden");
+  if (first) node.style.visibility = "hidden";
+  // A little more than the overlay itself, for the gap between it and the pet.
+  const needed = Math.ceil(node.getBoundingClientRect().height) + 14;
+  if (Math.abs(needed - reserved) > 8) {
+    reserved = needed;
+    const side = await call("OpenOverlay", needed);
+    document.body.classList.toggle("overlay-below", side === "below");
+  }
+  node.style.visibility = "";
 }
 
 function togglePanel(kind) {
   if (!el.panel.classList.contains("hidden") && el.panel.dataset.kind === kind) {
-    el.panel.classList.add("hidden");
+    closeOverlays();
     return;
   }
   el.menu.classList.add("hidden");
@@ -289,7 +345,7 @@ function togglePanel(kind) {
   if (kind === "status") buildStatus(el.panel);
   else if (kind === "stats") buildStats(el.panel);
   else if (kind === "pets") buildPets(el.panel);
-  el.panel.classList.remove("hidden");
+  reveal(el.panel);
 }
 
 function buildStatus(p) {
@@ -478,7 +534,7 @@ function openMenu() {
     separator(),
     item("Quit", () => call("Quit")),
   );
-  el.menu.classList.remove("hidden");
+  reveal(el.menu);
 }
 
 /* --- interaction --------------------------------------------------------- */
@@ -528,6 +584,8 @@ function apply(v) {
     el.panel.replaceChildren();
     if (kind === "status") buildStatus(el.panel);
     else if (kind === "stats") buildStats(el.panel);
+    // A session appearing makes the panel taller; refit the window to it.
+    reveal(el.panel);
   }
 }
 
