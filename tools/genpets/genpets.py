@@ -71,8 +71,10 @@ class Species:
 
 
 MOMO = Species(
+    # The id stays `momo`: it is what config.yaml files in the wild already
+    # name, and a display name is not worth breaking them over.
     pid="momo",
-    name="Momo",
+    name="SanMao",
     description="A tortoiseshell tabby with a white bib and white paws.",
     palette=Palette(
         # A ginger base with dark tortie patches over it, white underneath.

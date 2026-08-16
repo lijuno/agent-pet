@@ -130,7 +130,7 @@ func Default() Config {
 			"git":    {Enabled: false},
 		},
 		Personality: Personality{
-			Name: "Momo", Preset: "gentle",
+			Name: "SanMao", Preset: "gentle",
 			Energy: 65, Curiosity: 80, Snark: 10, Patience: 90,
 		},
 		Thresholds: Thresholds{

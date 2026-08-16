@@ -108,7 +108,7 @@ behavior:
   dialogue: true        # speech bubbles
 
 personality:
-  name: Momo
+  name: SanMao
   personality: gentle   # gentle cheerful calm mischievous sarcastic energetic
 
 thresholds:
@@ -153,7 +153,7 @@ Three built-in packs ship in the binary:
 
 | id | | |
 |---|---|---|
-| `momo` | a tortoiseshell tabby | white bib, white socks, green eyes — the default |
+| `momo` | SanMao, a tortoiseshell tabby | white bib, white socks, green eyes — the default |
 | `byte` | a terminal robot | screen face, blinking antenna |
 | `pip` | a slime | very squishy |
 
