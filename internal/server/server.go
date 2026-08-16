@@ -440,9 +440,11 @@ func (s *Server) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 			d.MissingAnimations = append(d.MissingAnimations, string(m))
 		}
 	}
-	// Milestone 1 ships no adapters, so the honest answer is "not installed"
-	// rather than a green tick for something that cannot work yet (§29:
-	// never fake states that cannot be observed).
+	// The engine knows nothing about Claude Code or Codex, so it can only
+	// report what it has actually received. Whether an adapter is installed is
+	// a question about somebody else's configuration file, which petctl answers
+	// in `doctor` — this package does not go looking in ~/.claude (§29: never
+	// claim a state that cannot be observed from here).
 	for name, tog := range cfg.Integrations {
 		switch {
 		case !tog.Enabled:
@@ -450,7 +452,7 @@ func (s *Server) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 		case sourceSeen(snap, name):
 			d.Integrations[name] = "events received"
 		default:
-			d.Integrations[name] = "enabled, no events yet (adapter not installed in Milestone 1)"
+			d.Integrations[name] = "enabled, no events yet"
 		}
 	}
 	writeJSON(w, http.StatusOK, d)

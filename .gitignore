@@ -2,6 +2,12 @@ bin/
 build/bin/
 node_modules/
 
+# Written by `petctl install claude`. It holds an absolute path to the petctl
+# binary on this machine, which is meaningless in anyone else's clone — each
+# developer runs the install themselves.
+.claude/settings.json
+.claude/settings.json.bak
+
 # Wails writes generated JS bindings here.
 ui/wailsjs/
 

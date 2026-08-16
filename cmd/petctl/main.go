@@ -15,6 +15,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/lijunix/agent-digital-pet/adapters/claude"
 )
 
 var version = "dev"
@@ -54,6 +56,8 @@ func main() {
 		err = cmdWatch(c)
 	case "install", "uninstall":
 		err = cmdInstall(args)
+	case "hook":
+		err = cmdHook(c, args[1:])
 	case "version", "--version", "-v":
 		fmt.Println("petctl", version)
 	case "help", "--help", "-h":
@@ -94,6 +98,8 @@ Usage:
   petctl pets
   petctl pet <id>
   petctl watch
+  petctl install claude [--project|--global]
+  petctl uninstall claude [--project|--global]
   petctl version
 
 Options:
@@ -108,7 +114,12 @@ Events:
   task_completed task_failed tests_started tests_passed tests_failed
   git_commit error heartbeat
 
+Adapters:
+  install writes hooks into .claude/settings.json (--global for ~/.claude).
+  "petctl hook claude" is what those hooks run; it is not meant to be typed.
+
 Examples:
+  petctl install claude
   petctl event claude permission_requested
   petctl event codex task_completed --session abc123
   petctl event claude tool_started --meta tool=bash
@@ -391,9 +402,50 @@ func cmdDoctor(c *client) error {
 		}
 		fmt.Printf("    %s %-8s %s\n", mark, n, status)
 	}
+	reportAdapters()
+
 	fmt.Println()
 	fmt.Printf("  Current state: %s   sessions: %d   events this run: %d\n", d.State, d.Sessions, d.EventsSeen)
 	return nil
+}
+
+// reportAdapters answers "are the hooks actually installed?", which petd cannot
+// know: it is a fact about ~/.claude and .claude, not about the engine.
+func reportAdapters() {
+	fmt.Println()
+	fmt.Println("  Claude Code hooks")
+	for _, scope := range []struct {
+		label  string
+		global bool
+	}{{"project", false}, {"global", true}} {
+		path, err := settingsPath(scope.global)
+		if err != nil {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if os.IsNotExist(err) {
+			fmt.Printf("    · %-8s not installed (%s)\n", scope.label, path)
+			continue
+		}
+		if err != nil {
+			fmt.Printf("    %s %-8s cannot read %s: %v\n", cross, scope.label, path, err)
+			continue
+		}
+		n, err := claude.Installed(data)
+		switch {
+		case err != nil:
+			fmt.Printf("    %s %-8s %s is not valid JSON\n", cross, scope.label, path)
+		case n == 0:
+			fmt.Printf("    · %-8s not installed (%s)\n", scope.label, path)
+		case n == len(claude.Hooks):
+			fmt.Printf("    %s %-8s %d hooks installed\n", tick, scope.label, n)
+		default:
+			// A partial install is the interesting failure: a hand-edited file
+			// leaves the pet blind to whichever events went missing.
+			fmt.Printf("    %s %-8s only %d of %d hooks installed — run `petctl install claude` again\n",
+				warn, scope.label, n, len(claude.Hooks))
+		}
+	}
 }
 
 const (
@@ -474,15 +526,4 @@ func cmdWatch(c *client) error {
 		fmt.Printf("%s  %-10s %s%s\n", time.Now().Format("15:04:05"), s.Snapshot.State, reason, say)
 	}
 	return sc.Err()
-}
-
-// cmdInstall is an honest placeholder. §29 warns against faking capabilities
-// that do not exist; adapters arrive in Milestones 2 and 3.
-func cmdInstall(args []string) error {
-	target := "an agent"
-	if len(args) > 1 {
-		target = args[1]
-	}
-	return fmt.Errorf("`petctl %s %s` is not available yet — adapters land in Milestone 2 (Claude Code) and Milestone 3 (Codex).\n"+
-		"        Until then you can drive the pet manually:  petctl event claude working", args[0], target)
 }

@@ -8,11 +8,57 @@ Adapters do not import `internal/` and do not link against the engine. If
 `petctl` can drive the pet, so can a shell script — which is exactly how the
 Claude Code adapter will work, since hooks are shell commands.
 
+## Built
+
+### `claude/` — Milestone 2
+
+```bash
+petctl install claude              # .claude/settings.json in the current project
+petctl install claude --global     # ~/.claude/settings.json, every project
+petctl uninstall claude
+```
+
+Install patches `settings.json` in place: it preserves every other setting and
+every hook the user wrote, keeps a `.bak` of what it replaced, writes
+atomically, and refuses outright to touch a file it could not parse. Removal
+prunes the groups it added and leaves a file identical to the one it started
+from. It is idempotent, and re-running it after moving the binary repoints the
+hooks rather than adding a second set. `petctl doctor` reports how many of the
+hooks are present in each scope, so a hand-edited half-install looks wrong.
+
+The hooks run `petctl hook claude`, which reads the payload on stdin and POSTs
+one event. It exits 0 no matter what happens — bad JSON, no petd, a hook this
+build has never heard of — and writes nothing to stdout, because a non-zero
+exit or a stray `{` would interfere with the agent it is attached to.
+
+| Hook | Event |
+|---|---|
+| `SessionStart` | `session_started` |
+| `UserPromptSubmit` | `thinking_started` |
+| `PreToolUse` | `tool_started`, with `metadata.tool` |
+| `PostToolUse` | `tool_finished` |
+| `PostToolUseFailure` | `tool_failed` |
+| `PermissionRequest` | `permission_requested` |
+| `Notification` | `user_input_requested` |
+| `Stop` | `task_completed` |
+| `StopFailure` | `error` |
+| `SessionEnd` | `session_ended` |
+
+Every row is something Claude Code reports outright. Nothing is inferred: in
+particular `PostToolUse` fires only on success and failures arrive as their own
+`PostToolUseFailure`, so the pet never has to guess how a tool call went. The
+tool *name* is the only payload that travels — never a command line, a prompt,
+a path or a diff (§26).
+
+There is deliberately no test detection. Claude Code reports no test result, and
+pattern-matching command lines to guess at one is exactly the cry-wolf failure
+described below. A failing test run still reaches the pet honestly, as the
+`tool_failed` of the command that ran it.
+
 ## Planned
 
 | Directory | Milestone | Shape |
 |---|---|---|
-| `claude/` | 2 | A hook payload → event translator, plus a `settings.json` patcher for `petctl install claude`. Must inspect the existing configuration, preserve existing hooks, add only its own, and support clean removal (§28). |
 | `codex/` | 3 | Codex exposes fewer lifecycle events. The adapter infers state conservatively and reports what it genuinely cannot observe rather than faking it (§29). |
 | `git/` | secondary | A `post-commit` hook emitting `git_commit`. |
 

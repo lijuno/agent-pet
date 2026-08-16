@@ -4,12 +4,11 @@ A small desktop companion that reacts to what your coding agent is doing.
 Claude Code starts, the pet wakes up. A tool runs, it gets to work. A permission
 prompt appears, it turns and asks for you. Tests pass, it celebrates.
 
-**This repository currently contains Milestone 1** — the pet engine, the local
-event API, `petctl`, the desktop window and three built-in pixel-art characters.
-The Claude Code and Codex adapters are Milestones 2 and 3; see
+**This repository contains Milestones 1 and 2** — the pet engine, the local
+event API, `petctl`, the desktop window, three built-in pixel-art characters,
+and the Claude Code adapter. The Codex adapter is Milestone 3;
 [`docs/adr/0006-milestone-1-boundaries.md`](docs/adr/0006-milestone-1-boundaries.md)
-for exactly what is and is not built, and which seam each deferred piece
-attaches to.
+records which seam each deferred piece attaches to.
 
 ```
    agent events  ──▶  local state machine  ──▶  expressive character
@@ -46,9 +45,23 @@ A release build:
 make build           # produces build/bin/digital-pet.app
 ```
 
+## Connecting Claude Code
+
+```bash
+petctl install claude       # this project;  --global for every project
+```
+
+Then start a **new** Claude Code session — hooks are read at startup, so the
+session you are in now will not pick them up. `petctl watch` shows the events
+arriving. `petctl doctor` says whether the hooks are installed, and
+`petctl uninstall claude` removes them again.
+
+See [`adapters/README.md`](adapters/README.md) for the hook-to-event table and
+what the adapter deliberately does not try to detect.
+
 ## Trying every state
 
-There are no agent adapters yet, so this is how you see the whole character:
+To see the whole character without waiting for an agent to do something:
 
 ```bash
 for s in idle thinking working attention confused worried happy celebrate sleeping tired heart; do
@@ -178,7 +191,8 @@ internal/petassets/    pet pack loading
 internal/bubble/       template speech
 internal/config/       config.yaml
 cmd/petctl/            the CLI (no shared code with the engine)
-adapters/              Claude Code, Codex and git adapters — Milestones 2-3
+adapters/claude/       the Claude Code hook adapter
+adapters/              Codex and git adapters — Milestone 3 and later
 tools/genpets/         the sprite generator
 ui/dist/               the frontend, embedded in the binary
 docs/adr/              architectural decisions

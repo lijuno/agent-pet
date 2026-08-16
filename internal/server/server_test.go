@@ -214,7 +214,8 @@ func TestDiagnosticsReportsHonestIntegrationStatus(t *testing.T) {
 	if len(d.MissingAnimations) == 0 {
 		t.Fatal("a pack with one animation should report the missing ones")
 	}
-	// Milestone 1 has no adapters; claiming otherwise would violate §29.
+	// Having received nothing, the only honest answer is that nothing has
+	// arrived — never a green tick inferred from an adapter being installed (§29).
 	if got := d.Integrations["claude"]; !strings.Contains(got, "no events yet") {
 		t.Fatalf("claude integration status should be honest, got %q", got)
 	}
