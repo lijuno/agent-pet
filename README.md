@@ -153,7 +153,7 @@ Three built-in packs ship in the binary:
 
 | id | | |
 |---|---|---|
-| `momo` | a round cat | the default |
+| `momo` | a tortoiseshell tabby | white bib, white socks, green eyes — the default |
 | `byte` | a terminal robot | screen face, blinking antenna |
 | `pip` | a slime | very squishy |
 

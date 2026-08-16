@@ -17,7 +17,7 @@ import json
 import os
 from dataclasses import dataclass, field
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw
 
 W = H = 40
 OUT_ROOT = os.path.join("ui", "dist", "pets")
@@ -49,6 +49,10 @@ class Palette:
     accent: tuple
     eye: tuple = (40, 32, 42, 255)
     blush: tuple = (242, 152, 152, 150)
+    # Only a patched coat needs these; the robot and the slime leave them unset.
+    patch: tuple = None
+    white: tuple = (252, 250, 246, 255)
+    nose: tuple = None
 
 
 @dataclass
@@ -62,21 +66,28 @@ class Species:
     tail: bool = True
     body_w: int = 24
     body_h: int = 22
+    markings: str = "none"  # none | tortie
     extras: dict = field(default_factory=dict)
 
 
 MOMO = Species(
     pid="momo",
     name="Momo",
-    description="A small round cat. The default companion.",
+    description="A tortoiseshell tabby with a white bib and white paws.",
     palette=Palette(
-        body=(242, 179, 107, 255),
-        body_dark=(212, 143, 72, 255),
-        belly=(255, 235, 210, 255),
-        line=(58, 42, 32, 255),
-        accent=(234, 138, 148, 255),
+        # A ginger base with dark tortie patches over it, white underneath.
+        body=(224, 158, 99, 255),
+        body_dark=(188, 122, 68, 255),
+        belly=(252, 250, 246, 255),
+        line=(52, 38, 30, 255),
+        accent=(232, 158, 156, 255),   # the pink inside an ear
+        eye=(126, 156, 84, 255),       # green, going gold at the centre
+        patch=(86, 62, 48, 255),
+        white=(252, 250, 246, 255),
+        nose=(214, 146, 138, 255),
     ),
     ears="cat", face="muzzle", tail=True, body_w=24, body_h=22,
+    markings="tortie",
 )
 
 BYTE = Species(
@@ -280,6 +291,10 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0)):
 
 def mouth(d, mx, my, kind, pal, muzzle_style="cat"):
     c = pal.line
+    # A pink nose, on a cat that has one. Drawn under the mouth so the mouth
+    # line still reads as the boundary of the muzzle.
+    if pal.nose and muzzle_style == "cat" and kind in ("cat", "flat", "smile", "wobble"):
+        rect(d, mx - 1, my - 1, mx + 1, my, pal.nose)
     if kind == "smile":
         d.line([(mx - 2, my), (mx, my + 2)], fill=c)
         d.line([(mx, my + 2), (mx + 2, my)], fill=c)
@@ -318,6 +333,68 @@ def blush(d, s, cx, ey, pal):
         return
     d.ellipse([cx - 10, ey + 3, cx - 7, ey + 5], fill=pal.blush)
     d.ellipse([cx + 7, ey + 3, cx + 10, ey + 5], fill=pal.blush)
+
+
+def markings(img, s, top, bw, bh, cy, pal):
+    """A tortoiseshell tabby's coat: a dark cap with brow stripes, tabby bars
+    down one flank, and a white bib.
+
+    Every mark is drawn freely and then clipped to the body ellipse, so nothing
+    can spill past the silhouette however the squash-and-stretch deforms it.
+    Drawing them inside the ellipse arithmetic instead would mean redoing that
+    arithmetic in four places and getting it wrong in one.
+
+    The asymmetry is deliberate. A tortie's patches are never mirrored, and a
+    symmetrical coat reads as a pattern rather than as an animal.
+    """
+    if s.markings != "tortie":
+        return
+
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    o = ImageDraw.Draw(overlay)
+    x0, x1 = CX - bw // 2, CX + bw // 2
+    eye_y = cy - 4
+
+    # The dark cap over the top of the head.
+    o.ellipse([x0 - 3, top - 5, x1 + 3, top + 6], fill=pal.patch)
+
+    # Tabby brow stripes running down out of the cap. They stop short of the
+    # eyes: a stripe crossing an eye costs the expression, and the expression
+    # is the whole point of the character.
+    for dx, extra in ((-6, 0), (-2, 2), (2, 2), (6, 0)):
+        o.line([(CX + dx, top + 3), (CX + dx, top + 6 + extra)], fill=pal.patch)
+
+    # One patch down the left flank, below eye level, with bars over it.
+    o.ellipse([x0 - 5, eye_y + 2, x0 + 7, top + bh + 2], fill=pal.patch)
+    for k in range(3):
+        y = eye_y + 4 + k * 3
+        o.line([(x1 - 6, y), (x1 + 2, y)], fill=pal.patch)
+
+    # The white bib. Narrower than the muzzle above it, so the two read as
+    # chin-then-chest rather than merging into one white disc — which is what
+    # a bib as wide as the body does, and it swallows the ginger cheeks.
+    o.polygon([(CX - 4, top + bh - 4), (CX + 4, top + bh - 4),
+               (CX + 6, top + bh + 4), (CX - 6, top + bh + 4)], fill=pal.white)
+
+    # Clip to the body, inset by one pixel so the outline stays unbroken.
+    mask = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mask).ellipse([x0 + 1, top + 1, x1 - 1, top + bh - 1], fill=255)
+    overlay.putalpha(ImageChops.multiply(overlay.getchannel("A"), mask))
+    img.alpha_composite(overlay)
+
+
+def whiskers(d, cx, my, pal):
+    """Two short strokes a side, starting at the edge of the muzzle.
+
+    They have to stay inside the silhouette and stay short. Full-length
+    whiskers at 40px are wider than the cat, and they read as bars laid across
+    the face rather than as whiskers — they also wipe out the tabby bars and
+    the ginger cheeks they cross.
+    """
+    for sx in (-1, 1):
+        for k, dy in enumerate((0, 2)):
+            x = cx + sx * 7
+            d.line([(x, my + dy), (x + sx * 4, my + dy - 1 + k)], fill=pal.white)
 
 
 BOB = {
@@ -396,6 +473,10 @@ def draw_pet(s, state, i, n):
 
     # --- body
     d.ellipse([CX - bw // 2, top, CX + bw // 2, top + bh], fill=pal.body, outline=pal.line)
+    markings(img, s, top, bw, bh, cy, pal)
+
+    # White socks, on a cat that has them.
+    paw = pal.white if s.markings == "tortie" else pal.body
 
     # --- limbs that must sit on top of the body
     if state == "celebrate":
@@ -403,7 +484,7 @@ def draw_pet(s, state, i, n):
             ax = CX + sx * (bw // 2 - 1)
             d.line([(ax, cy + 1), (ax + sx * 4, cy - 6)], fill=pal.body_dark, width=3)
             d.ellipse([ax + sx * 4 - 2, cy - 9, ax + sx * 4 + 2, cy - 5],
-                      fill=pal.body, outline=pal.line)
+                      fill=paw, outline=pal.line)
     elif state == "working":
         # A tiny keyboard with two paws tapping out of phase.
         ky = cy + bh // 2 - 1
@@ -413,7 +494,7 @@ def draw_pet(s, state, i, n):
             ax = CX + sx * 6
             oy = 0 if (i + k) % 2 else 2
             d.ellipse([ax - 3, ky - 3 + oy, ax + 2, ky + 2 + oy],
-                      fill=pal.body, outline=pal.line)
+                      fill=paw, outline=pal.line)
 
     face_cx = CX
     ey = cy - 4
@@ -438,6 +519,10 @@ def draw_pet(s, state, i, n):
 
     blink = i == 2 and state in ("idle", "thinking")
     mstyle = "cat" if s.face == "muzzle" else "round"
+
+    # Whiskers sit under the expression, so a brow or a wide eye still wins.
+    if s.markings == "tortie" and state != "sleeping":
+        whiskers(d, face_cx, my, pal)
 
     if state == "idle":
         eyes(d, face_cx, ey, "closed" if blink else "dot", pal)
