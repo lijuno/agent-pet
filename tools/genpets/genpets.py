@@ -47,7 +47,11 @@ class Palette:
     belly: tuple
     line: tuple
     accent: tuple
+    # `eye` is the dark of the eye: the pupil, and every lid, lash and brow the
+    # expression grammar draws. `iris` is the colour around that pupil, and
+    # only an open round eye has one.
     eye: tuple = (40, 32, 42, 255)
+    iris: tuple = None
     blush: tuple = (242, 152, 152, 150)
     # Only a patched coat needs these; the robot and the slime leave them unset.
     patch: tuple = None
@@ -83,7 +87,8 @@ MOMO = Species(
         belly=(252, 250, 246, 255),
         line=(52, 38, 30, 255),
         accent=(232, 158, 156, 255),   # the pink inside an ear
-        eye=(126, 156, 84, 255),       # green, going gold at the centre
+        eye=(48, 38, 32, 255),         # pupil, lids and lashes
+        iris=(178, 166, 96, 255),      # hazel: gold in one light, green in another
         patch=(86, 62, 48, 255),
         white=(252, 250, 246, 255),
         nose=(214, 146, 138, 255),
@@ -238,18 +243,35 @@ def steam(d, x, y, c, phase):
 # --------------------------------------------------------------------------
 
 def eyes(d, ex, ey, kind, pal, look=(0, 0)):
-    lx, rx = ex - 6, ex + 3
+    # An eye is three pixels wide, so the right one starts at +4 to sit the same
+    # distance from centre as the left at -6. At +3 both eyes were shifted one
+    # pixel left of the face, which is small enough to look like nothing in
+    # particular and wrong enough to notice.
+    lx, rx = ex - 6, ex + 4
     ox, oy = look
     c = pal.eye
     white = (255, 255, 255, 255)
 
     if kind == "dot":
         for x in (lx, rx):
-            rect(d, x + ox, ey + oy, x + 2 + ox, ey + 2 + oy, c)
-            px(d, x + ox, ey + oy, (255, 255, 255, 170))
+            if pal.iris:
+                # A cat's eye is an iris with a slit pupil, not a solid disc,
+                # and a dark rim above it — the eyeliner every tabby wears.
+                #
+                # No catchlight: the eye is three pixels wide, so a highlight
+                # costs a whole column of iris and the eye reads
+                # white-pupil-iris, lopsided. Symmetry matters more than shine
+                # at this size.
+                d.line([(x - 1, ey - 1), (x + 3, ey - 1)], fill=pal.line)
+                rect(d, x + ox, ey + oy, x + 2 + ox, ey + 2 + oy, pal.iris)
+                rect(d, x + 1 + ox, ey + oy, x + 1 + ox, ey + 2 + oy, c)
+            else:
+                rect(d, x + ox, ey + oy, x + 2 + ox, ey + 2 + oy, c)
+                px(d, x + ox, ey + oy, (255, 255, 255, 170))
     elif kind == "wide":
         for x in (lx - 1, rx - 1):
-            d.ellipse([x, ey - 2, x + 4, ey + 3], fill=white, outline=pal.line)
+            # Startled: the pupil dilates and swallows the iris.
+            d.ellipse([x, ey - 2, x + 4, ey + 3], fill=pal.iris or white, outline=pal.line)
             rect(d, x + 1 + ox, ey + oy, x + 2 + ox, ey + 1 + oy, c)
     elif kind == "happy":
         for x in (lx - 1, rx - 1):
@@ -271,7 +293,7 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0)):
             d.line([(x, ey - 2), (x + 4, ey - 2)], fill=pal.line)
             rect(d, x + 1, ey, x + 3, ey + 1, c)
     elif kind == "confused":
-        d.ellipse([lx - 1, ey - 2, lx + 3, ey + 3], fill=white, outline=pal.line)
+        d.ellipse([lx - 1, ey - 2, lx + 3, ey + 3], fill=pal.iris or white, outline=pal.line)
         rect(d, lx, ey, lx + 1, ey + 1, c)
         d.line([(rx - 1, ey + 1), (rx + 3, ey + 1)], fill=c)
     elif kind == "worried":
