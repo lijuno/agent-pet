@@ -1,0 +1,601 @@
+/*
+ * UI tests for ui/dist/index.html.
+ *
+ * They run the real shipped file — loaded into an iframe, one fresh copy per
+ * test — rather than a copy of its markup. A harness that restates the DOM is
+ * a harness that drifts from the thing it is testing.
+ *
+ * No build step, no dependencies, no test runner to install: open
+ * ui/test/index.html over http and the results are on the page. The UI is a
+ * single static file and its tests should cost the same to run.
+ *
+ * The pet's script is a classic script, so its top-level `function`
+ * declarations are properties of the iframe's window and its top-level
+ * `const`/`let` live in the shared global lexical scope, reachable with
+ * w.eval(). That is the whole seam these tests need: no source changes, no
+ * exports, no module wrapper.
+ */
+"use strict";
+
+const tests = [];
+function test(name, fn) { tests.push({ name, fn }); }
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg || "assertion failed");
+}
+function eq(got, want, msg) {
+  if (got !== want) {
+    throw new Error((msg ? msg + ": " : "") + `expected ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
+  }
+}
+
+/* --- fixtures ------------------------------------------------------------ */
+
+// A realistic AnimationView (app.go) — 40x40 strips are what every built-in
+// pack ships.
+function anim(over) {
+  return Object.assign({
+    resolved: "working",
+    url: "/pets/momo/working.png",
+    frames: 4,
+    fps: 8,
+    loop: true,
+    frame_width: 40,
+    frame_height: 40,
+    pixelated: true,
+  }, over || {});
+}
+
+function view(over) {
+  return Object.assign({
+    pet: "momo",
+    pet_name: "Momo",
+    scale: 1,
+    muted: false,
+    on_top: true,
+    animation: anim(),
+    snapshot: {
+      state: "working",
+      since: new Date().toISOString(),
+      forced: false,
+      sessions: [],
+      stats: {},
+    },
+  }, over || {});
+}
+
+function session(over) {
+  return Object.assign({
+    key: { source: "claude", id: "abc" },
+    state: "working",
+    duration_ns: 65e9,
+    idle_ns: 0,
+    last_tool: "Bash",
+  }, over || {});
+}
+
+/* --- harness ------------------------------------------------------------- */
+
+// withPet loads a fresh copy of the real UI and hands the test its window and
+// document. A fresh frame per test keeps leaked state (an open panel, a mute
+// flag, a pending timer) from one test out of the next.
+// Keep in step with wails.Run in main.go.
+const WINDOW_W = 300;
+const WINDOW_H = 368;
+
+let frameSeq = 0;
+
+function withPet(fn) {
+  return async function () {
+    const frame = document.createElement("iframe");
+    // The real window, from wails.Run in main.go. Layout assertions are only
+    // meaningful at the size the pet actually ships at.
+    frame.style.cssText = `width:${WINDOW_W}px;height:${WINDOW_H}px;border:0;position:absolute;left:-9999px;top:0`;
+    // Cache-bust every load. Without this the browser happily serves a cached
+    // index.html to each frame and the whole suite passes against a file that
+    // is no longer on disk — which it did, until this line existed.
+    frame.src = "../dist/index.html?cachebust=" + (++frameSeq) + "_" + Date.now();
+    document.body.appendChild(frame);
+    try {
+      await new Promise((resolve, reject) => {
+        frame.addEventListener("load", resolve, { once: true });
+        frame.addEventListener("error", () => reject(new Error("iframe failed to load")), { once: true });
+        setTimeout(() => reject(new Error("iframe load timed out")), 5000);
+      });
+      const w = frame.contentWindow;
+      const d = frame.contentDocument;
+      // boot() runs on load and awaits two backend calls that resolve to null
+      // without a backend; let its microtasks drain before touching anything.
+      await new Promise((r) => setTimeout(r, 0));
+      await fn(w, d, frame);
+    } finally {
+      frame.remove();
+    }
+  };
+}
+
+// stubBackend installs a fake window.go and records every call. backend() reads
+// window.go at call time, so installing it after load is enough.
+function stubBackend(w, impl) {
+  const calls = [];
+  const app = new Proxy({}, {
+    get(_, name) {
+      if (typeof name !== "string") return undefined;
+      return (...args) => {
+        calls.push({ name, args });
+        const f = impl && impl[name];
+        return Promise.resolve(f ? f(...args) : null);
+      };
+    },
+    has() { return true; },
+  });
+  w.go = { main: { App: app } };
+  return calls;
+}
+
+function called(calls, name) {
+  return calls.filter((c) => c.name === name);
+}
+
+const tick = (ms) => new Promise((r) => setTimeout(r, ms || 0));
+
+/* --- formatting ---------------------------------------------------------- */
+
+test("dur formats seconds, minutes and hours", withPet(async (w) => {
+  eq(w.dur(0), "0s");
+  eq(w.dur(45e9), "45s");
+  eq(w.dur(59e9), "59s");
+  eq(w.dur(60e9), "1m");
+  eq(w.dur(90e9), "1m");
+  eq(w.dur(3600e9), "1h 0m");
+  eq(w.dur(3900e9), "1h 5m");
+}));
+
+test("dur survives missing and negative input", withPet(async (w) => {
+  // Durations arrive from JSON and a nil or clock-skewed value must not render
+  // as "NaNs" in the status panel.
+  eq(w.dur(undefined), "0s");
+  eq(w.dur(null), "0s");
+  eq(w.dur(-5e9), "0s");
+}));
+
+test("describe names the source when exactly one session is running", withPet(async (w) => {
+  eq(w.describe("working", [session()]), "claude is working.");
+  eq(w.describe("thinking", [session()]), "claude is thinking.");
+  eq(w.describe("working", []), "Working.");
+}));
+
+test("describe agrees with a plural subject", withPet(async (w) => {
+  // "12 agents is working." was on screen until this test existed.
+  eq(w.describe("working", [session(), session()]), "2 agents are working.");
+  eq(w.describe("thinking", [session(), session(), session()]), "3 agents are thinking.");
+}));
+
+test("describe covers every state the machine can produce", withPet(async (w) => {
+  // state.All() from internal/state/state.go. A state with no description
+  // falls through to the idle wording, which would be a silent lie.
+  const states = ["sleeping", "idle", "thinking", "working", "attention",
+    "confused", "worried", "happy", "celebrate", "tired", "heart"];
+  for (const s of states) {
+    const got = w.describe(s, []);
+    assert(typeof got === "string" && got.length > 0, `${s} has no description`);
+  }
+  eq(w.describe("attention", []), "Something needs you.");
+  eq(w.describe("celebrate", []), "Tests passed.");
+  eq(w.describe("worried", []), "Several failures in a row.");
+}));
+
+/* --- sprite rendering ---------------------------------------------------- */
+
+test("apply sizes the sprite from the animation and scale", withPet(async (w, d) => {
+  w.apply(view());
+  const s = d.getElementById("sprite");
+  // 40px frame at scale 1 renders at 3x (the UI's base pixel-art zoom).
+  eq(s.style.width, "120px");
+  eq(s.style.height, "120px");
+  // The strip is one row of frames, so the background is frames-wide.
+  eq(s.style.backgroundSize, "480px 120px");
+  assert(s.style.backgroundImage.includes("/pets/momo/working.png"), "wrong sprite url");
+}));
+
+test("scale multiplies the rendered size", withPet(async (w, d) => {
+  w.apply(view({ scale: 2 }));
+  const s = d.getElementById("sprite");
+  eq(s.style.width, "240px");
+  eq(s.style.height, "240px");
+}));
+
+test("animation timing is frames over fps, stepped per frame", withPet(async (w, d) => {
+  w.apply(view({ animation: anim({ frames: 6, fps: 12 }) }));
+  const a = d.getElementById("sprite").style.animation;
+  assert(a.includes("0.5s"), `6 frames at 12fps should last 0.5s, got ${a}`);
+  assert(a.includes("steps(6)"), `should step once per frame, got ${a}`);
+  assert(a.includes("infinite"), `a looping animation should repeat, got ${a}`);
+}));
+
+test("a non-looping animation plays once", withPet(async (w, d) => {
+  w.apply(view({ animation: anim({ loop: false }) }));
+  const a = d.getElementById("sprite").style.animation;
+  assert(!a.includes("infinite"), `should not loop, got ${a}`);
+}));
+
+test("a zero-fps animation does not divide by zero", withPet(async (w, d) => {
+  // fps comes from a pet pack's manifest.json, which anyone can write.
+  w.apply(view({ animation: anim({ fps: 0 }) }));
+  const a = d.getElementById("sprite").style.animation;
+  assert(!a.includes("Infinity") && !a.includes("NaN"), `bad duration: ${a}`);
+}));
+
+test("changing state swaps the sprite", withPet(async (w, d) => {
+  const s = d.getElementById("sprite");
+  w.apply(view());
+  const before = s.style.backgroundImage;
+  w.apply(view({ animation: anim({ resolved: "celebrate", url: "/pets/momo/celebrate.png", frames: 6, fps: 10 }) }));
+  assert(s.style.backgroundImage !== before, "sprite did not change with the state");
+  assert(s.style.backgroundImage.includes("celebrate.png"), "wrong sprite after change");
+}));
+
+test("apply tolerates a view with no animation", withPet(async (w, d) => {
+  // decorate() returns a View with a nil Animation when no pack is loaded.
+  w.apply(view({ animation: null }));
+  eq(d.getElementById("sprite").style.backgroundImage, "");
+}));
+
+test("apply ignores a null update", withPet(async (w) => {
+  w.apply(null);
+  w.apply(undefined);
+}));
+
+/* --- untrusted content (§26) --------------------------------------------- */
+
+const XSS = '<img src=x onerror="window.__pwned=true">';
+
+test("a hostile session name cannot become markup", withPet(async (w, d) => {
+  w.apply(view({
+    snapshot: {
+      state: "working", forced: false, stats: {},
+      sessions: [session({ key: { source: XSS, id: "</span><b>bold</b>" } })],
+    },
+  }));
+  w.togglePanel("status");
+  const panel = d.getElementById("panel");
+  eq(panel.querySelectorAll("img").length, 0, "an agent injected an element");
+  eq(panel.querySelectorAll("b").length, 0, "an agent injected markup");
+  assert(!w.__pwned, "injected script executed");
+  assert(panel.textContent.includes("<img src=x"), "the name should render as literal text");
+}));
+
+test("a hostile tool name cannot become markup", withPet(async (w, d) => {
+  w.apply(view({
+    snapshot: {
+      state: "working", forced: false, stats: {},
+      sessions: [session({ last_tool: XSS })],
+    },
+  }));
+  w.togglePanel("status");
+  eq(d.getElementById("panel").querySelectorAll("img").length, 0, "tool name became an element");
+  assert(!w.__pwned, "injected script executed");
+}));
+
+test("a hostile bubble cannot become markup", withPet(async (w, d) => {
+  w.apply(view({ bubble: { text: XSS, ttl_ns: 5e9 } }));
+  const bubble = d.getElementById("bubble");
+  eq(bubble.querySelectorAll("img").length, 0, "bubble text became an element");
+  assert(!w.__pwned, "injected script executed");
+  eq(bubble.textContent, XSS, "bubble should show the text literally");
+}));
+
+test("a hostile pet name cannot become markup", withPet(async (w, d) => {
+  // A pet pack's manifest.json is a local file, but a downloaded pack is no
+  // more trusted than an agent's metadata.
+  w.apply(view({ pet_name: XSS }));
+  w.togglePanel("status");
+  eq(d.getElementById("panel").querySelectorAll("img").length, 0, "pet name became an element");
+  assert(!w.__pwned, "injected script executed");
+}));
+
+/* --- speech bubble ------------------------------------------------------- */
+
+test("a bubble shows when there is something to say", withPet(async (w, d) => {
+  w.apply(view({ bubble: { text: "Tests passed!", ttl_ns: 5e9 } }));
+  const bubble = d.getElementById("bubble");
+  assert(bubble.classList.contains("show"), "bubble should be visible");
+  eq(bubble.textContent, "Tests passed!");
+}));
+
+test("muting silences the bubble", withPet(async (w, d) => {
+  w.apply(view({ muted: true, bubble: { text: "quiet please", ttl_ns: 5e9 } }));
+  assert(!d.getElementById("bubble").classList.contains("show"), "a muted pet must not speak");
+}));
+
+test("an open panel suppresses the bubble", withPet(async (w, d) => {
+  // A bubble underneath a panel is unreadable and reads as a rendering bug.
+  w.togglePanel("status");
+  w.apply(view({ bubble: { text: "hello", ttl_ns: 5e9 } }));
+  assert(!d.getElementById("bubble").classList.contains("show"), "bubble should stay hidden behind a panel");
+}));
+
+test("opening a panel hides a bubble already on screen", withPet(async (w, d) => {
+  w.apply(view({ bubble: { text: "hello", ttl_ns: 5e9 } }));
+  assert(d.getElementById("bubble").classList.contains("show"), "precondition: bubble visible");
+  w.togglePanel("status");
+  assert(!d.getElementById("bubble").classList.contains("show"), "bubble should be dismissed by the panel");
+}));
+
+/* --- panels -------------------------------------------------------------- */
+
+test("the status panel lists running sessions", withPet(async (w, d) => {
+  w.apply(view({
+    snapshot: {
+      state: "working", forced: false, stats: {},
+      sessions: [
+        session({ key: { source: "claude", id: "one" }, duration_ns: 90e9 }),
+        session({ key: { source: "codex", id: "two" }, state: "thinking" }),
+      ],
+    },
+  }));
+  w.togglePanel("status");
+  const text = d.getElementById("panel").textContent;
+  assert(text.includes("claude/one"), "first session missing");
+  assert(text.includes("codex/two"), "second session missing");
+  assert(text.includes("1m"), "session duration missing");
+  assert(text.includes("thinking"), "session state missing");
+}));
+
+test("the status panel says so when nothing is running", withPet(async (w, d) => {
+  w.apply(view({ snapshot: { state: "sleeping", forced: false, sessions: [], stats: {} } }));
+  w.togglePanel("status");
+  assert(d.getElementById("panel").textContent.includes("Nothing running."), "empty state missing");
+}));
+
+test("the status panel discloses a forced state", withPet(async (w, d) => {
+  // Otherwise `petctl test` looks like the pet is broken.
+  w.apply(view({ snapshot: { state: "celebrate", forced: true, sessions: [], stats: {} } }));
+  w.togglePanel("status");
+  assert(d.getElementById("panel").textContent.includes("forced"), "a forced state should be disclosed");
+}));
+
+test("the statistics panel shows the counters", withPet(async (w, d) => {
+  w.apply(view({
+    snapshot: {
+      state: "idle", forced: false, sessions: [],
+      stats: { events_seen: 42, sessions_started: 3, tasks_completed: 7, tests_passed: 2, tests_failed: 1, commits: 4, errors: 5, interactions: 9 },
+    },
+  }));
+  w.togglePanel("stats");
+  const text = d.getElementById("panel").textContent;
+  for (const n of ["42", "3", "7", "2", "1", "4", "5", "9"]) {
+    assert(text.includes(n), `counter ${n} missing from the statistics panel`);
+  }
+}));
+
+test("statistics render as zero rather than blank when absent", withPet(async (w, d) => {
+  w.apply(view({ snapshot: { state: "idle", forced: false, sessions: [], stats: {} } }));
+  w.togglePanel("stats");
+  assert(d.getElementById("panel").textContent.includes("0"), "missing counters should read 0");
+}));
+
+test("clicking the same panel twice closes it", withPet(async (w, d) => {
+  const panel = d.getElementById("panel");
+  w.apply(view());
+  w.togglePanel("status");
+  assert(!panel.classList.contains("hidden"), "panel should open");
+  w.togglePanel("status");
+  assert(panel.classList.contains("hidden"), "panel should close on a second toggle");
+}));
+
+test("switching panel kinds keeps the panel open", withPet(async (w, d) => {
+  const panel = d.getElementById("panel");
+  w.apply(view());
+  w.togglePanel("status");
+  w.togglePanel("stats");
+  assert(!panel.classList.contains("hidden"), "panel should stay open when switching kinds");
+  eq(panel.dataset.kind, "stats");
+}));
+
+test("an open panel refreshes when state arrives", withPet(async (w, d) => {
+  w.apply(view({ snapshot: { state: "idle", forced: false, sessions: [], stats: {} } }));
+  w.togglePanel("status");
+  assert(d.getElementById("panel").textContent.includes("Nothing running."), "precondition");
+  w.apply(view({ snapshot: { state: "working", forced: false, stats: {}, sessions: [session()] } }));
+  assert(d.getElementById("panel").textContent.includes("claude/abc"), "an open panel should follow the state");
+}));
+
+test("a full panel never covers the pet", withPet(async (w, d) => {
+  // The CSS says so in as many words: overlays are anchored to the top and the
+  // pet lives at the bottom, "which is the whole point of having one". That
+  // only holds while the panel's max-height fits the gap above the character,
+  // so it breaks silently if either the window or the panel is ever resized.
+  const sessions = [];
+  for (let i = 0; i < 20; i++) {
+    sessions.push(session({ key: { source: "claude", id: "session-" + i } }));
+  }
+  w.apply(view({ snapshot: { state: "working", forced: false, stats: {}, sessions } }));
+  w.togglePanel("status");
+
+  const panel = d.getElementById("panel").getBoundingClientRect();
+  const pet = d.getElementById("pet").getBoundingClientRect();
+  assert(panel.height > 0, "precondition: the panel should be open");
+  assert(panel.bottom <= pet.top,
+    `the panel covers the pet: panel ends at ${Math.round(panel.bottom)}, pet starts at ${Math.round(pet.top)}`);
+}));
+
+test("the menu also stays clear of the pet", withPet(async (w, d) => {
+  w.apply(view());
+  w.openMenu();
+  const menu = d.getElementById("menu").getBoundingClientRect();
+  const pet = d.getElementById("pet").getBoundingClientRect();
+  assert(menu.bottom <= pet.top,
+    `the menu covers the pet: menu ends at ${Math.round(menu.bottom)}, pet starts at ${Math.round(pet.top)}`);
+}));
+
+/* --- menu ---------------------------------------------------------------- */
+
+test("the menu offers Sleep while the pet is awake", withPet(async (w, d) => {
+  w.apply(view());
+  w.openMenu();
+  const text = d.getElementById("menu").textContent;
+  assert(text.includes("Sleep"), "Sleep missing");
+  assert(!text.includes("Wake Up"), "should not offer Wake while awake");
+}));
+
+test("the menu offers Wake Up only when forced asleep", withPet(async (w, d) => {
+  // A pet that is merely sleeping from inactivity wakes on the next event; only
+  // a forced sleep needs a manual way out.
+  w.apply(view({ snapshot: { state: "sleeping", forced: true, sessions: [], stats: {} } }));
+  w.openMenu();
+  assert(d.getElementById("menu").textContent.includes("Wake Up"), "Wake Up missing when forced asleep");
+
+  w.apply(view({ snapshot: { state: "sleeping", forced: false, sessions: [], stats: {} } }));
+  w.openMenu();
+  assert(!d.getElementById("menu").textContent.includes("Wake Up"), "an unforced sleep should not offer Wake Up");
+}));
+
+test("the menu checks Always on Top to match the window", withPet(async (w, d) => {
+  w.apply(view({ on_top: true }));
+  w.openMenu();
+  const rows = [...d.getElementById("menu").querySelectorAll(".mi")];
+  const onTop = rows.find((r) => r.textContent.includes("Always on Top"));
+  assert(onTop, "Always on Top missing");
+  assert(onTop.querySelector(".check").textContent === "✓", "should be ticked when the window is on top");
+}));
+
+test("menu actions reach the backend", withPet(async (w, d) => {
+  w.apply(view());
+  const calls = stubBackend(w);
+  w.openMenu();
+  const rows = [...d.getElementById("menu").querySelectorAll(".mi")];
+  const click = (label) => rows.find((r) => r.textContent.includes(label)).dispatchEvent(
+    new w.MouseEvent("click", { bubbles: true }));
+
+  click("Always on Top");
+  await tick();
+  eq(called(calls, "SetAlwaysOnTop").length, 1, "Always on Top should call the backend");
+  eq(called(calls, "SetAlwaysOnTop")[0].args[0], false, "should toggle away from the current value");
+}));
+
+test("Quit asks the backend to quit", withPet(async (w, d) => {
+  w.apply(view());
+  const calls = stubBackend(w);
+  w.openMenu();
+  [...d.getElementById("menu").querySelectorAll(".mi")]
+    .find((r) => r.textContent.includes("Quit"))
+    .dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+  await tick();
+  eq(called(calls, "Quit").length, 1, "Quit should reach the backend");
+}));
+
+test("muting from the menu silences the pet immediately", withPet(async (w, d) => {
+  w.apply(view({ bubble: { text: "hello", ttl_ns: 5e9 } }));
+  const calls = stubBackend(w);
+  w.openMenu();
+  [...d.getElementById("menu").querySelectorAll(".mi")]
+    .find((r) => r.textContent.includes("Mute"))
+    .dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+  await tick();
+  eq(called(calls, "SetMuted").length, 1, "Mute should reach the backend");
+  eq(called(calls, "SetMuted")[0].args[0], true);
+  assert(!d.getElementById("bubble").classList.contains("show"), "muting should dismiss the bubble on screen");
+}));
+
+/* --- interaction --------------------------------------------------------- */
+
+test("a single click opens the status panel", withPet(async (w, d) => {
+  w.apply(view());
+  d.getElementById("pet").dispatchEvent(new w.MouseEvent("click", { bubbles: true, button: 0 }));
+  await tick(300); // the UI waits 240ms to see whether a double-click follows
+  assert(!d.getElementById("panel").classList.contains("hidden"), "a click should open the status panel");
+}));
+
+test("a double-click pets instead of opening the panel", withPet(async (w, d) => {
+  w.apply(view());
+  const calls = stubBackend(w);
+  const pet = d.getElementById("pet");
+  pet.dispatchEvent(new w.MouseEvent("click", { bubbles: true, button: 0 }));
+  pet.dispatchEvent(new w.MouseEvent("dblclick", { bubbles: true }));
+  await tick(300);
+  eq(called(calls, "Interact").length, 1, "a double-click should pet");
+  assert(d.getElementById("panel").classList.contains("hidden"), "the pending single-click panel should be cancelled");
+}));
+
+test("right-clicking opens the menu instead of the browser's", withPet(async (w, d) => {
+  w.apply(view());
+  const e = new w.MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+  d.getElementById("pet").dispatchEvent(e);
+  assert(e.defaultPrevented, "the native context menu should be suppressed");
+  assert(!d.getElementById("menu").classList.contains("hidden"), "the pet menu should open");
+}));
+
+test("Escape closes whatever is open", withPet(async (w, d) => {
+  w.apply(view());
+  w.openMenu();
+  d.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert(d.getElementById("menu").classList.contains("hidden"), "Escape should close the menu");
+
+  w.togglePanel("status");
+  d.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert(d.getElementById("panel").classList.contains("hidden"), "Escape should close the panel");
+}));
+
+test("clicking away closes overlays", withPet(async (w, d) => {
+  w.apply(view());
+  w.togglePanel("status");
+  d.getElementById("stage").dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+  assert(d.getElementById("panel").classList.contains("hidden"), "clicking outside should dismiss the panel");
+}));
+
+test("clicking inside a panel does not dismiss it", withPet(async (w, d) => {
+  w.apply(view());
+  w.togglePanel("status");
+  d.getElementById("panel").dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+  assert(!d.getElementById("panel").classList.contains("hidden"), "clicking inside should keep the panel open");
+}));
+
+/* --- backend absence ----------------------------------------------------- */
+
+test("the UI loads and stays usable with no backend at all", withPet(async (w, d) => {
+  // This is the state every one of these tests starts in: window.go is absent
+  // because nothing bound it. Nothing may throw, and the window must not be
+  // painted opaque — a transparent window is the whole visual design.
+  eq(w.backend(), null);
+  w.togglePanel("status");
+  assert(!d.getElementById("panel").classList.contains("hidden"), "panels should work without a backend");
+  const bg = w.getComputedStyle(d.body).backgroundColor;
+  assert(bg === "rgba(0, 0, 0, 0)" || bg === "transparent", `the window must stay transparent, got ${bg}`);
+}));
+
+test("changing pet through the panel reaches the backend", withPet(async (w, d) => {
+  w.apply(view());
+  const calls = stubBackend(w, {
+    ListPets: () => [
+      { id: "momo", name: "Momo", builtin: true },
+      { id: "byte", name: "Byte", builtin: true },
+    ],
+  });
+  w.togglePanel("pets");
+  await tick(); // buildPets awaits ListPets
+  const rows = [...d.getElementById("panel").querySelectorAll(".mi")];
+  eq(rows.length, 2, "both packs should be listed");
+  rows.find((r) => r.textContent.includes("Byte")).dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+  await tick();
+  eq(called(calls, "SetPet").length, 1, "picking a pet should call SetPet");
+  eq(called(calls, "SetPet")[0].args[0], "byte");
+}));
+
+/* --- runner -------------------------------------------------------------- */
+
+async function run(report) {
+  let pass = 0;
+  const failures = [];
+  for (const t of tests) {
+    try {
+      await t.fn();
+      pass++;
+      report({ name: t.name, ok: true });
+    } catch (e) {
+      failures.push({ name: t.name, error: String((e && e.message) || e) });
+      report({ name: t.name, ok: false, error: String((e && e.message) || e) });
+    }
+  }
+  return { total: tests.length, pass, fail: failures.length, failures };
+}

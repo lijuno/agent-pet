@@ -195,15 +195,26 @@ adapters/claude/       the Claude Code hook adapter
 adapters/              Codex and git adapters — Milestone 3 and later
 tools/genpets/         the sprite generator
 ui/dist/               the frontend, embedded in the binary
+ui/test/               its tests — open in a browser, no build step
 docs/adr/              architectural decisions
 ```
 
 ## Tests
 
 ```bash
-make test
+make test      # Go: engine, state machine, event API, adapter
+make test-ui   # the window, in a browser
 ```
 
 The state machine is a pure function of (events, clock), so its tests drive a
 synthetic clock and never sleep. See
 [ADR 0004](docs/adr/0004-deterministic-state-machine.md).
+
+`make test-ui` serves the repository and opens
+[`ui/test/index.html`](ui/test/index.html), which loads the real
+`ui/dist/index.html` into a fresh iframe for each test and reports pass/fail on
+the page. There is no runner to install and no build step, because the UI is one
+static file and its tests should cost the same to run. They cover sprite
+rendering and timing, the panels and menu, click versus double-click, the
+layout invariant that an open panel never covers the pet, and — most
+importantly — that nothing an agent controls can become markup (§26).

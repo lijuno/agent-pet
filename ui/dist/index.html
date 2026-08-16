@@ -340,9 +340,11 @@ function buildStatus(p) {
 function describe(state, sessions) {
   const n = (sessions || []).length;
   const who = n === 1 ? sessions[0].key.source : (n > 1 ? n + " agents" : "");
+  // "2 agents is working" — the subject is plural whenever it is a count.
+  const is = n > 1 ? " are " : " is ";
   switch (state) {
-    case "working":   return who ? who + " is working." : "Working.";
-    case "thinking":  return who ? who + " is thinking." : "Thinking.";
+    case "working":   return who ? who + is + "working." : "Working.";
+    case "thinking":  return who ? who + is + "thinking." : "Thinking.";
     case "attention": return "Something needs you.";
     case "confused":  return "That didn't work.";
     case "worried":   return "Several failures in a row.";
