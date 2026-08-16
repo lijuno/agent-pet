@@ -1,0 +1,14 @@
+bin/
+build/bin/
+node_modules/
+
+# Wails writes generated JS bindings here.
+ui/wailsjs/
+
+# A local go.work would silently override the module requirements for anyone
+# who clones this.
+go.work
+go.work.sum
+
+.DS_Store
+*.log

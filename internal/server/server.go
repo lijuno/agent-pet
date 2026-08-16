@@ -1,0 +1,481 @@
+// Package server exposes the local event API (§25) on a loopback listener.
+//
+// Security posture (§26): loopback-only bind, bounded request bodies, strict
+// field decoding, sanitised metadata, and no path in this package that turns
+// request content into a command, a file path, or HTML.
+package server
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"net"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/lijunix/agent-digital-pet/internal/config"
+	"github.com/lijunix/agent-digital-pet/internal/engine"
+	"github.com/lijunix/agent-digital-pet/internal/events"
+	"github.com/lijunix/agent-digital-pet/internal/state"
+)
+
+// MaxBody caps request bodies. Large enough for any legitimate hook payload,
+// small enough that a runaway producer cannot grow the process.
+const MaxBody = 16 << 10
+
+// Version is stamped by main.
+var Version = "dev"
+
+type Server struct {
+	eng  *engine.Engine
+	log  *slog.Logger
+	mux  *http.ServeMux
+	http *http.Server
+	ln   net.Listener
+	// startedAt supports the uptime field in /healthz and `petctl doctor`.
+	startedAt time.Time
+}
+
+func New(eng *engine.Engine, log *slog.Logger) *Server {
+	s := &Server{eng: eng, log: log, mux: http.NewServeMux(), startedAt: time.Now()}
+	s.routes()
+	s.http = &http.Server{
+		Handler:           s.withGuards(s.mux),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		// No WriteTimeout: /stream is a long-lived SSE response.
+		IdleTimeout: 60 * time.Second,
+	}
+	return s
+}
+
+func (s *Server) routes() {
+	s.mux.HandleFunc("/healthz", s.handleHealth)
+	s.mux.HandleFunc("/event", s.handleEvent)
+	s.mux.HandleFunc("/state", s.handleState)
+	s.mux.HandleFunc("/stream", s.handleStream)
+	s.mux.HandleFunc("/test", s.handleTest)
+	s.mux.HandleFunc("/interact", s.handleInteract)
+	s.mux.HandleFunc("/pets", s.handlePets)
+	s.mux.HandleFunc("/pet", s.handleSetPet)
+	s.mux.HandleFunc("/diagnostics", s.handleDiagnostics)
+}
+
+// Listen binds the address. It refuses non-loopback addresses unless the config
+// explicitly allows it, so a careless edit cannot expose the pet to the LAN.
+func (s *Server) Listen(cfg config.Server) error {
+	if !config.IsLoopback(cfg.Addr) && !cfg.AllowNonLoopback {
+		return fmt.Errorf("refusing to bind %q: not a loopback address; set server.allow_non_loopback if you really mean it", cfg.Addr)
+	}
+	ln, err := net.Listen("tcp", cfg.Addr)
+	if err != nil {
+		return fmt.Errorf("listen on %s: %w", cfg.Addr, err)
+	}
+	s.ln = ln
+	return nil
+}
+
+func (s *Server) Addr() string {
+	if s.ln == nil {
+		return ""
+	}
+	return s.ln.Addr().String()
+}
+
+// Serve blocks until the server is closed.
+func (s *Server) Serve() error {
+	if s.ln == nil {
+		return errors.New("Listen must be called before Serve")
+	}
+	err := s.http.Serve(s.ln)
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
+}
+
+func (s *Server) Close() error {
+	if s.http == nil {
+		return nil
+	}
+	return s.http.Close()
+}
+
+// withGuards applies the transport-level protections to every route.
+func (s *Server) withGuards(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Reject requests that did not arrive over loopback even if the
+		// listener somehow ended up bound more widely.
+		if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+			if ip := net.ParseIP(host); ip != nil && !ip.IsLoopback() {
+				http.Error(w, "loopback only", http.StatusForbidden)
+				return
+			}
+		}
+		// A browser on some other page must not be able to poke the pet.
+		if o := r.Header.Get("Origin"); o != "" && !isLocalOrigin(o) {
+			http.Error(w, "bad origin", http.StatusForbidden)
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, MaxBody)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func isLocalOrigin(o string) bool {
+	o = strings.ToLower(o)
+	return strings.HasPrefix(o, "http://127.0.0.1") ||
+		strings.HasPrefix(o, "http://localhost") ||
+		strings.HasPrefix(o, "http://[::1]") ||
+		strings.HasPrefix(o, "wails://")
+}
+
+func writeJSON(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func badRequest(w http.ResponseWriter, msg string) {
+	writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
+}
+
+// decode reads a strict JSON body: unknown fields are an error, so a typo in a
+// hook script is reported instead of silently ignored.
+func decode(r *http.Request, v any) error {
+	if ct := r.Header.Get("Content-Type"); ct != "" && !strings.HasPrefix(ct, "application/json") {
+		return fmt.Errorf("content-type must be application/json")
+	}
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		if errors.Is(err, io.EOF) {
+			return errors.New("empty body")
+		}
+		return err
+	}
+	return nil
+}
+
+func methodIs(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method != method {
+		w.Header().Set("Allow", method)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return false
+	}
+	return true
+}
+
+// ---- handlers ----
+
+type healthResponse struct {
+	OK      bool   `json:"ok"`
+	Version string `json:"version"`
+	Uptime  string `json:"uptime"`
+	PID     int    `json:"pid"`
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, healthResponse{
+		OK:      true,
+		Version: Version,
+		Uptime:  time.Since(s.startedAt).Round(time.Second).String(),
+	})
+}
+
+// eventRequest mirrors events.Event but keeps metadata as raw JSON values so a
+// hook can send numbers or booleans without a type error. Everything is
+// stringified and sanitised before it reaches the state machine.
+type eventRequest struct {
+	Source    string         `json:"source"`
+	Event     string         `json:"event"`
+	SessionID string         `json:"session_id"`
+	Timestamp string         `json:"timestamp"`
+	Metadata  map[string]any `json:"metadata"`
+}
+
+func (s *Server) handleEvent(w http.ResponseWriter, r *http.Request) {
+	if !methodIs(w, r, http.MethodPost) {
+		return
+	}
+	var req eventRequest
+	if err := decode(r, &req); err != nil {
+		badRequest(w, err.Error())
+		return
+	}
+	if req.Event == "" {
+		badRequest(w, "event is required")
+		return
+	}
+	ev := events.Event{
+		Source:    req.Source,
+		Event:     events.Kind(req.Event),
+		SessionID: req.SessionID,
+		Metadata:  stringifyMeta(req.Metadata),
+	}
+	if req.Timestamp != "" {
+		if t, err := time.Parse(time.RFC3339, req.Timestamp); err == nil {
+			ev.Timestamp = t
+		}
+	}
+	snap := s.eng.Submit(ev)
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"accepted": true,
+		"known":    ev.Event.Known(),
+		"state":    snap.State,
+	})
+}
+
+// stringifyMeta flattens arbitrary JSON scalars to strings and drops anything
+// structured. Nested objects have no meaning to the pet and are a needless
+// attack surface.
+func stringifyMeta(m map[string]any) map[string]string {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		switch t := v.(type) {
+		case string:
+			out[k] = t
+		case bool:
+			out[k] = fmt.Sprintf("%t", t)
+		case float64:
+			out[k] = strings.TrimSuffix(fmt.Sprintf("%.6f", t), ".000000")
+		case nil:
+			out[k] = ""
+		default:
+			// objects and arrays are dropped
+		}
+	}
+	return out
+}
+
+func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
+	if !methodIs(w, r, http.MethodGet) {
+		return
+	}
+	up := s.eng.Last()
+	up.Snapshot = s.eng.Snapshot()
+	writeJSON(w, http.StatusOK, up)
+}
+
+func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
+	if !methodIs(w, r, http.MethodGet) {
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	ch, cancel := s.eng.Subscribe()
+	defer cancel()
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	keepalive := time.NewTicker(20 * time.Second)
+	defer keepalive.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-keepalive.C:
+			fmt.Fprint(w, ": keepalive\n\n")
+			flusher.Flush()
+		case up, ok := <-ch:
+			if !ok {
+				return
+			}
+			b, err := json.Marshal(up)
+			if err != nil {
+				continue
+			}
+			fmt.Fprintf(w, "event: state\ndata: %s\n\n", b)
+			flusher.Flush()
+		}
+	}
+}
+
+type testRequest struct {
+	State    string `json:"state"`
+	Duration string `json:"duration"`
+	Clear    bool   `json:"clear"`
+}
+
+// handleTest backs `petctl test <state>` (§31): it pins a state so animations
+// can be reviewed without running an agent.
+func (s *Server) handleTest(w http.ResponseWriter, r *http.Request) {
+	if !methodIs(w, r, http.MethodPost) {
+		return
+	}
+	var req testRequest
+	if err := decode(r, &req); err != nil {
+		badRequest(w, err.Error())
+		return
+	}
+	if req.Clear {
+		s.eng.ClearForce()
+		writeJSON(w, http.StatusOK, map[string]any{"cleared": true})
+		return
+	}
+	st := state.State(req.State)
+	if !state.Valid(st) {
+		badRequest(w, fmt.Sprintf("unknown state %q; valid: %s", req.State, joinStates(state.All())))
+		return
+	}
+	d := 12 * time.Second
+	if req.Duration != "" {
+		parsed, err := time.ParseDuration(req.Duration)
+		if err != nil {
+			badRequest(w, "invalid duration: "+err.Error())
+			return
+		}
+		if parsed <= 0 || parsed > time.Hour {
+			badRequest(w, "duration must be between 0 and 1h")
+			return
+		}
+		d = parsed
+	}
+	snap := s.eng.Force(st, d)
+	writeJSON(w, http.StatusOK, map[string]any{"state": snap.State, "for": d.String()})
+}
+
+func (s *Server) handleInteract(w http.ResponseWriter, r *http.Request) {
+	if !methodIs(w, r, http.MethodPost) {
+		return
+	}
+	snap := s.eng.Submit(events.Event{Source: "ui", Event: events.PetInteraction, SessionID: "ui"})
+	writeJSON(w, http.StatusOK, map[string]any{"state": snap.State})
+}
+
+func (s *Server) handlePets(w http.ResponseWriter, r *http.Request) {
+	if !methodIs(w, r, http.MethodGet) {
+		return
+	}
+	active := ""
+	if p, ok := s.eng.ActivePet(); ok {
+		active = p.ID
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"active": active,
+		"pets":   s.eng.Library().List(),
+	})
+}
+
+type setPetRequest struct {
+	ID string `json:"id"`
+}
+
+func (s *Server) handleSetPet(w http.ResponseWriter, r *http.Request) {
+	if !methodIs(w, r, http.MethodPost) {
+		return
+	}
+	var req setPetRequest
+	if err := decode(r, &req); err != nil {
+		badRequest(w, err.Error())
+		return
+	}
+	p, ok := s.eng.SetPet(req.ID)
+	if !ok {
+		badRequest(w, "unknown pet "+req.ID)
+		return
+	}
+	writeJSON(w, http.StatusOK, p)
+}
+
+// Diagnostics is the payload behind `petctl doctor` (§30).
+type Diagnostics struct {
+	Version           string            `json:"version"`
+	Uptime            string            `json:"uptime"`
+	Addr              string            `json:"addr"`
+	ConfigPath        string            `json:"config_path"`
+	DataDir           string            `json:"data_dir"`
+	DataWrite         string            `json:"data_writable"`
+	ActivePet         string            `json:"active_pet"`
+	Animations        int               `json:"animations"`
+	MissingAnimations []string          `json:"missing_animations,omitempty"`
+	Pets              []string          `json:"pets"`
+	Sessions          int               `json:"sessions"`
+	EventsSeen        int               `json:"events_seen"`
+	State             string            `json:"state"`
+	Integrations      map[string]string `json:"integrations"`
+}
+
+func (s *Server) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
+	if !methodIs(w, r, http.MethodGet) {
+		return
+	}
+	snap := s.eng.Snapshot()
+	cfg := s.eng.Config()
+
+	d := Diagnostics{
+		Version:      Version,
+		Uptime:       time.Since(s.startedAt).Round(time.Second).String(),
+		Addr:         s.Addr(),
+		ConfigPath:   config.Path(),
+		DataDir:      config.DataDir(),
+		DataWrite:    writableStatus(config.DataDir()),
+		Sessions:     len(snap.Sessions),
+		EventsSeen:   snap.Stats.EventsSeen,
+		State:        string(snap.State),
+		Integrations: map[string]string{},
+	}
+	for _, p := range s.eng.Library().List() {
+		d.Pets = append(d.Pets, p.ID)
+	}
+	if p, ok := s.eng.ActivePet(); ok {
+		d.ActivePet = p.ID
+		d.Animations = len(p.Animations)
+		for _, m := range p.Missing() {
+			d.MissingAnimations = append(d.MissingAnimations, string(m))
+		}
+	}
+	// Milestone 1 ships no adapters, so the honest answer is "not installed"
+	// rather than a green tick for something that cannot work yet (§29:
+	// never fake states that cannot be observed).
+	for name, tog := range cfg.Integrations {
+		switch {
+		case !tog.Enabled:
+			d.Integrations[name] = "disabled"
+		case sourceSeen(snap, name):
+			d.Integrations[name] = "events received"
+		default:
+			d.Integrations[name] = "enabled, no events yet (adapter not installed in Milestone 1)"
+		}
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+func sourceSeen(snap state.Snapshot, source string) bool {
+	for _, s := range snap.Sessions {
+		if s.Key.Source == source {
+			return true
+		}
+	}
+	return false
+}
+
+func writableStatus(dir string) string {
+	if err := ensureWritable(dir); err != nil {
+		return "no: " + err.Error()
+	}
+	return "yes"
+}
+
+func joinStates(ss []state.State) string {
+	parts := make([]string, len(ss))
+	for i, s := range ss {
+		parts[i] = string(s)
+	}
+	return strings.Join(parts, ", ")
+}

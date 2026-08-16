@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digital Pet</title>
+<style>
+  /*
+    The window is transparent. Nothing here may paint a background on html or
+    body, or the pet ends up sitting in a grey square.
+  */
+  html, body {
+    margin: 0; padding: 0; height: 100%; width: 100%;
+    background: transparent;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    cursor: default;
+  }
+
+  #stage {
+    position: relative;
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-end;
+    padding-bottom: 8px; box-sizing: border-box;
+  }
+
+  /* --- the pet ------------------------------------------------------- */
+
+  #pet {
+    /* Wails moves the window when a drag starts on this element. Only the
+       character is draggable; panels and menus are not, so a click on a menu
+       item never turns into a window drag. */
+    --wails-draggable: drag;
+    position: relative;
+    display: grid; place-items: center;
+    cursor: grab;
+  }
+  #pet:active { cursor: grabbing; }
+
+  #sprite {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background-repeat: no-repeat;
+    background-position: 0 0;
+    /* A soft drop shadow lifts the character off any wallpaper. */
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,.35));
+    transition: opacity .18s ease;
+  }
+  #sprite.swapping { opacity: 0; }
+
+  /* Paused when the window is hidden, so a pet nobody can see costs nothing. */
+  body.paused #sprite { animation-play-state: paused !important; }
+
+  /* --- speech bubble ------------------------------------------------- */
+
+  #bubble {
+    position: absolute; bottom: calc(100% + 6px);
+    max-width: 240px;
+    padding: 6px 10px;
+    background: rgba(28, 28, 34, .94);
+    color: #f2f2f4;
+    font-size: 12px; line-height: 1.35;
+    border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.3);
+    opacity: 0; transform: translateY(4px) scale(.96);
+    transition: opacity .16s ease, transform .16s ease;
+    pointer-events: none;
+    white-space: pre-wrap; word-break: break-word;
+    text-align: center;
+  }
+  #bubble.show { opacity: 1; transform: translateY(0) scale(1); }
+  #bubble::after {
+    content: ""; position: absolute; top: 100%; left: 50%;
+    margin-left: -5px; border: 5px solid transparent;
+    border-top-color: rgba(28, 28, 34, .94);
+  }
+
+  /* --- panels and menu ----------------------------------------------- */
+
+  /*
+    Overlays are anchored to the TOP of the window and the pet lives at the
+    bottom, so opening the status panel never hides the character — which is
+    the whole point of having one. The window is sized to fit both.
+  */
+  .panel, #menu {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    top: 6px;
+    background: rgba(24, 24, 29, .97);
+    color: #ececf1;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    font-size: 12px;
+    z-index: 10;
+    /* border-box so max-height is the real on-screen height: the overlay must
+       stop above the pet, and padding must not push it into the character. */
+    box-sizing: border-box;
+  }
+
+  .panel { width: 258px; padding: 11px 13px; max-height: 224px; overflow-y: auto; }
+  .panel h2 {
+    margin: 0 0 2px; font-size: 13px; font-weight: 600; letter-spacing: .01em;
+  }
+  .panel .sub { color: #9a9aa6; margin-bottom: 10px; font-size: 11px; }
+  .row { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+  .row span:first-child { color: #9a9aa6; }
+  .row span:last-child { text-align: right; }
+  .sessions { margin-top: 8px; border-top: 1px solid rgba(255,255,255,.08); padding-top: 8px; }
+  .sess { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+  .sess .name { color: #cfcfd8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sess .st { color: #8fd0ff; flex: none; }
+  .empty { color: #77777f; font-style: italic; }
+
+  #menu { min-width: 176px; padding: 6px; max-height: 224px; overflow-y: auto; }
+  .mi {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 5px 10px; border-radius: 7px; cursor: pointer;
+    white-space: nowrap;
+  }
+  .mi:hover { background: rgba(255,255,255,.10); }
+  .mi .check { color: #8fd0ff; width: 10px; text-align: right; }
+  .msep { height: 1px; margin: 5px 8px; background: rgba(255,255,255,.09); }
+  .mtitle { padding: 4px 10px 6px; color: #77777f; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; }
+
+  .hidden { display: none !important; }
+
+  #badge {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; color: #b9b9c4;
+    background: rgba(24,24,29,.9); padding: 2px 8px; border-radius: 8px;
+    opacity: 0; transition: opacity .2s ease;
+  }
+  #badge.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="badge"></div>
+
+  <div id="pet" title="Click for status · double-click to pet · right-click for the menu">
+    <div id="bubble"></div>
+    <div id="sprite"></div>
+  </div>
+
+  <div id="panel" class="panel hidden"></div>
+  <div id="menu" class="hidden"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------------------------------------------------------------------------
+ * Everything an agent can influence — state names, tool names, bubble text —
+ * is written with textContent, never innerHTML. §26: agent metadata is
+ * untrusted input and must never become markup.
+ * ------------------------------------------------------------------------ */
+
+const el = {
+  sprite: document.getElementById("sprite"),
+  bubble: document.getElementById("bubble"),
+  pet: document.getElementById("pet"),
+  panel: document.getElementById("panel"),
+  menu: document.getElementById("menu"),
+  badge: document.getElementById("badge"),
+};
+
+let view = null;
+let info = null;
+let pets = [];
+let currentAnimKey = "";
+let bubbleTimer = null;
+let clickTimer = null;
+let muted = false;
+
+/* --- backend plumbing ---------------------------------------------------- */
+
+function backend() {
+  return (window.go && window.go.main && window.go.main.App) || null;
+}
+
+async function call(name, ...args) {
+  const b = backend();
+  if (!b || typeof b[name] !== "function") return null;
+  try { return await b[name](...args); } catch (e) { console.error(name, e); return null; }
+}
+
+/* --- sprite rendering ---------------------------------------------------- */
+
+const injected = new Set();
+
+function ensureKeyframes(frames, stripWidth) {
+  const name = `sprite_${frames}_${stripWidth}`;
+  if (injected.has(name)) return name;
+  const style = document.createElement("style");
+  style.textContent =
+    `@keyframes ${name} { from { background-position-x: 0; } ` +
+    `to { background-position-x: -${stripWidth}px; } }`;
+  document.head.appendChild(style);
+  injected.add(name);
+  return name;
+}
+
+function renderAnimation(anim, scale) {
+  if (!anim) return;
+  const s = Math.max(1, Math.round((scale || 1) * 3));
+  const w = anim.frame_width * s;
+  const h = anim.frame_height * s;
+  const strip = w * anim.frames;
+  const key = [anim.url, anim.frames, anim.fps, s].join("|");
+  if (key === currentAnimKey) return;
+  currentAnimKey = key;
+
+  el.sprite.style.width = w + "px";
+  el.sprite.style.height = h + "px";
+  el.sprite.style.backgroundImage = `url("${anim.url}")`;
+  el.sprite.style.backgroundSize = `${strip}px ${h}px`;
+  el.sprite.style.imageRendering = anim.pixelated ? "pixelated" : "auto";
+
+  const name = ensureKeyframes(anim.frames, strip);
+  const duration = anim.frames / Math.max(0.1, anim.fps);
+  // Restart cleanly: without clearing first, the browser keeps the old
+  // animation's progress and the pet appears to skip frames on a state change.
+  el.sprite.style.animation = "none";
+  void el.sprite.offsetWidth;
+  el.sprite.style.animation =
+    `${name} ${duration}s steps(${anim.frames}) ${anim.loop ? "infinite" : "1"}`;
+}
+
+/* --- bubble -------------------------------------------------------------- */
+
+function showBubble(text, ttlNanos) {
+  // A bubble under an open panel is unreadable and looks broken.
+  if (muted || !text || overlayOpen()) return;
+  el.bubble.textContent = text;
+  el.bubble.classList.add("show");
+  clearTimeout(bubbleTimer);
+  const ms = Math.min(20000, Math.max(1500, (ttlNanos || 5e9) / 1e6));
+  bubbleTimer = setTimeout(() => el.bubble.classList.remove("show"), ms);
+}
+
+function flashBadge(text) {
+  el.badge.textContent = text;
+  el.badge.classList.add("show");
+  setTimeout(() => el.badge.classList.remove("show"), 1400);
+}
+
+/* --- formatting ---------------------------------------------------------- */
+
+function dur(ns) {
+  const s = Math.max(0, Math.floor((ns || 0) / 1e9));
+  if (s < 60) return s + "s";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m";
+  const h = Math.floor(m / 60);
+  return h + "h " + (m % 60) + "m";
+}
+
+function row(parent, label, value) {
+  const r = document.createElement("div");
+  r.className = "row";
+  const a = document.createElement("span"); a.textContent = label;
+  const b = document.createElement("span"); b.textContent = value;
+  r.append(a, b);
+  parent.appendChild(r);
+}
+
+/* --- panels -------------------------------------------------------------- */
+
+function overlayOpen() {
+  return !el.panel.classList.contains("hidden") || !el.menu.classList.contains("hidden");
+}
+
+function closeOverlays() {
+  el.panel.classList.add("hidden");
+  el.menu.classList.add("hidden");
+}
+
+function togglePanel(kind) {
+  if (!el.panel.classList.contains("hidden") && el.panel.dataset.kind === kind) {
+    el.panel.classList.add("hidden");
+    return;
+  }
+  el.menu.classList.add("hidden");
+  el.bubble.classList.remove("show");
+  el.panel.dataset.kind = kind;
+  el.panel.replaceChildren();
+  if (kind === "status") buildStatus(el.panel);
+  else if (kind === "stats") buildStats(el.panel);
+  else if (kind === "pets") buildPets(el.panel);
+  el.panel.classList.remove("hidden");
+}
+
+function buildStatus(p) {
+  const snap = (view && view.snapshot) || {};
+  const h = document.createElement("h2");
+  h.textContent = (view && view.pet_name) || "Pet";
+  const sub = document.createElement("div");
+  sub.className = "sub";
+  sub.textContent = describe(snap.state, snap.sessions);
+  p.append(h, sub);
+
+  row(p, "State", snap.state || "—");
+  if (snap.since) {
+    row(p, "For", dur(Date.now() * 1e6 - Date.parse(snap.since) * 1e6));
+  }
+  if (snap.forced) row(p, "Note", "forced by petctl test");
+
+  const box = document.createElement("div");
+  box.className = "sessions";
+  const t = document.createElement("div");
+  t.className = "sub";
+  t.textContent = "Sessions";
+  box.appendChild(t);
+
+  const sessions = snap.sessions || [];
+  if (!sessions.length) {
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = "Nothing running.";
+    box.appendChild(e);
+  } else {
+    for (const s of sessions) {
+      const d = document.createElement("div");
+      d.className = "sess";
+      const n = document.createElement("span");
+      n.className = "name";
+      n.textContent = s.key.source + "/" + s.key.id;
+      const st = document.createElement("span");
+      st.className = "st";
+      st.textContent = s.state + " · " + dur(s.duration_ns);
+      d.append(n, st);
+      box.appendChild(d);
+    }
+  }
+  p.appendChild(box);
+}
+
+function describe(state, sessions) {
+  const n = (sessions || []).length;
+  const who = n === 1 ? sessions[0].key.source : (n > 1 ? n + " agents" : "");
+  switch (state) {
+    case "working":   return who ? who + " is working." : "Working.";
+    case "thinking":  return who ? who + " is thinking." : "Thinking.";
+    case "attention": return "Something needs you.";
+    case "confused":  return "That didn't work.";
+    case "worried":   return "Several failures in a row.";
+    case "happy":     return "Task finished.";
+    case "celebrate": return "Tests passed.";
+    case "tired":     return "Long session.";
+    case "sleeping":  return "Nothing running.";
+    case "heart":     return "Hello.";
+    default:          return who ? who + " is idle." : "Waiting.";
+  }
+}
+
+function buildStats(p) {
+  const st = ((view && view.snapshot) || {}).stats || {};
+  const h = document.createElement("h2");
+  h.textContent = "Statistics";
+  const sub = document.createElement("div");
+  sub.className = "sub";
+  sub.textContent = "Since petd started. Durable history arrives with the SQLite store.";
+  p.append(h, sub);
+
+  row(p, "Events seen", st.events_seen || 0);
+  row(p, "Sessions", st.sessions_started || 0);
+  row(p, "Tasks completed", st.tasks_completed || 0);
+  row(p, "Tests passed", st.tests_passed || 0);
+  row(p, "Tests failed", st.tests_failed || 0);
+  row(p, "Commits", st.commits || 0);
+  row(p, "Errors", st.errors || 0);
+  row(p, "Times petted", st.interactions || 0);
+
+  if (info) {
+    const box = document.createElement("div");
+    box.className = "sessions";
+    row(box, "Event API", info.addr || "—");
+    row(box, "Personality", info.personality || "—");
+    p.appendChild(box);
+  }
+}
+
+async function buildPets(p) {
+  const h = document.createElement("h2");
+  h.textContent = "Change pet";
+  const sub = document.createElement("div");
+  sub.className = "sub";
+  sub.textContent = "Switches immediately. No restart.";
+  p.append(h, sub);
+
+  pets = (await call("ListPets")) || [];
+  for (const pet of pets) {
+    const item = document.createElement("div");
+    item.className = "mi";
+    const left = document.createElement("span");
+    left.textContent = pet.name + (pet.builtin ? "" : " (yours)");
+    const right = document.createElement("span");
+    right.className = "check";
+    right.textContent = view && view.pet === pet.id ? "✓" : "";
+    item.append(left, right);
+    item.addEventListener("click", async () => {
+      await call("SetPet", pet.id);
+      closeOverlays();
+      flashBadge(pet.name);
+    });
+    p.appendChild(item);
+  }
+
+  if (info && info.pets_dir) {
+    const note = document.createElement("div");
+    note.className = "sub";
+    note.style.marginTop = "10px";
+    note.textContent = "Custom packs: " + info.pets_dir;
+    p.appendChild(note);
+  }
+}
+
+/* --- context menu -------------------------------------------------------- */
+
+function item(label, onClick, checked) {
+  const d = document.createElement("div");
+  d.className = "mi";
+  const a = document.createElement("span");
+  a.textContent = label;
+  const b = document.createElement("span");
+  b.className = "check";
+  if (checked !== undefined) b.textContent = checked ? "✓" : "";
+  d.append(a, b);
+  d.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
+  return d;
+}
+
+function separator() {
+  const d = document.createElement("div");
+  d.className = "msep";
+  return d;
+}
+
+function asleep() {
+  const snap = (view && view.snapshot) || {};
+  return snap.forced && snap.state === "sleeping";
+}
+
+function openMenu() {
+  el.panel.classList.add("hidden");
+  el.bubble.classList.remove("show");
+  el.menu.replaceChildren();
+
+  el.menu.append(
+    item("Pet Status", () => { el.menu.classList.add("hidden"); togglePanel("status"); }),
+    item("Statistics", () => { el.menu.classList.add("hidden"); togglePanel("stats"); }),
+    item("Change Pet…", () => { el.menu.classList.add("hidden"); togglePanel("pets"); }),
+    separator(),
+    item("Always on Top", async () => {
+      const next = !(view && view.on_top);
+      await call("SetAlwaysOnTop", next);
+      if (view) view.on_top = next;
+      openMenu();
+      flashBadge(next ? "Always on top" : "Normal window");
+    }, view ? view.on_top : false),
+    item("Mute", async () => {
+      muted = !muted;
+      await call("SetMuted", muted);
+      el.bubble.classList.remove("show");
+      openMenu();
+      flashBadge(muted ? "Muted" : "Unmuted");
+    }, muted),
+    separator(),
+    // One toggle rather than two rows: the menu has to fit in a 300px-wide
+    // window without scrolling, and "Sleep" and "Wake" are never both useful.
+    asleep()
+      ? item("Wake Up", async () => { closeOverlays(); await call("Wake"); })
+      : item("Sleep", async () => { closeOverlays(); await call("Sleep"); }),
+    separator(),
+    item("Quit", () => call("Quit")),
+  );
+  el.menu.classList.remove("hidden");
+}
+
+/* --- interaction --------------------------------------------------------- */
+
+el.pet.addEventListener("click", (e) => {
+  if (e.button !== 0) return;
+  // Wait to see whether this becomes a double-click before opening a panel.
+  clearTimeout(clickTimer);
+  clickTimer = setTimeout(() => togglePanel("status"), 240);
+});
+
+el.pet.addEventListener("dblclick", () => {
+  clearTimeout(clickTimer);
+  closeOverlays();
+  call("Interact");
+});
+
+document.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  openMenu();
+});
+
+document.addEventListener("click", (e) => {
+  if (!el.pet.contains(e.target) && !el.panel.contains(e.target) && !el.menu.contains(e.target)) {
+    closeOverlays();
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeOverlays();
+});
+
+document.addEventListener("visibilitychange", () => {
+  document.body.classList.toggle("paused", document.hidden);
+});
+
+/* --- updates ------------------------------------------------------------- */
+
+function apply(v) {
+  if (!v) return;
+  view = v;
+  muted = !!v.muted;
+  renderAnimation(v.animation, v.scale);
+  if (v.bubble && v.bubble.text) showBubble(v.bubble.text, v.bubble.ttl_ns);
+  if (!el.panel.classList.contains("hidden")) {
+    const kind = el.panel.dataset.kind;
+    el.panel.replaceChildren();
+    if (kind === "status") buildStatus(el.panel);
+    else if (kind === "stats") buildStats(el.panel);
+  }
+}
+
+async function boot() {
+  if (window.runtime && window.runtime.EventsOn) {
+    window.runtime.EventsOn("pet:update", apply);
+    window.runtime.EventsOn("pet:panel", (kind) => togglePanel(kind));
+    window.runtime.EventsOn("pet:muted", (m) => { muted = !!m; });
+  }
+  info = await call("GetInfo");
+  apply(await call("GetState"));
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", boot);
+} else {
+  boot();
+}
+</script>
+</body>
+</html>

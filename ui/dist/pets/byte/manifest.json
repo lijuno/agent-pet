@@ -1,0 +1,79 @@
+{
+  "id": "byte",
+  "name": "Byte",
+  "version": 1,
+  "author": "built-in",
+  "description": "A little terminal robot with a blinking antenna.",
+  "frame_width": 40,
+  "frame_height": 40,
+  "scale": 3,
+  "pixelated": true,
+  "animations": {
+    "idle": {
+      "file": "idle.png",
+      "frames": 4,
+      "fps": 3,
+      "loop": true
+    },
+    "thinking": {
+      "file": "thinking.png",
+      "frames": 4,
+      "fps": 4,
+      "loop": true
+    },
+    "working": {
+      "file": "working.png",
+      "frames": 4,
+      "fps": 8,
+      "loop": true
+    },
+    "attention": {
+      "file": "attention.png",
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "confused": {
+      "file": "confused.png",
+      "frames": 4,
+      "fps": 5,
+      "loop": true
+    },
+    "worried": {
+      "file": "worried.png",
+      "frames": 4,
+      "fps": 4,
+      "loop": true
+    },
+    "happy": {
+      "file": "happy.png",
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "celebrate": {
+      "file": "celebrate.png",
+      "frames": 6,
+      "fps": 10,
+      "loop": true
+    },
+    "sleeping": {
+      "file": "sleeping.png",
+      "frames": 4,
+      "fps": 2,
+      "loop": true
+    },
+    "tired": {
+      "file": "tired.png",
+      "frames": 4,
+      "fps": 2,
+      "loop": true
+    },
+    "heart": {
+      "file": "heart.png",
+      "frames": 4,
+      "fps": 5,
+      "loop": true
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "digital-pet",
+  "outputfilename": "petd",
+  "assetdir": "ui/dist",
+  "frontend:dir": "ui",
+  "frontend:install": "",
+  "frontend:build": "",
+  "wailsjsdir": "./ui",
+  "author": {
+    "name": "digital-pet"
+  },
+  "info": {
+    "productName": "Digital Pet",
+    "productVersion": "0.1.0",
+    "comments": "An ambient companion for Claude Code and Codex."
+  }
+}
