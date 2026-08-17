@@ -558,24 +558,14 @@ test("a rebuild that does not change height does not resize the window", withPet
 
 /* --- menu ---------------------------------------------------------------- */
 
-test("the menu offers Sleep while the pet is awake", withPet(async (w, d) => {
-  w.apply(view());
-  w.openMenu();
-  const text = d.getElementById("menu").textContent;
-  assert(text.includes("Sleep"), "Sleep missing");
-  assert(!text.includes("Wake Up"), "should not offer Wake while awake");
-}));
-
-test("the menu offers Wake Up only when forced asleep", withPet(async (w, d) => {
-  // A pet that is merely sleeping from inactivity wakes on the next event; only
-  // a forced sleep needs a manual way out.
+// Sleep and Wake are gone. `sleeping` is now only ever something the pet
+// arrived at on its own, so nothing offers to put it there by hand.
+test("the menu does not offer to sleep or wake the pet", withPet(async (w, d) => {
   w.apply(view({ snapshot: { state: "sleeping", forced: true, sessions: [], stats: {} } }));
   w.openMenu();
-  assert(d.getElementById("menu").textContent.includes("Wake Up"), "Wake Up missing when forced asleep");
-
-  w.apply(view({ snapshot: { state: "sleeping", forced: false, sessions: [], stats: {} } }));
-  w.openMenu();
-  assert(!d.getElementById("menu").textContent.includes("Wake Up"), "an unforced sleep should not offer Wake Up");
+  const text = d.getElementById("menu").textContent;
+  assert(!text.includes("Sleep"), `Sleep should be gone, menu reads: ${text}`);
+  assert(!text.includes("Wake"), `Wake should be gone, menu reads: ${text}`);
 }));
 
 test("the menu checks Always on Top to match the window", withPet(async (w, d) => {

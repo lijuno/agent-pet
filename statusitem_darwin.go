@@ -79,7 +79,6 @@ func (a *App) startTray(ctx context.Context) {
 						return
 					}
 					setStatusTitle(trayLabel(up.Snapshot.State))
-					setSleepTitle(up.Snapshot.State)
 				}
 			}
 		}()
@@ -90,18 +89,6 @@ func setStatusTitle(s string) {
 	c := C.CString(s)
 	defer C.free(unsafe.Pointer(c))
 	C.petStatusSetState(c)
-}
-
-// The one item that changes wording rather than state: a pet already asleep
-// should offer to wake up, exactly as the in-window menu does.
-func setSleepTitle(s state.State) {
-	title := "Sleep"
-	if s == state.Sleeping {
-		title = "Wake Up"
-	}
-	c := C.CString(title)
-	defer C.free(unsafe.Pointer(c))
-	C.petStatusSetSleepTitle(c)
 }
 
 // usableArea is where a window may sit, in the coordinates Wails uses for
@@ -153,7 +140,7 @@ func (a *App) ClickStatusItem(name string) error {
 	tags := map[string]C.int{
 		"show": C.PET_SHOW, "status": C.PET_STATUS, "stats": C.PET_STATS,
 		"change": C.PET_CHANGE, "ontop": C.PET_ONTOP, "mute": C.PET_MUTE,
-		"sleep": C.PET_SLEEP, "quit": C.PET_QUIT,
+		"quit": C.PET_QUIT,
 	}
 	tag, ok := tags[name]
 	if !ok {
@@ -300,14 +287,6 @@ func (a *App) handleStatusClick(tag C.int) {
 		next := !a.muted
 		a.SetMuted(next)
 		setStatusCheck(C.PET_MUTE, next)
-	case C.PET_SLEEP:
-		// One item, like the in-window menu: sleep and wake are never both
-		// useful at once.
-		if a.eng.Snapshot().State == state.Sleeping {
-			a.Wake()
-		} else {
-			a.Sleep()
-		}
 	case C.PET_QUIT:
 		a.Quit()
 	}

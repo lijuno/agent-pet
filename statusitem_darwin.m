@@ -20,7 +20,6 @@ extern void goStatusClick(int tag);
 static NSStatusItem *petItem = nil;
 static PetStatusTarget *petTarget = nil;
 static NSMenuItem *petStateItem = nil;
-static NSMenuItem *petSleepItem = nil;
 static NSMenuItem *petChangeItem = nil;
 
 static NSMenuItem *addItem(NSMenu *menu, NSString *title, int tag) {
@@ -93,8 +92,6 @@ void petStatusInstall(const void *png, int len, int onTop, int muted, int shown)
     [mute setState:muted ? NSControlStateValueOn : NSControlStateValueOff];
     [menu addItem:[NSMenuItem separatorItem]];
 
-    petSleepItem = addItem(menu, @"Sleep", PET_SLEEP);
-    [menu addItem:[NSMenuItem separatorItem]];
     addItem(menu, @"Quit Digital Pet", PET_QUIT);
 
     petItem.menu = menu;
@@ -133,13 +130,6 @@ void petStatusAddPet(const char *title, int tag, int checked) {
     [it setTag:tag];
     [it setState:checked ? NSControlStateValueOn : NSControlStateValueOff];
     [petChangeItem.submenu addItem:it];
-  });
-}
-
-void petStatusSetSleepTitle(const char *title) {
-  NSString *s = [NSString stringWithUTF8String:title];
-  onMain(^{
-    [petSleepItem setTitle:s];
   });
 }
 

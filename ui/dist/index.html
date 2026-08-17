@@ -573,11 +573,6 @@ function sizeItems() {
   return out;
 }
 
-function asleep() {
-  const snap = (view && view.snapshot) || {};
-  return snap.forced && snap.state === "sleeping";
-}
-
 function openMenu() {
   el.panel.classList.add("hidden");
   el.bubble.classList.remove("show");
@@ -604,12 +599,6 @@ function openMenu() {
       openMenu();
       flashBadge(muted ? "Muted" : "Unmuted");
     }, muted),
-    separator(),
-    // One toggle rather than two rows: the menu has to fit in a 300px-wide
-    // window without scrolling, and "Sleep" and "Wake" are never both useful.
-    asleep()
-      ? item("Wake Up", async () => { closeOverlays(); await call("Wake"); })
-      : item("Sleep", async () => { closeOverlays(); await call("Sleep"); }),
     separator(),
     item("Quit", () => call("Quit")),
   );

@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
@@ -565,14 +564,6 @@ func (a *App) SetAlwaysOnTop(b bool) {
 
 func (a *App) SetMuted(b bool) { a.muted = b }
 
-// Sleep sends the pet to sleep on demand. It is a forced state rather than a
-// fake event: pretending an agent went idle would corrupt the session model.
-func (a *App) Sleep() {
-	a.eng.Force(state.Sleeping, 8*time.Hour)
-}
-
-func (a *App) Wake() { a.eng.ClearForce() }
-
 // Info backs the status and statistics panels.
 type Info struct {
 	Version     string   `json:"version"`
@@ -714,8 +705,6 @@ func (a *App) appMenu() *menu.Menu {
 	})
 
 	pet.AddSeparator()
-	pet.AddText("Sleep", nil, func(*menu.CallbackData) { a.Sleep() })
-	pet.AddText("Wake", nil, func(*menu.CallbackData) { a.Wake() })
 	pet.AddSeparator()
 	pet.AddText("Quit", keys.CmdOrCtrl("q"), func(*menu.CallbackData) { a.Quit() })
 

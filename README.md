@@ -95,7 +95,7 @@ petctl event claude tests_passed --session demo
 | Drag | Move the pet. Its position is remembered, and dragging never opens a panel. |
 | Click | Status panel: what each session is doing. |
 | Double-click | Pet it. |
-| Right-click | Menu: status, statistics, change pet, always on top, mute, sleep, quit. |
+| Right-click | Menu: status, statistics, change pet, size, always on top, mute, quit. |
 | Menu bar | The same commands under the `Pet` menu while the app is frontmost. |
 
 The pet also lives in the macOS menu bar. Its icon shows the current state and

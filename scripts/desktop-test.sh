@@ -64,7 +64,7 @@ echo
 echo "Every menu item survives being clicked"
 # The suite used to click only Show Pet. Three of the others emitted an event
 # from the main thread and killed the process, and nothing here noticed.
-for item in show show status stats change ontop ontop mute mute sleep pet:byte pet:momo; do
+for item in show show status stats change ontop ontop mute mute pet:byte pet:momo; do
 	if ! curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
 		bad "clicking $item" "petd is gone — an earlier item killed it"
 		break
@@ -85,6 +85,12 @@ sleep 0.4
 
 echo
 echo "Change Pet is a submenu of the menu bar menu"
+# Start from a known character. This section used to assert on whichever pet
+# the last run — or a stray click — happened to leave active, so it passed in
+# sequence and failed on its own.
+curl -sS --max-time 5 -X POST "$BASE/pet" -H 'content-type: application/json' \
+	-d '{"id":"momo"}' >/dev/null
+sleep 0.6
 menu=$(field status_menu)
 want "it lists the cat"   "$menu" ":>SanMao"
 want "it lists the robot" "$menu" ":>Byte"

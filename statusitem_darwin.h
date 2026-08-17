@@ -19,7 +19,6 @@ enum {
   PET_CHANGE = 4,
   PET_ONTOP = 5,
   PET_MUTE = 6,
-  PET_SLEEP = 7,
   PET_QUIT = 8,
   // Items in the Change Pet submenu are PET_PICK_BASE + the pet's index in the
   // list the Go side last sent.
@@ -44,9 +43,6 @@ void petStatusSetCheck(int tag, int on);
 // from there rather than guessed at here.
 void petStatusClearPets(void);
 void petStatusAddPet(const char *title, int tag, int checked);
-
-// petStatusSetSleepTitle switches the sleep item between Sleep and Wake Up.
-void petStatusSetSleepTitle(const char *title);
 
 // petStatusProbe reports what actually happened, because nothing else can:
 // there is no way to look at the menu bar from a test. Bit 0: the item object
