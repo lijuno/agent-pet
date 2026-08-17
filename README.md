@@ -52,6 +52,20 @@ A release build:
 make build           # produces build/bin/digital-pet.app
 ```
 
+The bundle is neither signed nor notarized — there is no Apple Developer
+account behind this project. One you built yourself runs without complaint,
+because Gatekeeper only quarantines what arrives from elsewhere. One you
+downloaded is quarantined, and macOS refuses it with *"Digital Pet" is damaged
+and can't be opened*, which is not what has happened: the app is intact and
+unsigned. To run it anyway:
+
+```bash
+xattr -d com.apple.quarantine /Applications/digital-pet.app
+```
+
+Do that only if you trust where the bundle came from. Building from source is
+the honest way, and it is two commands.
+
 ## Connecting Claude Code
 
 ```bash
@@ -224,6 +238,11 @@ PNG strip per state plus a `manifest.json`; see [`docs/pets.md`](docs/pets.md).
   no image-generation service to opt into.
 - No accessibility, screen-recording, camera, microphone or keyboard-monitoring
   permission is requested, and no elevated privileges are needed.
+
+The event API is unauthenticated, so anything running as you — including
+whatever you ask your agent to run — can drive the pet. What that is and is not
+worth worrying about is set out in [SECURITY.md](SECURITY.md), along with how
+to report something privately.
 
 ## Layout
 
