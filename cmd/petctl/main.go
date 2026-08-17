@@ -349,6 +349,7 @@ type diagnostics struct {
 	EventsSeen        int               `json:"events_seen"`
 	State             string            `json:"state"`
 	Integrations      map[string]string `json:"integrations"`
+	Desktop           map[string]string `json:"desktop"`
 }
 
 func cmdDoctor(c *client) error {
@@ -402,6 +403,26 @@ func cmdDoctor(c *client) error {
 		}
 		fmt.Printf("    %s %-8s %s\n", mark, n, status)
 	}
+	if len(d.Desktop) > 0 {
+		fmt.Println()
+		fmt.Println("  Window")
+		keys := make([]string, 0, len(d.Desktop))
+		for k := range d.Desktop {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			mark := "·"
+			if k == "menu_bar" {
+				mark = tick
+				if strings.Contains(d.Desktop[k], "not installed") || strings.Contains(d.Desktop[k], "hidden") {
+					mark = cross
+				}
+			}
+			fmt.Printf("    %s %-16s %s\n", mark, k, d.Desktop[k])
+		}
+	}
+
 	reportAdapters()
 
 	fmt.Println()

@@ -3,7 +3,13 @@
 package main
 
 /*
-#cgo CFLAGS: -x objective-c -Wno-deprecated-declarations
+// -fobjc-arc is load-bearing. cgo compiles Objective-C without ARC by default,
+// and under manual retain/release the status item comes back autoreleased:
+// storing it in a static does not retain it, so it is deallocated at the next
+// drain of the pool. The icon appeared for no time at all, and the next message
+// sent to that pointer killed the process. With ARC the file-scope statics are
+// __strong and hold the objects for the life of the app.
+#cgo CFLAGS: -x objective-c -fobjc-arc -Wno-deprecated-declarations
 #cgo LDFLAGS: -framework Cocoa
 #include <stdlib.h>
 #include "statusitem_darwin.h"
@@ -86,6 +92,39 @@ func setSleepTitle(s state.State) {
 	c := C.CString(title)
 	defer C.free(unsafe.Pointer(c))
 	C.petStatusSetSleepTitle(c)
+}
+
+// visibleFrame is the area a window can actually occupy, from AppKit rather
+// than from arithmetic on the display size.
+func (a *App) visibleFrame() rect {
+	var x, y, w, h C.int
+	C.petVisibleFrame(&x, &y, &w, &h)
+	if w <= 0 || h <= 0 {
+		// AppKit had no answer. Fall back to the whole display less a guess at
+		// the menu bar, which is what this code did before it could ask.
+		sw, sh := a.screenSize()
+		return rect{X: 0, Y: menuBarInset, W: sw, H: sh - menuBarInset}
+	}
+	return rect{X: int(x), Y: int(y), W: int(w), H: int(h)}
+}
+
+// statusItemReport is what `petctl doctor` prints about the menu bar. There is
+// no way to look at a menu bar from a test, so the item is asked about itself.
+func statusItemReport() string {
+	bits := int(C.petStatusProbe())
+	if bits == 0 {
+		return "not installed"
+	}
+	out := "installed"
+	if bits&2 == 0 {
+		out = "installed but hidden — the menu bar may be full"
+	}
+	if bits&4 == 0 {
+		out += ", no button"
+	} else if bits&8 == 0 {
+		out += ", no icon (showing a letter instead)"
+	}
+	return out
 }
 
 func setStatusCheck(tag C.int, on bool) {

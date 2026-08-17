@@ -101,6 +101,11 @@ func main() {
 	}
 
 	app := NewApp(eng, log, cfgPath, srv.Addr())
+	// Let `petctl doctor` see the window and the menu bar. The server has no
+	// idea either exists; this is the only wire between them.
+	srv.Desktop = app.DesktopDiagnostics
+	srv.Panel = app.OpenPanel
+	srv.MoveWindow = app.MoveWindow
 	// Only as big as the character. The window grows when a panel opens and
 	// shrinks again when it closes — see App.OpenOverlay for why it must not
 	// simply stay large.

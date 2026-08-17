@@ -35,6 +35,17 @@ type Server struct {
 	mux  *http.ServeMux
 	http *http.Server
 	ln   net.Listener
+	// Desktop reports window and menu-bar facts that only the Wails layer can
+	// see. It is a function rather than a field so this package stays ignorant
+	// of the desktop shell, and nil in a headless test.
+	Desktop func() map[string]string
+	// Panel opens one of the pet's overlays. It exists so the window can be
+	// driven from a test — proving a menu is not clipped in a corner needs the
+	// menu actually opened in that corner, and a mouse is not available to a
+	// test. Nil in a headless run.
+	Panel func(kind string) error
+	// MoveWindow parks the window, for the same reason.
+	MoveWindow func(x, y int) error
 	// startedAt supports the uptime field in /healthz and `petctl doctor`.
 	startedAt time.Time
 }
@@ -62,6 +73,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/pets", s.handlePets)
 	s.mux.HandleFunc("/pet", s.handleSetPet)
 	s.mux.HandleFunc("/diagnostics", s.handleDiagnostics)
+	s.mux.HandleFunc("/window", s.handleWindow)
 }
 
 // Listen binds the address. It refuses non-loopback addresses unless the config
@@ -393,6 +405,48 @@ func (s *Server) handleSetPet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, p)
 }
 
+type windowRequest struct {
+	Panel string `json:"panel"`
+	X     *int   `json:"x"`
+	Y     *int   `json:"y"`
+}
+
+// handleWindow drives the window from outside the process, so the placement of
+// a menu in the corner of a screen can be checked by something other than a
+// person with a mouse. It moves nothing an ordinary user cannot move by
+// dragging, and opens nothing they cannot open by clicking.
+func (s *Server) handleWindow(w http.ResponseWriter, r *http.Request) {
+	if !methodIs(w, r, http.MethodPost) {
+		return
+	}
+	var req windowRequest
+	if err := decode(r, &req); err != nil {
+		badRequest(w, err.Error())
+		return
+	}
+	if req.X != nil && req.Y != nil {
+		if s.MoveWindow == nil {
+			badRequest(w, "no window to move: petd is running headless")
+			return
+		}
+		if err := s.MoveWindow(*req.X, *req.Y); err != nil {
+			badRequest(w, err.Error())
+			return
+		}
+	}
+	if req.Panel != "" {
+		if s.Panel == nil {
+			badRequest(w, "no window to open a panel in: petd is running headless")
+			return
+		}
+		if err := s.Panel(req.Panel); err != nil {
+			badRequest(w, err.Error())
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 // Diagnostics is the payload behind `petctl doctor` (§30).
 type Diagnostics struct {
 	Version           string            `json:"version"`
@@ -409,6 +463,9 @@ type Diagnostics struct {
 	EventsSeen        int               `json:"events_seen"`
 	State             string            `json:"state"`
 	Integrations      map[string]string `json:"integrations"`
+	// Desktop is window geometry and menu-bar status: things with no other way
+	// of being checked, since nothing in a test can look at a screen.
+	Desktop map[string]string `json:"desktop,omitempty"`
 }
 
 func (s *Server) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
@@ -429,6 +486,9 @@ func (s *Server) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 		EventsSeen:   snap.Stats.EventsSeen,
 		State:        string(snap.State),
 		Integrations: map[string]string{},
+	}
+	if s.Desktop != nil {
+		d.Desktop = s.Desktop()
 	}
 	for _, p := range s.eng.Library().List() {
 		d.Pets = append(d.Pets, p.ID)

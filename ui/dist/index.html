@@ -357,6 +357,14 @@ function placeBeside(node, wide) {
   if (left < 8) left = 8;
   node.style.left = Math.round(left) + "px";
   node.style.transform = "none";
+
+  // Tell the backend where this actually ended up. Only it knows where the
+  // window is on screen, so only it can say whether any of this fell off the
+  // edge — and that is the one thing about a menu in a corner that no other
+  // check here can see.
+  const box = node.getBoundingClientRect();
+  call("ReportOverlay", Math.round(box.left), Math.round(box.top),
+       Math.round(box.width), Math.round(box.height));
 }
 
 function togglePanel(kind) {
@@ -656,7 +664,11 @@ function apply(v) {
 async function boot() {
   if (window.runtime && window.runtime.EventsOn) {
     window.runtime.EventsOn("pet:update", apply);
-    window.runtime.EventsOn("pet:panel", (kind) => togglePanel(kind));
+    window.runtime.EventsOn("pet:panel", (kind) => {
+      if (kind === "menu") openMenu();
+      else if (kind === "close") closeOverlays();
+      else togglePanel(kind);
+    });
     window.runtime.EventsOn("pet:muted", (m) => { muted = !!m; });
   }
   info = await call("GetInfo");

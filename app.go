@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/menu"
@@ -34,6 +37,12 @@ type App struct {
 	baseW, baseH int
 	baseX, baseY int
 	grown        bool
+
+	// Where the last overlay landed, for diagnostics. Written from the
+	// frontend thread, read by an HTTP handler.
+	mu         sync.Mutex
+	overlay    rect
+	hasOverlay bool
 }
 
 func NewApp(eng *engine.Engine, log *slog.Logger, cfgPath, addr string) *App {
@@ -150,11 +159,14 @@ type Placement struct {
 // drag the character with it, which is why PetX comes back out: the frontend
 // puts the character at that offset instead of in the middle, so it stays
 // exactly where the user parked it while the panel beside it moves.
-func placeOverlay(base rect, ow, oh, screenW, screenH int) (rect, Placement) {
+// screen is the usable area of the display: the whole thing minus the menu bar
+// and the Dock. Placing against the full display puts a menu behind the Dock,
+// which looks exactly like falling off the bottom of the screen.
+func placeOverlay(base rect, ow, oh int, screen rect) (rect, Placement) {
 	petCX := base.X + base.W/2
 
-	roomAbove := base.Y - menuBarInset
-	roomBelow := screenH - (base.Y + base.H)
+	roomAbove := base.Y - screen.Y
+	roomBelow := (screen.Y + screen.H) - (base.Y + base.H)
 	// Prefer above, which is where the panel has always been; drop below only
 	// when it genuinely does not fit and below is the roomier side.
 	below := roomAbove < oh && roomBelow > roomAbove
@@ -168,19 +180,30 @@ func placeOverlay(base rect, ow, oh, screenW, screenH int) (rect, Placement) {
 	}
 
 	out.X = petCX - out.W/2
-	if limit := screenW - out.W; limit < 0 {
-		out.X = 0 // a window wider than the screen: nothing to choose between
+	if limit := screen.X + screen.W - out.W; limit < screen.X {
+		out.X = screen.X // wider than the screen: nothing to choose between
 	} else if out.X > limit {
 		out.X = limit
-	} else if out.X < 0 {
-		out.X = 0
+	} else if out.X < screen.X {
+		out.X = screen.X
+	}
+
+	petX := petCX - out.X
+	// The character can be dragged far enough off the side of the screen that
+	// its centre is outside the window we just pulled back on. Placing it there
+	// would hide it completely the moment a menu opened. Keep it at the edge
+	// it went out of.
+	if petX < 0 {
+		petX = 0
+	} else if petX > out.W {
+		petX = out.W
 	}
 
 	side := "above"
 	if below {
 		side = "below"
 	}
-	return out, Placement{Side: side, PetX: petCX - out.X}
+	return out, Placement{Side: side, PetX: petX}
 }
 
 // OpenOverlay makes room for an ow x oh overlay and reports where the frontend
@@ -195,8 +218,7 @@ func (a *App) OpenOverlay(ow, oh int) Placement {
 	x, y := wruntime.WindowGetPosition(a.ctx)
 	a.baseX, a.baseY, a.grown = x, y, true
 
-	sw, sh := a.screenSize()
-	r, p := placeOverlay(rect{X: x, Y: y, W: a.baseW, H: a.baseH}, ow, oh, sw, sh)
+	r, p := placeOverlay(rect{X: x, Y: y, W: a.baseW, H: a.baseH}, ow, oh, a.visibleFrame())
 
 	// Size and position are both set explicitly rather than trusting which
 	// edge a resize anchors to, which is a platform detail.
@@ -281,6 +303,116 @@ func (a *App) push() {
 		return
 	}
 	wruntime.EventsEmit(a.ctx, "pet:update", a.decorate(a.eng.Last()))
+}
+
+// OpenPanel and MoveWindow let the loopback API drive the window. They do
+// nothing a user cannot do with a mouse; they exist because a test has no
+// mouse, and the only way to know whether a menu is clipped in a corner is to
+// open one in a corner.
+func (a *App) OpenPanel(kind string) error {
+	if a.ctx == nil {
+		return fmt.Errorf("no window")
+	}
+	switch kind {
+	case "status", "stats", "pets", "menu", "close":
+	default:
+		return fmt.Errorf("unknown panel %q", kind)
+	}
+	wruntime.EventsEmit(a.ctx, "pet:panel", kind)
+	return nil
+}
+
+func (a *App) MoveWindow(x, y int) error {
+	if a.ctx == nil {
+		return fmt.Errorf("no window")
+	}
+	a.CloseOverlay()
+	wruntime.WindowSetPosition(a.ctx, x, y)
+	a.mu.Lock()
+	a.hasOverlay = false
+	a.mu.Unlock()
+	return nil
+}
+
+// ReportOverlay is the frontend telling the backend where an overlay actually
+// landed, in window coordinates.
+//
+// It exists to be tested. Whether a menu is clipped by the edge of a screen is
+// invisible to every other kind of check here: the geometry unit tests only
+// prove the arithmetic, and nothing on this machine is allowed to look at the
+// screen. With this, `petctl doctor` can state where the menu really is and
+// whether it fits, and a test can drive the window into each corner and read
+// the answer back.
+func (a *App) ReportOverlay(left, top, width, height int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.overlay = rect{X: left, Y: top, W: width, H: height}
+	a.hasOverlay = width > 0 && height > 0
+}
+
+// overlayReport describes the last overlay's position on screen, and whether
+// any of it fell off.
+func (a *App) overlayReport() string {
+	a.mu.Lock()
+	o, ok := a.overlay, a.hasOverlay
+	a.mu.Unlock()
+	if !ok {
+		return "none open"
+	}
+	wx, wy := wruntime.WindowGetPosition(a.ctx)
+	v := a.visibleFrame()
+	l, t := wx+o.X, wy+o.Y
+	r, b := l+o.W, t+o.H
+
+	var off []string
+	if l < v.X {
+		off = append(off, fmt.Sprintf("%dpt off the left", v.X-l))
+	}
+	if r > v.X+v.W {
+		off = append(off, fmt.Sprintf("%dpt off the right", r-(v.X+v.W)))
+	}
+	if t < v.Y {
+		off = append(off, fmt.Sprintf("%dpt under the menu bar", v.Y-t))
+	}
+	if b > v.Y+v.H {
+		off = append(off, fmt.Sprintf("%dpt behind the Dock or off the bottom", b-(v.Y+v.H)))
+	}
+	where := fmt.Sprintf("%dx%d at %d,%d", o.W, o.H, l, t)
+	if len(off) == 0 {
+		return where + " — fully on screen"
+	}
+	return where + " — " + strings.Join(off, ", ")
+}
+
+// DesktopDiagnostics reports what the window and the menu bar are actually
+// doing. None of it can be seen from a test — there is no screen to look at —
+// so the app is asked instead, and `petctl doctor` prints the answer.
+func (a *App) DesktopDiagnostics() map[string]string {
+	out := map[string]string{"menu_bar": statusItemReport()}
+	if a.ctx == nil {
+		return out
+	}
+	out["overlay"] = a.overlayReport()
+	x, y := wruntime.WindowGetPosition(a.ctx)
+	w, h := wruntime.WindowGetSize(a.ctx)
+	out["window"] = fmt.Sprintf("%dx%d at %d,%d", w, h, x, y)
+	out["window_base"] = fmt.Sprintf("%dx%d", a.baseW, a.baseH)
+
+	sw, sh := a.screenSize()
+	out["screen"] = fmt.Sprintf("%dx%d", sw, sh)
+	v := a.visibleFrame()
+	out["screen_usable"] = fmt.Sprintf("%dx%d at %d,%d", v.W, v.H, v.X, v.Y)
+	if screens, err := wruntime.ScreenGetAll(a.ctx); err == nil {
+		for _, s := range screens {
+			if s.IsCurrent {
+				// Logical and physical differ on a Retina display, and using
+				// the wrong one silently disables every edge calculation.
+				out["screen_physical"] = fmt.Sprintf("%dx%d", s.PhysicalSize.Width, s.PhysicalSize.Height)
+				break
+			}
+		}
+	}
+	return out
 }
 
 // screenSize is the display the window is on. A sane fallback matters more

@@ -144,7 +144,21 @@ curl -sS -X POST http://127.0.0.1:9876/event \
 | `GET /stream` | Server-sent events, one per state change |
 | `POST /test` | Force a state (`petctl test`) |
 | `GET /diagnostics` | Everything `petctl doctor` prints |
+| `POST /window` | Move the window or open a panel — see below |
 | `GET /pets`, `POST /pet` | List and switch characters |
+
+`POST /window` parks the window and opens its overlays, doing nothing you
+cannot do with a mouse. It exists because a test has no mouse, and the only way
+to know whether a menu is clipped in the corner of a screen is to open one in
+the corner of a screen and measure it:
+
+```bash
+curl -sS -X POST http://127.0.0.1:9876/window \
+  -H 'content-type: application/json' -d '{"x":0,"y":400}'
+curl -sS -X POST http://127.0.0.1:9876/window \
+  -H 'content-type: application/json' -d '{"panel":"menu"}'
+petctl doctor      # ... overlay  176x224 at 62,168 — fully on screen
+```
 
 The listener binds `127.0.0.1` and refuses anything else unless you explicitly
 set `server.allow_non_loopback`. See [`docs/events.md`](docs/events.md) for the

@@ -111,3 +111,61 @@ void petStatusSetSleepTitle(const char *title) {
     [petSleepItem setTitle:s];
   });
 }
+
+void petVisibleFrame(int *x, int *y, int *w, int *h) {
+  __block NSRect frame = NSZeroRect;
+  __block NSRect visible = NSZeroRect;
+  void (^read)(void) = ^{
+    // The screen the window is on, falling back to the main one.
+    NSScreen *screen = [NSApp keyWindow].screen;
+    if (screen == nil) {
+      screen = [NSScreen mainScreen];
+    }
+    if (screen != nil) {
+      frame = screen.frame;
+      visible = screen.visibleFrame;
+    }
+  };
+  if ([NSThread isMainThread]) {
+    read();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), read);
+  }
+  if (visible.size.width <= 0) {
+    *x = *y = *w = *h = 0;
+    return;
+  }
+  // Cocoa measures from the bottom left of the display; window positions are
+  // measured from the top left. Flip the origin.
+  *x = (int)(visible.origin.x - frame.origin.x);
+  *y = (int)((frame.origin.y + frame.size.height) -
+             (visible.origin.y + visible.size.height));
+  *w = (int)visible.size.width;
+  *h = (int)visible.size.height;
+}
+
+int petStatusProbe(void) {
+  __block int bits = 0;
+  // Synchronous on purpose: a probe that answered before the work happened
+  // would be worse than no probe. Never called from the main thread itself.
+  void (^check)(void) = ^{
+    if (petItem != nil) {
+      bits |= 1;
+      if ([petItem isVisible]) {
+        bits |= 2;
+      }
+      if (petItem.button != nil) {
+        bits |= 4;
+        if (petItem.button.image != nil) {
+          bits |= 8;
+        }
+      }
+    }
+  };
+  if ([NSThread isMainThread]) {
+    check();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), check);
+  }
+  return bits;
+}

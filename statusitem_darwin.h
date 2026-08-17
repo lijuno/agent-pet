@@ -38,4 +38,20 @@ void petStatusSetCheck(int tag, int on);
 // petStatusSetSleepTitle switches the sleep item between Sleep and Wake Up.
 void petStatusSetSleepTitle(const char *title);
 
+// petStatusProbe reports what actually happened, because nothing else can:
+// there is no way to look at the menu bar from a test. Bit 0: the item object
+// exists. Bit 1: the system says it is visible. Bit 2: it has a button. Bit 3:
+// the button has an image. `petctl doctor` prints the answer.
+int petStatusProbe(void);
+
+// petVisibleFrame is the part of the screen a window can actually occupy: the
+// whole display minus the menu bar and the Dock. Written in top-left
+// coordinates to match the ones Wails uses for window positions, rather than
+// Cocoa's bottom-left.
+//
+// Guessing this was the bug. A menu placed against the bottom of the "screen"
+// is behind the Dock, and against the top it is under the menu bar; both look
+// exactly like being off the edge.
+void petVisibleFrame(int *x, int *y, int *w, int *h);
+
 #endif
