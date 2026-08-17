@@ -50,6 +50,8 @@ type Server struct {
 	// that menu says. Nothing else can see a menu bar.
 	StatusItem func(name string) error
 	StatusMenu func() string
+	// SetShown hides or shows the pet, the same toggle the menu bar offers.
+	SetShown func(bool)
 	// startedAt supports the uptime field in /healthz and `petctl doctor`.
 	startedAt time.Time
 }
@@ -414,6 +416,7 @@ type windowRequest struct {
 	X          *int   `json:"x"`
 	Y          *int   `json:"y"`
 	StatusItem string `json:"status_item"`
+	Shown      *bool  `json:"shown"`
 }
 
 // handleWindow drives the window from outside the process, so the placement of
@@ -448,6 +451,13 @@ func (s *Server) handleWindow(w http.ResponseWriter, r *http.Request) {
 			badRequest(w, err.Error())
 			return
 		}
+	}
+	if req.Shown != nil {
+		if s.SetShown == nil {
+			badRequest(w, "no window: petd is running headless")
+			return
+		}
+		s.SetShown(*req.Shown)
 	}
 	if req.StatusItem != "" {
 		if s.StatusItem == nil {

@@ -108,6 +108,7 @@ func main() {
 	srv.MoveWindow = app.MoveWindow
 	srv.StatusItem = app.ClickStatusItem
 	srv.StatusMenu = app.StatusMenu
+	srv.SetShown = app.SetShown
 	// Only as big as the character. The window grows when a panel opens and
 	// shrinks again when it closes — see App.OpenOverlay for why it must not
 	// simply stay large.

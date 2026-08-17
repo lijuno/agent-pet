@@ -46,15 +46,18 @@ func (a *App) startTray(ctx context.Context) {
 		statusApp = a
 		statusMu.Unlock()
 
-		onTop, muted := 0, 0
+		onTop, muted, shown := 0, 0, 0
 		if a.alwaysOnTop {
 			onTop = 1
 		}
 		if a.muted {
 			muted = 1
 		}
+		if !a.hidden {
+			shown = 1
+		}
 		C.petStatusInstall(unsafe.Pointer(&trayIcon[0]), C.int(len(trayIcon)),
-			C.int(onTop), C.int(muted))
+			C.int(onTop), C.int(muted), C.int(shown))
 
 		// Keep the disabled first line in step, so the pet's state is readable
 		// from the menu bar without opening anything.
@@ -173,6 +176,9 @@ func statusItemReport() string {
 	return out
 }
 
+// syncShownCheck keeps the Show Pet tick in step with the window.
+func (a *App) syncShownCheck(on bool) { setStatusCheck(C.PET_SHOW, on) }
+
 func setStatusCheck(tag C.int, on bool) {
 	v := C.int(0)
 	if on {
@@ -191,7 +197,9 @@ func goStatusClick(tag C.int) {
 	}
 	switch tag {
 	case C.PET_SHOW:
-		a.showWindow()
+		// A toggle, so the same item both fetches the pet and puts it away.
+		// SetShown ticks the box itself.
+		a.SetShown(a.hidden)
 	case C.PET_STATUS:
 		a.emitPanel("status")
 	case C.PET_STATS:

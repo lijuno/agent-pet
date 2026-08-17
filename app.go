@@ -43,6 +43,10 @@ type App struct {
 	mu         sync.Mutex
 	overlay    rect
 	hasOverlay bool
+
+	// hidden mirrors the window's visibility, so the Show Pet checkbox can
+	// report it. Wails has no "is the window visible" call to ask.
+	hidden bool
 }
 
 func NewApp(eng *engine.Engine, log *slog.Logger, cfgPath, addr string) *App {
@@ -56,6 +60,7 @@ func NewApp(eng *engine.Engine, log *slog.Logger, cfgPath, addr string) *App {
 		alwaysOnTop: cfg.Pet.AlwaysOnTop,
 		baseW:       w,
 		baseH:       h,
+		hidden:      cfg.Window.StartHidden,
 	}
 }
 
@@ -401,6 +406,11 @@ func (a *App) DesktopDiagnostics() map[string]string {
 	}
 	out["overlay"] = a.overlayReport()
 	out["status_menu"] = a.StatusMenu()
+	if a.hidden {
+		out["visible"] = "no — hidden from the menu bar"
+	} else {
+		out["visible"] = "yes"
+	}
 	x, y := wruntime.WindowGetPosition(a.ctx)
 	w, h := wruntime.WindowGetSize(a.ctx)
 	out["window"] = fmt.Sprintf("%dx%d at %d,%d", w, h, x, y)
@@ -583,6 +593,30 @@ func (a *App) Quit() { wruntime.Quit(a.ctx) }
 
 // showWindow and emitPanel exist for the optional status-bar menu, which has to
 // reach into the window from outside the webview.
+// SetShown puts the pet on screen or takes it away. It backs the Show Pet
+// checkbox in the menu-bar menu, which is the only surface that can offer it:
+// a hidden pet cannot be clicked to bring itself back.
+func (a *App) SetShown(shown bool) {
+	if a.ctx == nil {
+		return
+	}
+	if shown {
+		a.hidden = false
+		a.showWindow()
+	} else {
+		a.CloseOverlay()
+		wruntime.WindowHide(a.ctx)
+		a.hidden = true
+	}
+	// Tick the box here rather than at the call site: visibility changes from
+	// the menu, from the API and from startup, and a checkbox that only tracks
+	// one of those is lying the rest of the time.
+	a.syncShownCheck(!a.hidden)
+}
+
+// Shown reports whether the pet is on screen.
+func (a *App) Shown() bool { return !a.hidden }
+
 // showWindow is "Show Pet". Three things have to be true for that to mean
 // anything, and only the first was being done:
 //
@@ -598,6 +632,7 @@ func (a *App) showWindow() {
 		return
 	}
 	a.CloseOverlay()
+	a.hidden = false
 	wruntime.WindowUnminimise(a.ctx)
 	wruntime.WindowShow(a.ctx)
 	wruntime.WindowSetAlwaysOnTop(a.ctx, a.alwaysOnTop)

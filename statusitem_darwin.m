@@ -42,7 +42,7 @@ static void onMain(void (^block)(void)) {
   }
 }
 
-void petStatusInstall(const void *png, int len, int onTop, int muted) {
+void petStatusInstall(const void *png, int len, int onTop, int muted, int shown) {
   NSData *data = [NSData dataWithBytes:png length:len];
   onMain(^{
     if (petItem != nil) {
@@ -71,7 +71,10 @@ void petStatusInstall(const void *png, int len, int onTop, int muted) {
     [petStateItem setEnabled:NO];
     [menu addItem:[NSMenuItem separatorItem]];
 
-    addItem(menu, @"Show Pet", PET_SHOW);
+    // A checkbox, like Always on Top: it reports whether the pet is on screen
+    // and toggles it, rather than being a one-way door.
+    NSMenuItem *show = addItem(menu, @"Show Pet", PET_SHOW);
+    [show setState:shown ? NSControlStateValueOn : NSControlStateValueOff];
     addItem(menu, @"Pet Status", PET_STATUS);
     addItem(menu, @"Statistics", PET_STATS);
     addItem(menu, @"Change Pet…", PET_CHANGE);

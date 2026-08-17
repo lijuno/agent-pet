@@ -26,7 +26,7 @@ enum {
 // petStatusInstall adds the status item. png is a template icon. Safe to call
 // from any goroutine: the work is dispatched to the main thread, which is the
 // only place AppKit will accept it.
-void petStatusInstall(const void *png, int len, int onTop, int muted);
+void petStatusInstall(const void *png, int len, int onTop, int muted, int shown);
 
 // petStatusSetState updates the disabled first line, so the pet's state is
 // readable without opening anything.

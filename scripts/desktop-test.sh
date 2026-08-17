@@ -45,6 +45,38 @@ for item in "Show Pet" "Pet Status" "Statistics" "Change Pet" "Always on Top" "M
 done
 
 echo
+echo "Show Pet is a toggle"
+# Start from a known state. Asserting on whatever the last run left behind
+# makes the first check depend on the previous one, across invocations.
+post '{"shown":true}'
+sleep 0.5
+want "it is ticked while the pet is on screen" "$(field status_menu)" "Show Pet[on]"
+post '{"status_item":"show"}'
+sleep 0.8
+menu=$(field status_menu)
+case "$menu" in
+*"Show Pet[on]"*) bad "clicking it hides the pet" "still ticked: $menu" ;;
+*"Show Pet"*) ok "clicking it hides the pet" ;;
+*) bad "clicking it hides the pet" "no Show Pet item: $menu" ;;
+esac
+want "and the pet reports itself hidden" "$(field visible)" "no"
+post '{"status_item":"show"}'
+sleep 0.8
+want "clicking it again brings the pet back" "$(field status_menu)" "Show Pet[on]"
+want "and the pet reports itself visible" "$(field visible)" "yes"
+# Hiding by any route must move the tick, not just clicking the item.
+post '{"shown":false}'
+sleep 0.6
+menu=$(field status_menu)
+case "$menu" in
+*"Show Pet[on]"*) bad "hiding from elsewhere clears the tick" "still ticked: $menu" ;;
+*) ok "hiding from elsewhere clears the tick" ;;
+esac
+post '{"shown":true}'
+sleep 0.6
+want "showing from elsewhere sets it again" "$(field status_menu)" "Show Pet[on]"
+
+echo
 echo "Show Pet finds a character parked off screen"
 usable=$(field usable)
 uw=$(echo "$usable" | sed 's/x.*//')
@@ -55,7 +87,9 @@ for spot in "$((uw - 40)),300 off the right" "-250,300 off the left" \
 	name=${spot#* }
 	post "{\"x\":${pos%,*},\"y\":${pos#*,}}"
 	sleep 0.4
-	post '{"status_item":"show"}'
+	# Showing, not toggling: the toggle would hide a pet that is already shown,
+	# which the section above covers.
+	post '{"shown":true}'
 	sleep 0.8
 	win=$(field window)
 	x=$(echo "$win" | sed 's/.* at //; s/,.*//')
@@ -88,6 +122,10 @@ for corner in "0,0 top-left" "$((uw - 300)),0 top-right" \
 		sleep 0.3
 	done
 done
+
+# Leave the pet as it was found: on screen, with nothing open.
+post '{"panel":"close"}'
+post '{"shown":true}'
 
 echo
 if [ "$fails" -eq 0 ]; then

@@ -85,15 +85,16 @@ petctl event claude tests_passed --session demo
 
 | Action | Result |
 |---|---|
-| Drag | Move the pet. Its position is remembered. |
+| Drag | Move the pet. Its position is remembered, and dragging never opens a panel. |
 | Click | Status panel: what each session is doing. |
 | Double-click | Pet it. |
 | Right-click | Menu: status, statistics, change pet, always on top, mute, sleep, quit. |
 | Menu bar | The same commands under the `Pet` menu while the app is frontmost. |
 
 The pet also lives in the macOS menu bar. Its icon shows the current state and
-carries the same commands, so the pet can be reached even when it is behind
-something. See [ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
+carries the same commands. **Show Pet** is a checkbox there: it puts the pet
+away and brings it back, and bringing it back also retrieves one that has been
+dragged off the edge of the screen. See [ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
 
 The character comes in three sizes — small, medium and large — from the
 right-click menu or the `pet.scale` setting.
