@@ -89,6 +89,10 @@ event, so a crashed agent cannot leak one.
 | Condition | Result |
 |---|---|
 | A `working`/`thinking` session goes quiet for `idle_after` (30s) | that session reads as `idle` |
-| No events at all for `sleeping_after` (60s) | `sleeping` |
-| An unanswered `attention` for `attention_timeout` (10m) | gives up, back to `idle` |
+| No sessions at all | `sleeping`, at once |
+| Every session idle and no events for `sleeping_after` (60s) | `sleeping` |
+| An unanswered `attention` for `attention_timeout` (10m) | gives up, and then sleeps like anything else |
+
+The sleep rule applies to `idle` and nothing else, so a pending `attention` is
+never slept through — see [ADR 0007](adr/0007-what-the-states-mean.md).
 
