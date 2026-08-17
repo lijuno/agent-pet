@@ -106,8 +106,7 @@ petctl event claude tests_passed --session demo
 
 | Action | Result |
 |---|---|
-| Drag | Move the pet. Its position is remembered, and dragging never opens a panel. |
-| Click | Status panel: what each session is doing. |
+| Drag | Move the pet. Its position is remembered. |
 | Double-click | Pet it. |
 | Right-click | Menu: status, statistics, change pet, size, always on top, mute, quit. |
 | Menu bar | The same commands under the `Pet` menu while the app is frontmost. |

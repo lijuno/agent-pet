@@ -156,6 +156,12 @@ echo "Show Pet finds a character parked off screen"
 usable=$(field usable)
 uw=$(echo "$usable" | sed 's/x.*//')
 uh=$(echo "$usable" | sed 's/^[0-9]*x//; s/ .*//')
+# The window is as big as the character, and the character has three sizes.
+# These bounds used to assume the medium one, so the whole section failed on a
+# pet set to Small — the test being wrong, not the pet.
+base=$(field window_base)
+ww=$(echo "$base" | sed 's/x.*//')
+wh=$(echo "$base" | sed 's/^[0-9]*x//')
 for spot in "$((uw - 40)),300 off the right" "-250,300 off the left" \
 	"300,$((uh - 40)) off the bottom"; do
 	pos=${spot%% *}
@@ -168,17 +174,17 @@ for spot in "$((uw - 40)),300 off the right" "-250,300 off the left" \
 	win=$(field window)
 	x=$(echo "$win" | sed 's/.* at //; s/,.*//')
 	y=$(echo "$win" | sed 's/.*,//')
-	if [ "$x" -ge 0 ] && [ "$y" -ge 0 ] && [ "$x" -le "$((uw - 300))" ] && [ "$y" -le "$((uh - 184))" ]; then
+	if [ "$x" -ge 0 ] && [ "$y" -ge 0 ] && [ "$x" -le "$((uw - ww))" ] && [ "$y" -le "$((uh - wh))" ]; then
 		ok "recovered from $name ($win)"
 	else
-		bad "recovered from $name" "still outside the usable ${uw}x${uh}: $win"
+		bad "recovered from $name" "a ${ww}x${wh} window outside the usable ${uw}x${uh}: $win"
 	fi
 done
 
 echo
 echo "Overlays stay on screen in every corner"
-for corner in "0,0 top-left" "$((uw - 300)),0 top-right" \
-	"0,$((uh - 184)) bottom-left" "$((uw - 300)),$((uh - 184)) bottom-right" \
+for corner in "0,0 top-left" "$((uw - ww)),0 top-right" \
+	"0,$((uh - wh)) bottom-left" "$((uw - ww)),$((uh - wh)) bottom-right" \
 	"-200,400 hanging off the left" "$((uw - 60)),400 hanging off the right"; do
 	pos=${corner%% *}
 	name=${corner#* }

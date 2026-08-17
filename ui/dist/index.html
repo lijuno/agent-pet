@@ -177,7 +177,7 @@
 <div id="stage">
   <div id="badge"></div>
 
-  <div id="pet" title="Click for status · double-click to pet · right-click for the menu">
+  <div id="pet" title="Drag to move · double-click to pet · right-click for the menu">
     <div id="bubble"></div>
     <div id="sprite"></div>
   </div>
@@ -209,7 +209,6 @@ let info = null;
 let pets = [];
 let currentAnimKey = "";
 let bubbleTimer = null;
-let clickTimer = null;
 let muted = false;
 
 /* --- backend plumbing ---------------------------------------------------- */
@@ -606,34 +605,15 @@ function openMenu() {
 
 /* --- interaction --------------------------------------------------------- */
 
-// DRAG_SLOP is how far the pointer may wander and still count as a click.
-const DRAG_SLOP = 4;
-let pressAt = null;
-
-// Screen coordinates, not client ones. Wails moves the window under the cursor
-// during a drag, so the pointer barely shifts relative to the page — client
-// coordinates say a drag across the desk was a click on the spot. Where the
-// pointer is on the *screen* is the thing that actually changed.
-el.pet.addEventListener("mousedown", (e) => {
-  if (e.button !== 0) return;
-  pressAt = { x: e.screenX, y: e.screenY };
-});
-
-el.pet.addEventListener("click", (e) => {
-  if (e.button !== 0) return;
-  const moved = pressAt &&
-    (Math.abs(e.screenX - pressAt.x) > DRAG_SLOP ||
-     Math.abs(e.screenY - pressAt.y) > DRAG_SLOP);
-  pressAt = null;
-  // Dragging the pet somewhere is not a request to open its status panel.
-  if (moved) return;
-  // Wait to see whether this becomes a double-click before opening a panel.
-  clearTimeout(clickTimer);
-  clickTimer = setTimeout(() => togglePanel("status"), 240);
-});
+// A left click on the character does nothing. The status panel is a menu item
+// — right-click, or the menu bar — and having a click open it as well made
+// picking the pet up an act with a side effect.
+//
+// Everything that distinguished a click from a drag went with it: that code
+// existed only to stop a drag opening the panel, and there is now no panel for
+// a drag to open.
 
 el.pet.addEventListener("dblclick", () => {
-  clearTimeout(clickTimer);
   closeOverlays();
   call("Interact");
 });

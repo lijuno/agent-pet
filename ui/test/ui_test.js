@@ -617,59 +617,21 @@ test("muting from the menu silences the pet immediately", withPet(async (w, d) =
 
 /* --- interaction --------------------------------------------------------- */
 
-test("a single click opens the status panel", withPet(async (w, d) => {
-  w.apply(view());
-  d.getElementById("pet").dispatchEvent(new w.MouseEvent("click", { bubbles: true, button: 0 }));
-  await tick(300); // the UI waits 240ms to see whether a double-click follows
-  assert(!d.getElementById("panel").classList.contains("hidden"), "a click should open the status panel");
-}));
-
-// Dragging the pet across the desk ends in a click on it, because the pointer
-// never left. Opening the status panel every time somebody moved the pet was
-// the result.
-test("dragging the pet does not open the panel", withPet(async (w, d) => {
-  stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
-  w.apply(view());
-  const pet = d.getElementById("pet");
-  // Wails moves the window under the cursor, so the pointer barely shifts
-  // relative to the page — only the screen coordinates change.
-  pet.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true, button: 0, screenX: 500, screenY: 300 }));
-  pet.dispatchEvent(new w.MouseEvent("click", { bubbles: true, button: 0, screenX: 740, screenY: 410 }));
-  await tick(300);
-  assert(d.getElementById("panel").classList.contains("hidden"),
-    "a drag should not open the status panel");
-}, GROWN_H));
-
-test("a click that barely moves still opens the panel", withPet(async (w, d) => {
-  stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
-  w.apply(view());
-  const pet = d.getElementById("pet");
-  // Nobody presses a mouse button without moving it a pixel or two.
-  pet.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true, button: 0, screenX: 500, screenY: 300 }));
-  pet.dispatchEvent(new w.MouseEvent("click", { bubbles: true, button: 0, screenX: 502, screenY: 301 }));
-  await tick(300);
-  assert(!d.getElementById("panel").classList.contains("hidden"),
-    "a click with a little wobble is still a click");
-}, GROWN_H));
-
-// A drag must not leave the next click poisoned.
-test("a click after a drag opens the panel", withPet(async (w, d) => {
+// Picking the pet up should not have a side effect, so a plain click does
+// nothing at all now. The status panel is a menu item.
+test("clicking the pet opens nothing", withPet(async (w, d) => {
   stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
   w.apply(view());
   const pet = d.getElementById("pet");
   pet.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true, button: 0, screenX: 500, screenY: 300 }));
-  pet.dispatchEvent(new w.MouseEvent("click", { bubbles: true, button: 0, screenX: 800, screenY: 300 }));
+  pet.dispatchEvent(new w.MouseEvent("click", { bubbles: true, button: 0, screenX: 500, screenY: 300 }));
+  // Longer than the delay the old handler waited before opening the panel.
   await tick(300);
-  assert(d.getElementById("panel").classList.contains("hidden"), "precondition: the drag was ignored");
-
-  pet.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true, button: 0, screenX: 800, screenY: 300 }));
-  pet.dispatchEvent(new w.MouseEvent("click", { bubbles: true, button: 0, screenX: 800, screenY: 300 }));
-  await tick(300);
-  assert(!d.getElementById("panel").classList.contains("hidden"),
-    "the click after a drag should still work");
+  assert(d.getElementById("panel").classList.contains("hidden"), "a click should open nothing");
+  assert(d.getElementById("menu").classList.contains("hidden"), "and certainly not the menu");
 }, GROWN_H));
 
-test("a double-click pets instead of opening the panel", withPet(async (w, d) => {
+test("a double-click pets the character", withPet(async (w, d) => {
   w.apply(view());
   const calls = stubBackend(w);
   const pet = d.getElementById("pet");
@@ -677,7 +639,7 @@ test("a double-click pets instead of opening the panel", withPet(async (w, d) =>
   pet.dispatchEvent(new w.MouseEvent("dblclick", { bubbles: true }));
   await tick(300);
   eq(called(calls, "Interact").length, 1, "a double-click should pet");
-  assert(d.getElementById("panel").classList.contains("hidden"), "the pending single-click panel should be cancelled");
+  assert(d.getElementById("panel").classList.contains("hidden"), "and open nothing");
 }));
 
 test("right-clicking opens the menu instead of the browser's", withPet(async (w, d) => {
