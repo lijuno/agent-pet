@@ -23,7 +23,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/lijunix/agent-digital-pet/internal/state"
+	"github.com/lijuno/agent-digital-pet/internal/state"
 )
 
 //go:embed build/trayicon.png

@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/lijunix/agent-digital-pet/internal/events"
+	"github.com/lijuno/agent-digital-pet/internal/events"
 )
 
 // Options are the tunable thresholds from §20 and §21. They are passed in

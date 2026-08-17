@@ -4,7 +4,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/lijunix/agent-digital-pet/internal/state"
+	"github.com/lijuno/agent-digital-pet/internal/state"
 )
 
 const fullManifest = `{

@@ -7,10 +7,10 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/lijunix/agent-digital-pet/internal/config"
-	"github.com/lijunix/agent-digital-pet/internal/events"
-	"github.com/lijunix/agent-digital-pet/internal/petassets"
-	"github.com/lijunix/agent-digital-pet/internal/state"
+	"github.com/lijuno/agent-digital-pet/internal/config"
+	"github.com/lijuno/agent-digital-pet/internal/events"
+	"github.com/lijuno/agent-digital-pet/internal/petassets"
+	"github.com/lijuno/agent-digital-pet/internal/state"
 )
 
 const manifestA = `{"id":"a","name":"Alpha","animations":{"idle":"idle.png","working":"working.png"}}`

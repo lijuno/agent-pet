@@ -16,10 +16,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lijunix/agent-digital-pet/internal/config"
-	"github.com/lijunix/agent-digital-pet/internal/engine"
-	"github.com/lijunix/agent-digital-pet/internal/events"
-	"github.com/lijunix/agent-digital-pet/internal/state"
+	"github.com/lijuno/agent-digital-pet/internal/config"
+	"github.com/lijuno/agent-digital-pet/internal/engine"
+	"github.com/lijuno/agent-digital-pet/internal/events"
+	"github.com/lijuno/agent-digital-pet/internal/state"
 )
 
 // MaxBody caps request bodies. Large enough for any legitimate hook payload,

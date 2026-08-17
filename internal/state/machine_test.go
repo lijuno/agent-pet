@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lijunix/agent-digital-pet/internal/events"
+	"github.com/lijuno/agent-digital-pet/internal/events"
 )
 
 // clock is a synthetic clock. The machine takes `now` as an argument

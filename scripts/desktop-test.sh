@@ -23,6 +23,22 @@ field() {
 	curl -sS --max-time 5 "$BASE/diagnostics" |
 		python3 -c "import sys,json;print(json.load(sys.stdin)['desktop'].get('$1',''))"
 }
+# move_to parks the window and waits until it has actually arrived. Wails
+# applies a move on the main thread, so posting and sleeping is a race: the
+# placement would be computed against the position the window is leaving, and
+# the pending move then lands on top of the result. Poll instead of guess.
+move_to() {
+	post "{\"x\":$1,\"y\":$2}"
+	i=0
+	while [ "$i" -lt 40 ]; do
+		case "$(field window)" in
+		*"at $1,$2") return 0 ;;
+		esac
+		sleep 0.1
+		i=$((i + 1))
+	done
+	return 1
+}
 ok()   { printf '  \033[32mok\033[0m   %s\n' "$1"; }
 bad()  { printf '  \033[31mFAIL\033[0m %s\n     %s\n' "$1" "$2"; fails=$((fails + 1)); }
 want() { # want <name> <haystack> <needle>
@@ -85,8 +101,7 @@ for spot in "$((uw - 40)),300 off the right" "-250,300 off the left" \
 	"300,$((uh - 40)) off the bottom"; do
 	pos=${spot%% *}
 	name=${spot#* }
-	post "{\"x\":${pos%,*},\"y\":${pos#*,}}"
-	sleep 0.4
+	move_to "${pos%,*}" "${pos#*,}" || bad "$name" "the window never reached ${pos}"
 	# Showing, not toggling: the toggle would hide a pet that is already shown,
 	# which the section above covers.
 	post '{"shown":true}'
@@ -109,8 +124,7 @@ for corner in "0,0 top-left" "$((uw - 300)),0 top-right" \
 	pos=${corner%% *}
 	name=${corner#* }
 	for kind in menu status; do
-		post "{\"x\":${pos%,*},\"y\":${pos#*,}}"
-		sleep 0.4
+		move_to "${pos%,*}" "${pos#*,}" || bad "$kind at $name" "the window never reached ${pos}"
 		post "{\"panel\":\"$kind\"}"
 		sleep 1
 		got=$(field overlay)

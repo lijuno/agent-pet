@@ -13,7 +13,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/lijunix/agent-digital-pet/internal/state"
+	"github.com/lijuno/agent-digital-pet/internal/state"
 )
 
 // Animation describes one state's sprite strip: N frames of FrameWidth ×
