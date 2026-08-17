@@ -64,7 +64,7 @@ echo
 echo "Every menu item survives being clicked"
 # The suite used to click only Show Pet. Three of the others emitted an event
 # from the main thread and killed the process, and nothing here noticed.
-for item in show show status stats change ontop ontop mute mute pet:byte pet:momo; do
+for item in show show status stats change ontop ontop mute mute pet:momo; do
 	if ! curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
 		bad "clicking $item" "petd is gone — an earlier item killed it"
 		break
@@ -92,19 +92,32 @@ curl -sS --max-time 5 -X POST "$BASE/pet" -H 'content-type: application/json' \
 	-d '{"id":"momo"}' >/dev/null
 sleep 0.6
 menu=$(field status_menu)
-want "it lists the cat"   "$menu" ":>SanMao"
-want "it lists the robot" "$menu" ":>Byte"
+want "it lists the cat" "$menu" ":>SanMao"
 want "the character in use is ticked" "$menu" ">SanMao (三毛)[on]"
 
-post '{"status_item":"pet:byte"}'
-sleep 0.8
-want "picking one switches the character" "$(field status_menu)" ">Byte[on]"
-
-# The tick has to follow a change made anywhere, not only from this menu.
-curl -sS --max-time 5 -X POST "$BASE/pet" -H 'content-type: application/json' \
-	-d '{"id":"momo"}' >/dev/null
-sleep 0.8
-want "and follows a change made elsewhere" "$(field status_menu)" ">SanMao (三毛)[on]"
+# Switching needs somewhere to switch to. Only SanMao ships today, so these
+# checks describe themselves as skipped rather than passing on nothing — add a
+# pack to ~/.local/share/digital-pet/pets and they run by themselves.
+others=$(curl -sS --max-time 5 "$BASE/pets" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+print(' '.join(p['id'] for p in d['pets'] if p['id'] != d['active']))")
+if [ -z "$others" ]; then
+	printf '  \033[33mskip\033[0m only one character is installed, so switching is untested\n'
+else
+	other=${others%% *}
+	post "{\"status_item\":\"pet:$other\"}"
+	sleep 0.8
+	case "$(field status_menu)" in
+	*"[on]"*) ok "picking one switches the character (to $other)" ;;
+	*) bad "picking one switches the character" "nothing ticked after choosing $other" ;;
+	esac
+	# The tick has to follow a change made anywhere, not only from this menu.
+	curl -sS --max-time 5 -X POST "$BASE/pet" -H 'content-type: application/json' \
+		-d '{"id":"momo"}' >/dev/null
+	sleep 0.8
+	want "and follows a change made elsewhere" "$(field status_menu)" ">SanMao (三毛)[on]"
+fi
 
 echo
 echo "Show Pet is a toggle"

@@ -31,6 +31,8 @@ type hookPayload struct {
 	HookEventName string `json:"hook_event_name"`
 	SessionID     string `json:"session_id"`
 	ToolName      string `json:"tool_name"`
+	// Reason distinguishes the two very different things SessionEnd means.
+	Reason string `json:"reason"`
 }
 
 // Hooks are the hook events this adapter subscribes to, in the order they are
@@ -70,7 +72,24 @@ var mapping = map[string]string{
 	"Notification":       "user_input_requested",
 	"Stop":               "task_completed",
 	"StopFailure":        "error",
-	"SessionEnd":         "session_ended",
+	// Only when the reason says Claude Code is going away; see endsTheAgent.
+	"SessionEnd": "session_ended",
+}
+
+// endsTheAgent reports whether a SessionEnd reason means Claude Code itself is
+// going away, rather than one conversation being replaced by another.
+//
+// Only two reasons say so plainly. Everything else — `clear`, `resume`, a
+// reason this build has never heard of, or none at all — is treated as the
+// agent still being there, which is the safer way to be wrong: a pet that
+// stays in colour for a Claude Code that has quit still falls asleep a minute
+// later, while a pet that greys out for one that is running is simply lying.
+func endsTheAgent(reason string) bool {
+	switch reason {
+	case "prompt_input_exit", "logout":
+		return true
+	}
+	return false
 }
 
 // Translate converts one hook payload into an event. It reports false when the
@@ -86,6 +105,17 @@ func Translate(stdin []byte) (Event, bool) {
 	if !ok {
 		return Event{}, false
 	}
+	if p.HookEventName == "SessionEnd" && !endsTheAgent(p.Reason) {
+		// The conversation ended, not Claude Code. Rewinding, /clear and
+		// resuming another session all fire SessionEnd while the agent carries
+		// on running — reporting those as the agent leaving is what made the
+		// pet grey out with Claude Code still open, and stay grey until the
+		// next session happened to begin.
+		//
+		// The session really is over, so it goes idle rather than being left
+		// mid-tool. What it must not do is disappear.
+		name = "idle"
+	}
 	ev := Event{Source: Source, Event: name, SessionID: p.SessionID}
 
 	// The tool name is the one piece of payload worth showing: it is what the
@@ -94,6 +124,11 @@ func Translate(stdin []byte) (Event, bool) {
 	// arguments out of the pet entirely.
 	if t := strings.TrimSpace(p.ToolName); t != "" {
 		ev.Metadata = map[string]string{"tool": t}
+	}
+	// One of a handful of fixed words, and the thing you need to know when the
+	// pet greys out at the wrong moment.
+	if r := strings.TrimSpace(p.Reason); r != "" && p.HookEventName == "SessionEnd" {
+		ev.Metadata = map[string]string{"reason": r}
 	}
 	return ev, true
 }

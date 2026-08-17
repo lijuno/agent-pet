@@ -64,6 +64,43 @@ func TestToolFailureComesFromItsOwnHook(t *testing.T) {
 	}
 }
 
+// Rewinding, /clear and resuming all end a conversation while Claude Code
+// keeps running. Reporting those as the agent leaving greyed the pet out with
+// Claude Code open, and it stayed grey until the next session began — 87
+// seconds, in the log that found this.
+func TestSessionEndOnlyEndsTheAgentWhenItReallyLeft(t *testing.T) {
+	staying := []string{"clear", "resume", "bypass_permissions_disabled", "", "something_new"}
+	for _, reason := range staying {
+		ev, ok := Translate([]byte(`{"hook_event_name":"SessionEnd","session_id":"a","reason":"` + reason + `"}`))
+		if !ok {
+			t.Fatalf("reason %q should still translate", reason)
+		}
+		if ev.Event != "idle" {
+			t.Fatalf("reason %q means Claude Code is still there, want idle, got %s", reason, ev.Event)
+		}
+	}
+	for _, reason := range []string{"prompt_input_exit", "logout"} {
+		ev, _ := Translate([]byte(`{"hook_event_name":"SessionEnd","session_id":"a","reason":"` + reason + `"}`))
+		if ev.Event != "session_ended" {
+			t.Fatalf("reason %q means Claude Code has gone, want session_ended, got %s", reason, ev.Event)
+		}
+	}
+}
+
+// The reason is one of a handful of fixed words, and it is what you need when
+// the pet greys out at a moment you did not expect.
+func TestSessionEndCarriesItsReason(t *testing.T) {
+	ev, _ := Translate([]byte(`{"hook_event_name":"SessionEnd","session_id":"a","reason":"clear"}`))
+	if got := ev.Metadata["reason"]; got != "clear" {
+		t.Fatalf("want the reason recorded, got %q", got)
+	}
+	// And it is not invented for hooks that have none.
+	ev, _ = Translate([]byte(`{"hook_event_name":"Stop","session_id":"a"}`))
+	if _, ok := ev.Metadata["reason"]; ok {
+		t.Fatalf("Stop has no reason, got %v", ev.Metadata)
+	}
+}
+
 func TestUnusablePayloadsAreSilent(t *testing.T) {
 	for _, in := range []string{
 		``,

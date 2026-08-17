@@ -5,7 +5,7 @@ Claude Code starts, the pet wakes up. A tool runs, it gets to work. A permission
 prompt appears, it turns and asks for you. Tests pass, it celebrates.
 
 **This repository contains Milestones 1 and 2** — the pet engine, the local
-event API, `petctl`, the desktop window, two built-in pixel-art characters,
+event API, `petctl`, the desktop window, a pixel-art character,
 and the Claude Code adapter. The Codex adapter is Milestone 3;
 [`docs/adr/0006-milestone-1-boundaries.md`](docs/adr/0006-milestone-1-boundaries.md)
 records which seam each deferred piece attaches to.
@@ -129,7 +129,7 @@ grey means the pet is running but nothing is. A state forced with
 
 ```yaml
 pet:
-  active: momo          # momo | byte, or your own pack
+  active: momo          # momo, or your own pack
   always_on_top: true
   scale: 1.0
 
@@ -192,14 +192,18 @@ hardening applied to untrusted input.
 
 ## Characters
 
-Two built-in packs ship in the binary:
+One built-in pack ships in the binary:
 
 | id | | |
 |---|---|---|
-| `momo` | SanMao (三毛), a tortoiseshell tabby | white bib, white socks, green eyes — the default |
-| `byte` | a terminal robot | screen face, blinking antenna |
+| `momo` | SanMao (三毛), a tortoiseshell tabby | white bib, white socks, green eyes |
 
-Each provides all ten states as 40×40 pixel-art sprite strips. Regenerate
+Everything that makes a second character work is still here — the library, the
+Change Pet submenu, `GET /pets`, `POST /pet` and their tests. `tools/genpets`
+still carries a second species definition as a worked example; shipping it
+again is one line.
+
+It provides all ten states as 40×40 pixel-art sprite strips. Regenerate
 them with:
 
 ```bash

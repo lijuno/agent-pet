@@ -42,9 +42,17 @@ exit or a stray `{` would interfere with the agent it is attached to.
 | `Notification` | `user_input_requested` |
 | `Stop` | `task_completed` |
 | `StopFailure` | `error` |
-| `SessionEnd` | `session_ended` |
+| `SessionEnd` | `session_ended`, but only when its `reason` says Claude Code is leaving — otherwise `idle` |
 
-Every row is something Claude Code reports outright. Nothing is inferred: in
+`SessionEnd` fires for two quite different things. Quitting Claude Code reports
+`prompt_input_exit` or `logout`; rewinding, `/clear` and resuming another
+session report something else while the agent carries on running. Treating them
+alike greyed the pet out with Claude Code still open. An unrecognised reason
+counts as "still running", which is the safer way to be wrong: a pet left in
+colour for an agent that has quit still falls asleep a minute later, whereas a
+pet greyed out for one that is running is simply lying.
+
+Every other row is something Claude Code reports outright. Nothing is inferred: in
 particular `PostToolUse` fires only on success and failures arrive as their own
 `PostToolUseFailure`, so the pet never has to guess how a tool call went. The
 tool *name* is the only payload that travels — never a command line, a prompt,

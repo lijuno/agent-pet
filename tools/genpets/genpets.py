@@ -120,7 +120,11 @@ BYTE = Species(
 )
 
 
-SPECIES = [MOMO, BYTE]
+# Only SanMao ships. BYTE stays defined on purpose: it is the worked example of
+# a second species — antenna instead of ears, a lit screen instead of a muzzle —
+# and the reason the drawing code is parametric at all. Adding it back to this
+# list is the whole of shipping a second character again.
+SPECIES = [MOMO]
 
 
 # --------------------------------------------------------------------------
