@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/lijuno/agent-digital-pet/adapters/claude"
+	"github.com/lijuno/agent-pet/adapters/claude"
 )
 
 // maxHookInput bounds what a hook will read from stdin. Hook payloads are a few

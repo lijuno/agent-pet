@@ -11,11 +11,11 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/lijuno/agent-digital-pet/internal/config"
-	"github.com/lijuno/agent-digital-pet/internal/engine"
-	"github.com/lijuno/agent-digital-pet/internal/events"
-	"github.com/lijuno/agent-digital-pet/internal/petassets"
-	"github.com/lijuno/agent-digital-pet/internal/state"
+	"github.com/lijuno/agent-pet/internal/config"
+	"github.com/lijuno/agent-pet/internal/engine"
+	"github.com/lijuno/agent-pet/internal/events"
+	"github.com/lijuno/agent-pet/internal/petassets"
+	"github.com/lijuno/agent-pet/internal/state"
 )
 
 // App is the Wails-facing adapter. It is deliberately thin: it forwards engine

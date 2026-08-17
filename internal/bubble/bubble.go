@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lijuno/agent-digital-pet/internal/events"
-	"github.com/lijuno/agent-digital-pet/internal/state"
+	"github.com/lijuno/agent-pet/internal/events"
+	"github.com/lijuno/agent-pet/internal/state"
 )
 
 // Message is one line to show above the pet.

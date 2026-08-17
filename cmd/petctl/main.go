@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lijuno/agent-digital-pet/adapters/claude"
+	"github.com/lijuno/agent-pet/adapters/claude"
 )
 
 var version = "dev"

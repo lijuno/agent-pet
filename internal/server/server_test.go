@@ -11,9 +11,9 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/lijuno/agent-digital-pet/internal/config"
-	"github.com/lijuno/agent-digital-pet/internal/engine"
-	"github.com/lijuno/agent-digital-pet/internal/petassets"
+	"github.com/lijuno/agent-pet/internal/config"
+	"github.com/lijuno/agent-pet/internal/engine"
+	"github.com/lijuno/agent-pet/internal/petassets"
 )
 
 const manifest = `{"id":"test","name":"Test","frame_width":40,"frame_height":40,

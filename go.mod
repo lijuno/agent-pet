@@ -1,4 +1,4 @@
-module github.com/lijuno/agent-digital-pet
+module github.com/lijuno/agent-pet
 
 go 1.23.0
 

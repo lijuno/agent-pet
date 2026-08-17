@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lijuno/agent-digital-pet/internal/events"
-	"github.com/lijuno/agent-digital-pet/internal/state"
+	"github.com/lijuno/agent-pet/internal/events"
+	"github.com/lijuno/agent-pet/internal/state"
 )
 
 var t0 = time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)

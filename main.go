@@ -21,10 +21,10 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 
-	"github.com/lijuno/agent-digital-pet/internal/config"
-	"github.com/lijuno/agent-digital-pet/internal/engine"
-	"github.com/lijuno/agent-digital-pet/internal/petassets"
-	"github.com/lijuno/agent-digital-pet/internal/server"
+	"github.com/lijuno/agent-pet/internal/config"
+	"github.com/lijuno/agent-pet/internal/engine"
+	"github.com/lijuno/agent-pet/internal/petassets"
+	"github.com/lijuno/agent-pet/internal/server"
 )
 
 // The built-in pet packs ship inside the binary under ui/dist/pets/ and are

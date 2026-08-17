@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lijuno/agent-digital-pet/internal/bubble"
-	"github.com/lijuno/agent-digital-pet/internal/config"
-	"github.com/lijuno/agent-digital-pet/internal/events"
-	"github.com/lijuno/agent-digital-pet/internal/petassets"
-	"github.com/lijuno/agent-digital-pet/internal/state"
+	"github.com/lijuno/agent-pet/internal/bubble"
+	"github.com/lijuno/agent-pet/internal/config"
+	"github.com/lijuno/agent-pet/internal/events"
+	"github.com/lijuno/agent-pet/internal/petassets"
+	"github.com/lijuno/agent-pet/internal/state"
 )
 
 // Update is what subscribers receive. It is a complete picture, not a delta, so
