@@ -71,7 +71,7 @@ what the adapter deliberately does not try to detect.
 To see the whole character without waiting for an agent to do something:
 
 ```bash
-for s in idle thinking working attention confused worried happy celebrate sleeping tired heart; do
+for s in idle thinking working attention confused worried happy celebrate sleeping heart; do
   petctl test $s --for 2s; sleep 2
 done
 ```
@@ -108,10 +108,15 @@ the pet. See [ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
 The character comes in three sizes — small, medium and large — from the
 right-click menu or the `pet.scale` setting.
 
-She dozes off a minute after the agent goes quiet, and wakes on the next
-event — a cat's answer to an idle prompt. A request for you is the exception:
-`attention` is never slept through, because nobody answers a prompt they were
-never shown.
+Two rules decide whether she is awake, and neither has a special case:
+
+- **No agent, no pet.** Claude Code exiting puts her to sleep at once, and so
+  does never having started.
+- **Idle and quiet for a minute** and she dozes off, waking on the next event.
+
+A pending request is `attention`, not idle, so it falls outside the second rule
+rather than being excused from it — nobody answers a prompt they were never
+shown.
 
 When no agent is connected — Claude Code has exited, or has not started — the
 character greys out. Awake and in colour means something is there to watch;
@@ -138,7 +143,6 @@ personality:
 thresholds:
   idle_after: 30s       # a quiet agent stops looking busy
   sleeping_after: 60s   # ... and shortly after that, dozes off
-  tired_after: 2h
 
 server:
   addr: 127.0.0.1:9876
@@ -195,7 +199,7 @@ Two built-in packs ship in the binary:
 | `momo` | SanMao (三毛), a tortoiseshell tabby | white bib, white socks, green eyes — the default |
 | `byte` | a terminal robot | screen face, blinking antenna |
 
-Each provides all eleven states as 40×40 pixel-art sprite strips. Regenerate
+Each provides all ten states as 40×40 pixel-art sprite strips. Regenerate
 them with:
 
 ```bash

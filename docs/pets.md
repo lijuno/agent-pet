@@ -15,7 +15,6 @@ A pack is a directory of PNGs and one JSON file. No build step, no tooling.
     ├── happy.png
     ├── celebrate.png
     ├── sleeping.png
-    ├── tired.png
     └── heart.png
 ```
 
@@ -64,7 +63,6 @@ idle animation runs at 3 fps.
     "happy":     { "file": "happy.png",     "frames": 4, "fps": 6,  "loop": true },
     "celebrate": { "file": "celebrate.png", "frames": 6, "fps": 10, "loop": true },
     "sleeping":  { "file": "sleeping.png",  "frames": 4, "fps": 2,  "loop": true },
-    "tired":     { "file": "tired.png",     "frames": 4, "fps": 2,  "loop": true },
     "heart":     { "file": "heart.png",     "frames": 4, "fps": 5,  "loop": true }
   }
 }
@@ -99,7 +97,6 @@ confused  → worried  → idle
 worried   → confused → idle
 happy     → celebrate → idle
 celebrate → happy    → idle
-tired     → sleeping → idle
 heart     → happy    → idle
 ```
 

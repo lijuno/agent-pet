@@ -92,7 +92,6 @@ func machineOptions(cfg config.Config) state.Options {
 	return state.Options{
 		IdleAfter:        t.IdleAfter.D(),
 		SleepingAfter:    t.SleepingAfter.D(),
-		TiredAfter:       t.TiredAfter.D(),
 		AttentionTimeout: t.AttentionTimeout.D(),
 		SessionStale:     t.SessionStale.D(),
 		HappyFor:         t.HappyFor.D(),

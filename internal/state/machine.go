@@ -21,8 +21,6 @@ type Options struct {
 	// is connected: asleep in colour reads as "Claude is there and quiet",
 	// asleep in grey as "Claude is gone".
 	SleepingAfter time.Duration
-	// TiredAfter: a session running this long makes an otherwise-idle pet tired.
-	TiredAfter time.Duration
 	// AttentionTimeout: how long an unanswered permission request keeps the pet
 	// in attention before it gives up. Prevents a stuck pet if the agent dies
 	// mid-prompt.
@@ -58,7 +56,6 @@ func DefaultOptions() Options {
 	return Options{
 		IdleAfter:        30 * time.Second,
 		SleepingAfter:    60 * time.Second,
-		TiredAfter:       120 * time.Minute,
 		AttentionTimeout: 10 * time.Minute,
 		SessionStale:     2 * time.Hour,
 		MaxSessions:      DefaultMaxSessions,
@@ -388,8 +385,8 @@ func (m *Machine) failState(s *Session) State {
 	return Confused
 }
 
-// Tick advances time-based transitions: transient decay, sleep, tired, and
-// stale session cleanup. It is idempotent for a given `now`.
+// Tick advances time-based transitions: transient decay and stale session
+// cleanup. It is idempotent for a given `now`.
 func (m *Machine) Tick(now time.Time) {
 	for k, s := range m.sessions {
 		if s.Transient != "" && !now.Before(s.TransientUntil) {
@@ -412,19 +409,27 @@ func (m *Machine) Tick(now time.Time) {
 }
 
 // Resolve computes the visible state. Call Tick first.
+// Resolve computes the visible state. Call Tick first.
+//
+// Two rules, and no special cases inside either:
+//
+//   - No sessions, no pet. An agent that reported it was leaving is gone, and
+//     so is one that never arrived; there is nothing to stay up for.
+//   - Idle and quiet for SleepingAfter, and she sleeps.
+//
+// The second rule says `best == Idle` rather than "anything calmer than
+// working", which is both shorter and the reason there is no exception list.
+// A pending request is `attention`, not idle, so it is never slept through —
+// that falls out of the rule instead of being carved out of it. Reactions are
+// not idle either, though they expire in seconds and could never have reached
+// the threshold anyway.
 func (m *Machine) Resolve(now time.Time) State {
 	if m.forced != "" && now.Before(m.forcedUntil) {
 		return m.forced
 	}
 
 	best := State("")
-	longestSession := time.Duration(0)
-	live := 0
 	for _, s := range m.sessions {
-		live++
-		if d := now.Sub(s.StartedAt); d > longestSession && !s.Ended {
-			longestSession = d
-		}
 		st := s.Effective(now, m.opts)
 		if best == "" {
 			best = st
@@ -433,24 +438,11 @@ func (m *Machine) Resolve(now time.Time) State {
 		}
 	}
 
-	if live == 0 {
-		if m.lastActivity.IsZero() || now.Sub(m.lastActivity) >= m.opts.SleepingAfter {
-			return Sleeping
-		}
-		return Idle
-	}
-
-	// Global inactivity wins over any steady state, but never over a transient
-	// reaction that is still on screen or a pending request for the user.
-	quiet := now.Sub(m.lastActivity)
-	if quiet >= m.opts.SleepingAfter && Priority(best) <= Priority(Working) {
+	if best == "" {
 		return Sleeping
 	}
-
-	// §21: a long session makes an idle pet visibly tired. It never overrides
-	// an active state, so it cannot hide real activity.
-	if best == Idle && longestSession >= m.opts.TiredAfter {
-		return Tired
+	if best == Idle && now.Sub(m.lastActivity) >= m.opts.SleepingAfter {
+		return Sleeping
 	}
 	return best
 }

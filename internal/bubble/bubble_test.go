@@ -52,21 +52,6 @@ func TestAttentionBypassesTheQuietPeriod(t *testing.T) {
 }
 
 // §21: playful, not nagging.
-func TestLongSessionCommentIsRare(t *testing.T) {
-	s := NewTemplater("gentle", "Momo", true, 11)
-	if _, ok := s.Say(t0, state.Idle, state.Tired, nil, 2*time.Hour); !ok {
-		t.Fatal("the first long-session comment should be allowed")
-	}
-	later := t0.Add(MinGap + time.Minute)
-	if _, ok := s.Say(later, state.Idle, state.Tired, nil, 3*time.Hour); ok {
-		t.Fatal("the pet must not nag about the same long session minutes later")
-	}
-	muchLater := t0.Add(LongSessionGap + time.Minute)
-	if _, ok := s.Say(muchLater, state.Idle, state.Tired, nil, 4*time.Hour); !ok {
-		t.Fatal("after a long gap one more comment is fine")
-	}
-}
-
 func TestNoTransitionNoTalk(t *testing.T) {
 	s := NewTemplater("gentle", "Momo", true, 5)
 	if _, ok := s.Say(t0, state.Working, state.Working, nil, 0); ok {

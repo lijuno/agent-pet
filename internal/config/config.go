@@ -75,7 +75,6 @@ type Personality struct {
 type Thresholds struct {
 	IdleAfter        Duration `yaml:"idle_after"`
 	SleepingAfter    Duration `yaml:"sleeping_after"`
-	TiredAfter       Duration `yaml:"tired_after"`
 	AttentionTimeout Duration `yaml:"attention_timeout"`
 	SessionStale     Duration `yaml:"session_stale"`
 	HappyFor         Duration `yaml:"happy_for"`
@@ -136,7 +135,6 @@ func Default() Config {
 		Thresholds: Thresholds{
 			IdleAfter:        Duration(30 * time.Second),
 			SleepingAfter:    Duration(60 * time.Second),
-			TiredAfter:       Duration(120 * time.Minute),
 			AttentionTimeout: Duration(10 * time.Minute),
 			SessionStale:     Duration(2 * time.Hour),
 			HappyFor:         Duration(6 * time.Second),
@@ -224,7 +222,6 @@ func (c Config) sanitised() Config {
 	}
 	fix(&c.Thresholds.IdleAfter, d.IdleAfter)
 	fix(&c.Thresholds.SleepingAfter, d.SleepingAfter)
-	fix(&c.Thresholds.TiredAfter, d.TiredAfter)
 	fix(&c.Thresholds.AttentionTimeout, d.AttentionTimeout)
 	fix(&c.Thresholds.SessionStale, d.SessionStale)
 	fix(&c.Thresholds.HappyFor, d.HappyFor)

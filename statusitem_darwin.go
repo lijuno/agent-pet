@@ -308,8 +308,6 @@ func trayLabel(s state.State) string {
 		return "Task done"
 	case state.Celebrate:
 		return "Tests passed"
-	case state.Tired:
-		return "Long session"
 	case state.Sleeping:
 		return "Sleeping"
 	case state.Heart:

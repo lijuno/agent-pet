@@ -14,13 +14,12 @@ const (
 	Worried   State = "worried"
 	Happy     State = "happy"
 	Celebrate State = "celebrate"
-	Tired     State = "tired"
 	Heart     State = "heart"
 )
 
 // All returns every state, in the order a pet pack should provide them.
 func All() []State {
-	return []State{Sleeping, Idle, Thinking, Working, Attention, Confused, Worried, Happy, Celebrate, Tired, Heart}
+	return []State{Sleeping, Idle, Thinking, Working, Attention, Confused, Worried, Happy, Celebrate, Heart}
 }
 
 func Valid(s State) bool {
@@ -45,7 +44,6 @@ var priority = map[State]int{
 	Heart:     55,
 	Working:   50,
 	Thinking:  40,
-	Tired:     30,
 	Idle:      20,
 	Sleeping:  10,
 }
@@ -72,6 +70,5 @@ var Fallback = map[State][]State{
 	Worried:   {Confused, Idle},
 	Happy:     {Celebrate, Idle},
 	Celebrate: {Happy, Idle},
-	Tired:     {Sleeping, Idle},
 	Heart:     {Happy, Idle},
 }

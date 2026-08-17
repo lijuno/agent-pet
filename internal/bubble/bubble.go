@@ -30,20 +30,18 @@ type Speaker interface {
 type trigger string
 
 const (
-	tWake        trigger = "wake"
-	tThinking    trigger = "thinking"
-	tWorking     trigger = "working"
-	tAttention   trigger = "attention"
-	tConfused    trigger = "confused"
-	tWorried     trigger = "worried"
-	tHappy       trigger = "happy"
-	tCelebrate   trigger = "celebrate"
-	tSleeping    trigger = "sleeping"
-	tTired       trigger = "tired"
-	tHeart       trigger = "heart"
-	tCommit      trigger = "commit"
-	tTestsFail   trigger = "tests_failed"
-	tLongSession trigger = "long_session"
+	tWake      trigger = "wake"
+	tThinking  trigger = "thinking"
+	tWorking   trigger = "working"
+	tAttention trigger = "attention"
+	tConfused  trigger = "confused"
+	tWorried   trigger = "worried"
+	tHappy     trigger = "happy"
+	tCelebrate trigger = "celebrate"
+	tSleeping  trigger = "sleeping"
+	tHeart     trigger = "heart"
+	tCommit    trigger = "commit"
+	tTestsFail trigger = "tests_failed"
 )
 
 // Templater is the built-in Speaker.
@@ -55,9 +53,6 @@ type Templater struct {
 
 	rng    *rand.Rand
 	lastAt time.Time
-	// lastLongSessionNag prevents the "we've been at this a while" line from
-	// becoming nagging (§21).
-	lastLongSessionNag time.Time
 	// recent guards against the same line twice in a row.
 	recent map[trigger]int
 }
@@ -65,9 +60,6 @@ type Templater struct {
 // MinGap is the floor between any two bubbles. A pet that talks during every
 // tool call is noise, not company.
 const MinGap = 25 * time.Second
-
-// LongSessionGap is how often the pet may comment on a long session.
-const LongSessionGap = 45 * time.Minute
 
 func NewTemplater(personality, name string, enabled bool, seed int64) *Templater {
 	if personality == "" {
@@ -100,18 +92,12 @@ func (t *Templater) Say(now time.Time, prev, next state.State, ev *events.Event,
 	if tr != tAttention && now.Sub(t.lastAt) < MinGap {
 		return Message{}, false
 	}
-	if tr == tLongSession && now.Sub(t.lastLongSessionNag) < LongSessionGap {
-		return Message{}, false
-	}
 
 	text := t.pick(tr)
 	if text == "" {
 		return Message{}, false
 	}
 	t.lastAt = now
-	if tr == tLongSession {
-		t.lastLongSessionNag = now
-	}
 	return Message{Text: text, TTL: ttl}, true
 }
 
@@ -140,8 +126,6 @@ func (t *Templater) triggerFor(prev, next state.State, ev *events.Event) (trigge
 		return tConfused, 6 * time.Second, true
 	case state.Sleeping:
 		return tSleeping, 5 * time.Second, true
-	case state.Tired:
-		return tLongSession, 8 * time.Second, true
 	case state.Heart:
 		return tHeart, 4 * time.Second, true
 	case state.Working:
@@ -190,88 +174,82 @@ func (t *Templater) pick(tr trigger) string {
 // celebrates; it never changes anything about permissions or security.
 var templates = map[string]map[trigger][]string{
 	"gentle": {
-		tWake:        {"Oh, you're back.", "Morning.", "Ready when you are."},
-		tWorking:     {"On it.", "Working away.", "Let's see."},
-		tAttention:   {"Claude needs you.", "Something's waiting for you.", "Your turn."},
-		tConfused:    {"Hm, that didn't work.", "Something went sideways.", "Let's try again."},
-		tWorried:     {"That's a few in a row.", "Maybe take a look at this one.", "This one's stubborn."},
-		tHappy:       {"Done.", "That one's finished.", "Nice."},
-		tCelebrate:   {"Tests passed!", "All green.", "Everything's passing."},
-		tTestsFail:   {"Tests are unhappy.", "Some tests failed.", "Red, for now."},
-		tCommit:      {"Committed.", "Saved that one.", "Nice, it's in."},
-		tSleeping:    {"I'll nap here.", "Resting.", "Wake me up any time."},
-		tLongSession: {"We've been at this a while.", "Maybe stretch a little?", "Long one today."},
-		tHeart:       {"Hello there.", "That's nice.", "Aw."},
+		tWake:      {"Oh, you're back.", "Morning.", "Ready when you are."},
+		tWorking:   {"On it.", "Working away.", "Let's see."},
+		tAttention: {"Claude needs you.", "Something's waiting for you.", "Your turn."},
+		tConfused:  {"Hm, that didn't work.", "Something went sideways.", "Let's try again."},
+		tWorried:   {"That's a few in a row.", "Maybe take a look at this one.", "This one's stubborn."},
+		tHappy:     {"Done.", "That one's finished.", "Nice."},
+		tCelebrate: {"Tests passed!", "All green.", "Everything's passing."},
+		tTestsFail: {"Tests are unhappy.", "Some tests failed.", "Red, for now."},
+		tCommit:    {"Committed.", "Saved that one.", "Nice, it's in."},
+		tSleeping:  {"I'll nap here.", "Resting.", "Wake me up any time."},
+		tHeart:     {"Hello there.", "That's nice.", "Aw."},
 	},
 	"cheerful": {
-		tWake:        {"Hey hey!", "You're back!", "Let's go!"},
-		tWorking:     {"Working on it!", "Here we go!", "Busy busy!"},
-		tAttention:   {"Claude needs you!", "Hey! Over here!", "You're needed!"},
-		tConfused:    {"Whoops!", "That didn't go to plan.", "Hmm, weird."},
-		tWorried:     {"Okay, that's three.", "This one's fighting back.", "Ooh, tricky."},
-		tHappy:       {"Done and done!", "Another one!", "Nailed it."},
-		tCelebrate:   {"Tests passed! 🎉", "ALL GREEN!", "Look at that!"},
-		tTestsFail:   {"Aw, some tests failed.", "Not green yet!", "So close."},
-		tCommit:      {"Committed!", "That's in the history books.", "Saved!"},
-		tSleeping:    {"Nap time!", "Zzz...", "See you soon!"},
-		tLongSession: {"Big session today!", "Water break?", "You've earned a stretch."},
-		tHeart:       {"Hi!", "Yay!", "That's the good stuff."},
+		tWake:      {"Hey hey!", "You're back!", "Let's go!"},
+		tWorking:   {"Working on it!", "Here we go!", "Busy busy!"},
+		tAttention: {"Claude needs you!", "Hey! Over here!", "You're needed!"},
+		tConfused:  {"Whoops!", "That didn't go to plan.", "Hmm, weird."},
+		tWorried:   {"Okay, that's three.", "This one's fighting back.", "Ooh, tricky."},
+		tHappy:     {"Done and done!", "Another one!", "Nailed it."},
+		tCelebrate: {"Tests passed! 🎉", "ALL GREEN!", "Look at that!"},
+		tTestsFail: {"Aw, some tests failed.", "Not green yet!", "So close."},
+		tCommit:    {"Committed!", "That's in the history books.", "Saved!"},
+		tSleeping:  {"Nap time!", "Zzz...", "See you soon!"},
+		tHeart:     {"Hi!", "Yay!", "That's the good stuff."},
 	},
 	"calm": {
-		tWake:        {"Ready.", "Beginning.", "Here."},
-		tWorking:     {"Working.", "In progress.", "Running."},
-		tAttention:   {"Input needed.", "Waiting on you.", "A decision is required."},
-		tConfused:    {"An error occurred.", "That failed.", "Unexpected result."},
-		tWorried:     {"Three failures now.", "Repeated failure.", "This is not converging."},
-		tHappy:       {"Complete.", "Finished.", "Task done."},
-		tCelebrate:   {"Tests passed.", "All tests green.", "Suite is passing."},
-		tTestsFail:   {"Tests failed.", "Suite is red.", "Failures reported."},
-		tCommit:      {"Commit recorded.", "Committed.", "Change saved."},
-		tSleeping:    {"Idle.", "Sleeping.", "Standing by."},
-		tLongSession: {"Two hours elapsed.", "Long session.", "Consider a break."},
-		tHeart:       {"Noted.", "Thank you.", "Acknowledged."},
+		tWake:      {"Ready.", "Beginning.", "Here."},
+		tWorking:   {"Working.", "In progress.", "Running."},
+		tAttention: {"Input needed.", "Waiting on you.", "A decision is required."},
+		tConfused:  {"An error occurred.", "That failed.", "Unexpected result."},
+		tWorried:   {"Three failures now.", "Repeated failure.", "This is not converging."},
+		tHappy:     {"Complete.", "Finished.", "Task done."},
+		tCelebrate: {"Tests passed.", "All tests green.", "Suite is passing."},
+		tTestsFail: {"Tests failed.", "Suite is red.", "Failures reported."},
+		tCommit:    {"Commit recorded.", "Committed.", "Change saved."},
+		tSleeping:  {"Idle.", "Sleeping.", "Standing by."},
+		tHeart:     {"Noted.", "Thank you.", "Acknowledged."},
 	},
 	"mischievous": {
-		tWake:        {"Ooh, what are we breaking today?", "Back for more?", "This'll be fun."},
-		tWorking:     {"Meddling.", "Poking at things.", "Doing crimes to your codebase."},
-		tAttention:   {"It wants permission. Say yes. Or don't.", "Somebody needs your signature.", "Decision time!"},
-		tConfused:    {"Ha. Broke it.", "That's a new one.", "Interesting failure."},
-		tWorried:     {"Three for three. Impressive.", "It really doesn't want to work.", "Stubborn little thing."},
-		tHappy:       {"Done. You're welcome.", "Too easy.", "Another one bites the dust."},
-		tCelebrate:   {"Tests passed! Suspicious.", "All green. What did you skip?", "Green! Don't touch anything."},
-		tTestsFail:   {"Tests said no.", "The suite has opinions.", "Red. Very red."},
-		tCommit:      {"Committed. No takebacks.", "It's in the history now.", "Future you will love this."},
-		tSleeping:    {"Napping. Don't do anything fun.", "Zzz.", "Wake me for the interesting bugs."},
-		tLongSession: {"Still here? Bold.", "Your chair misses standing.", "This is hour three, you know."},
-		tHeart:       {"Careful, I'll get used to that.", "Ooh.", "More of that."},
+		tWake:      {"Ooh, what are we breaking today?", "Back for more?", "This'll be fun."},
+		tWorking:   {"Meddling.", "Poking at things.", "Doing crimes to your codebase."},
+		tAttention: {"It wants permission. Say yes. Or don't.", "Somebody needs your signature.", "Decision time!"},
+		tConfused:  {"Ha. Broke it.", "That's a new one.", "Interesting failure."},
+		tWorried:   {"Three for three. Impressive.", "It really doesn't want to work.", "Stubborn little thing."},
+		tHappy:     {"Done. You're welcome.", "Too easy.", "Another one bites the dust."},
+		tCelebrate: {"Tests passed! Suspicious.", "All green. What did you skip?", "Green! Don't touch anything."},
+		tTestsFail: {"Tests said no.", "The suite has opinions.", "Red. Very red."},
+		tCommit:    {"Committed. No takebacks.", "It's in the history now.", "Future you will love this."},
+		tSleeping:  {"Napping. Don't do anything fun.", "Zzz.", "Wake me for the interesting bugs."},
+		tHeart:     {"Careful, I'll get used to that.", "Ooh.", "More of that."},
 	},
 	"sarcastic": {
-		tWake:        {"Oh good, we're doing this.", "Back already.", "Delighted."},
-		tWorking:     {"Doing the thing.", "Busy. Obviously.", "Working. Allegedly."},
-		tAttention:   {"It needs you. Again.", "Your input is required. Shocking.", "Permission, please."},
-		tConfused:    {"That went well.", "Flawless.", "Perfect, no notes."},
-		tWorried:     {"Third time's the charm, surely.", "Still failing. Bold strategy.", "We're committed to this bit now."},
-		tHappy:       {"It's done. Somehow.", "Task complete. Astonishing.", "Well, that worked."},
-		tCelebrate:   {"Tests passed. I'm as surprised as you.", "Green. Enjoy it while it lasts.", "All passing. For now."},
-		tTestsFail:   {"Tests failed. Called it.", "Red again.", "The suite disagrees."},
-		tCommit:      {"Committed. It's permanent now.", "That's in the log forever.", "Git remembers."},
-		tSleeping:    {"Finally, rest.", "Zzz. Don't wake me.", "Sleeping. Earned it."},
-		tLongSession: {"Three hours. Very normal.", "Your posture is a war crime.", "Consider: outside."},
-		tHeart:       {"Fine, that was nice.", "Don't tell anyone.", "Hm. Acceptable."},
+		tWake:      {"Oh good, we're doing this.", "Back already.", "Delighted."},
+		tWorking:   {"Doing the thing.", "Busy. Obviously.", "Working. Allegedly."},
+		tAttention: {"It needs you. Again.", "Your input is required. Shocking.", "Permission, please."},
+		tConfused:  {"That went well.", "Flawless.", "Perfect, no notes."},
+		tWorried:   {"Third time's the charm, surely.", "Still failing. Bold strategy.", "We're committed to this bit now."},
+		tHappy:     {"It's done. Somehow.", "Task complete. Astonishing.", "Well, that worked."},
+		tCelebrate: {"Tests passed. I'm as surprised as you.", "Green. Enjoy it while it lasts.", "All passing. For now."},
+		tTestsFail: {"Tests failed. Called it.", "Red again.", "The suite disagrees."},
+		tCommit:    {"Committed. It's permanent now.", "That's in the log forever.", "Git remembers."},
+		tSleeping:  {"Finally, rest.", "Zzz. Don't wake me.", "Sleeping. Earned it."},
+		tHeart:     {"Fine, that was nice.", "Don't tell anyone.", "Hm. Acceptable."},
 	},
 	"energetic": {
-		tWake:        {"LET'S GO!", "I'm up! I'm up!", "Ready ready ready!"},
-		tWorking:     {"GOING!", "Full speed!", "Crunching!"},
-		tAttention:   {"HEY! You're needed!", "Permission! Now!", "Look at the terminal!"},
-		tConfused:    {"Ouch!", "That broke!", "Error! Error!"},
-		tWorried:     {"THREE fails!", "It keeps happening!", "Something's really wrong!"},
-		tHappy:       {"DONE!", "Next!", "Boom. Finished."},
-		tCelebrate:   {"TESTS PASSED!", "ALL GREEN! 🎉", "PERFECT RUN!"},
-		tTestsFail:   {"Tests failed!", "Red!", "Try again!"},
-		tCommit:      {"COMMITTED!", "In the repo!", "Locked in!"},
-		tSleeping:    {"Powering down...", "Zzz!", "Recharging!"},
-		tLongSession: {"Marathon session!", "Stretch break! Go!", "Hydrate!"},
-		tHeart:       {"YES!", "Best human.", "More!"},
+		tWake:      {"LET'S GO!", "I'm up! I'm up!", "Ready ready ready!"},
+		tWorking:   {"GOING!", "Full speed!", "Crunching!"},
+		tAttention: {"HEY! You're needed!", "Permission! Now!", "Look at the terminal!"},
+		tConfused:  {"Ouch!", "That broke!", "Error! Error!"},
+		tWorried:   {"THREE fails!", "It keeps happening!", "Something's really wrong!"},
+		tHappy:     {"DONE!", "Next!", "Boom. Finished."},
+		tCelebrate: {"TESTS PASSED!", "ALL GREEN! 🎉", "PERFECT RUN!"},
+		tTestsFail: {"Tests failed!", "Red!", "Try again!"},
+		tCommit:    {"COMMITTED!", "In the repo!", "Locked in!"},
+		tSleeping:  {"Powering down...", "Zzz!", "Recharging!"},
+		tHeart:     {"YES!", "Best human.", "More!"},
 	},
 }
 

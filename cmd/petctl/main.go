@@ -106,7 +106,7 @@ Options:
   --addr HOST:PORT   petd address (default 127.0.0.1:9876, $DIGITAL_PET_ADDR)
 
 States:
-  idle thinking working attention confused worried happy celebrate sleeping tired heart
+  idle thinking working attention confused worried happy celebrate sleeping heart
 
 Events:
   session_started session_ended thinking_started working idle

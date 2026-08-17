@@ -63,12 +63,6 @@
       "fps": 2,
       "loop": true
     },
-    "tired": {
-      "file": "tired.png",
-      "frames": 4,
-      "fps": 2,
-      "loop": true
-    },
     "heart": {
       "file": "heart.png",
       "frames": 4,

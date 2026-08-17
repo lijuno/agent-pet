@@ -142,9 +142,9 @@ func TestAttentionTimesOut(t *testing.T) {
 	m := New(o)
 	step(m, c, ev(events.PermissionRequested, "a"))
 
-	// The pet dozes off quickly now, and a request for the user is the one
-	// thing it must never doze through: nobody is coming to answer a prompt
-	// they were never shown.
+	// A pending request is `attention`, not idle, so the sleep rule does not
+	// apply to it at all. Nobody comes to answer a prompt they were never
+	// shown.
 	if got := advance(m, c, o.SleepingAfter+time.Second); got != Attention {
 		t.Fatalf("a pending request must outlast the sleep threshold, got %s", got)
 	}
@@ -158,6 +158,37 @@ func TestAttentionTimesOut(t *testing.T) {
 	}
 }
 
+// An agent that said it was leaving is gone. There is nothing to stay up for,
+// and no timer to wait out: the pet used to stand there awake for a full
+// SleepingAfter after the session closed.
+func TestReportedExitSleepsAtOnce(t *testing.T) {
+	c := newClock()
+	m := New(DefaultOptions())
+	step(m, c, ev(events.SessionStarted, "a"))
+	step(m, c, ev(events.ToolStarted, "a"))
+	if got := step(m, c, ev(events.SessionEnded, "a")); got != Sleeping {
+		t.Fatalf("a reported exit should sleep at once, got %s", got)
+	}
+	if s := m.Snapshot(c.now()); len(s.Sessions) != 0 {
+		t.Fatalf("the session should be gone, got %d", len(s.Sessions))
+	}
+}
+
+// The sleep rule reads `best == Idle`, so anything that is not idle is simply
+// outside it. This is the case that matters: a request nobody answered.
+func TestPendingRequestIsNeverSleptThrough(t *testing.T) {
+	c := newClock()
+	o := DefaultOptions()
+	m := New(o)
+	step(m, c, ev(events.PermissionRequested, "a"))
+	for i := 0; i < 5; i++ {
+		if got := advance(m, c, o.SleepingAfter); got != Attention {
+			t.Fatalf("after %v quiet the request should still show, got %s",
+				time.Duration(i+1)*o.SleepingAfter, got)
+		}
+	}
+}
+
 func TestSilentAgentFallsBackToIdle(t *testing.T) {
 	c := newClock()
 	o := DefaultOptions()
@@ -166,29 +197,6 @@ func TestSilentAgentFallsBackToIdle(t *testing.T) {
 
 	if got := advance(m, c, o.IdleAfter+time.Second); got != Idle {
 		t.Fatalf("an agent that stopped reporting should not stay working, got %s", got)
-	}
-}
-
-func TestLongSessionMakesPetTired(t *testing.T) {
-	c := newClock()
-	o := DefaultOptions()
-	m := New(o)
-	step(m, c, ev(events.SessionStarted, "a"))
-
-	// Keep the session alive past the tired threshold with heartbeats, so the
-	// pet does not simply fall asleep.
-	for c.now().Sub(m.sessions[events.SessionKey{Source: "claude", ID: "a"}].StartedAt) < o.TiredAfter {
-		c.add(time.Minute)
-		m.Apply(c.now(), ev(events.Heartbeat, "a"))
-	}
-	s, _ := m.Advance(c.now())
-	if s.State != Tired {
-		t.Fatalf("a long idle session should look tired, got %s", s.State)
-	}
-
-	// Tired must never mask real work.
-	if got := step(m, c, ev(events.ToolStarted, "a")); got != Working {
-		t.Fatalf("work must override tired, got %s", got)
 	}
 }
 

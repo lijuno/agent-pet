@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the built-in pixel-art pet packs.
 
-Every built-in pet is drawn from the same parametric creature, so the eleven
+Every built-in pet is drawn from the same parametric creature, so the ten
 states read consistently across characters: same eye grammar, same prop
 positions, same bob rhythm. Only the silhouette and palette change.
 
@@ -35,7 +35,6 @@ STATES = {
     "happy":     (4, 6),
     "celebrate": (6, 10),
     "sleeping":  (4, 2),
-    "tired":     (4, 2),
     "heart":     (4, 5),
 }
 
@@ -207,21 +206,6 @@ def dots(d, x, y, c, phase):
             rect(d, x + i * 4, y - i, x + i * 4 + 2, y + 2 - i, c)
 
 
-def coffee(d, x, y, line):
-    """A mug, for the tired state."""
-    rect(d, x, y, x + 6, y + 6, (250, 250, 250, 255))
-    d.rectangle([x, y, x + 6, y + 6], outline=line)
-    rect(d, x + 1, y + 1, x + 5, y + 2, (120, 76, 48, 255))
-    d.line([(x + 7, y + 2), (x + 8, y + 3)], fill=line)
-    px(d, x + 7, y + 4, line)
-
-
-def steam(d, x, y, c, phase):
-    for i in range(2):
-        yy = y - (phase % 3) - i * 2
-        px(d, x + i * 2, yy, c)
-
-
 # --------------------------------------------------------------------------
 # expression grammar
 #
@@ -269,10 +253,6 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0)):
             d.line([(x, ey + 1), (x + 4, ey + 1)], fill=c)
             px(d, x, ey, c)
             px(d, x + 4, ey, c)
-    elif kind == "half":
-        for x in (lx - 1, rx - 1):
-            d.line([(x, ey), (x + 4, ey)], fill=c)
-            rect(d, x + 1, ey + 1, x + 2, ey + 2, c)
     elif kind == "squint":
         # A brow with a pupil under it. A bare bar would be indistinguishable
         # from the closed eyes of `sleeping` at this size.
@@ -418,7 +398,6 @@ BOB = {
     "happy":     [-1, 0, -2, 0],
     "celebrate": [-2, -4, -1, 0, -2, -4],
     "sleeping":  [0, 0, 1, 1],
-    "tired":     [1, 1, 2, 2],
     "heart":     [-1, 0, -1, 0],
 }
 
@@ -442,8 +421,6 @@ def draw_pet(s, state, i, n):
         bw, bh = bw - 1, bh + 1
     elif bob > 0:
         bw, bh = bw + 1, bh - 1
-    if state == "tired":
-        bw, bh = bw + 2, bh - 2
 
     # ground shadow — shrinks as the pet rises, which is what sells the hop
     shadow_w = bw - 2 + bob
@@ -577,11 +554,6 @@ def draw_pet(s, state, i, n):
         eyes(d, face_cx, ey + 1, "closed", pal)
         mouth(d, face_cx, my, "flat", pal, mstyle)
         zzz(d, PROP_X + 2, cy - 12, pal.line, i)
-    elif state == "tired":
-        eyes(d, face_cx, ey, "half", pal)
-        mouth(d, face_cx, my, "flat", pal, mstyle)
-        coffee(d, PROP_X + 4, cy + 2, pal.line)
-        steam(d, PROP_X + 6, cy, (210, 210, 210, 190), i)
     elif state == "heart":
         eyes(d, face_cx, ey, "happy", pal)
         mouth(d, face_cx, my, "smile", pal, mstyle)

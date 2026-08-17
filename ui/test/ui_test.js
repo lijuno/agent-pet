@@ -178,7 +178,7 @@ test("describe covers every state the machine can produce", withPet(async (w) =>
   // state.All() from internal/state/state.go. A state with no description
   // falls through to the idle wording, which would be a silent lie.
   const states = ["sleeping", "idle", "thinking", "working", "attention",
-    "confused", "worried", "happy", "celebrate", "tired", "heart"];
+    "confused", "worried", "happy", "celebrate", "heart"];
   for (const s of states) {
     const got = w.describe(s, []);
     assert(typeof got === "string" && got.length > 0, `${s} has no description`);

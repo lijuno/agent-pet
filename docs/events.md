@@ -75,7 +75,7 @@ Each `source` + `session_id` pair gets its own automaton. The visible state is
 the highest-priority one across all of them:
 
 ```
-attention > worried > confused > celebrate > happy > heart > working > thinking > tired > idle > sleeping
+attention > worried > confused > celebrate > happy > heart > working > thinking > idle > sleeping
 ```
 
 So if Claude session A is working and session B asks for permission, the pet
@@ -91,7 +91,4 @@ event, so a crashed agent cannot leak one.
 | A `working`/`thinking` session goes quiet for `idle_after` (30s) | that session reads as `idle` |
 | No events at all for `sleeping_after` (60s) | `sleeping` |
 | An unanswered `attention` for `attention_timeout` (10m) | gives up, back to `idle` |
-| A session running longer than `tired_after` (2h), pet otherwise idle | `tired` |
 
-`tired` never overrides real activity — a long session that starts working looks
-like it is working.
