@@ -53,9 +53,24 @@
     background-position: 0 0;
     /* A soft drop shadow lifts the character off any wallpaper. */
     filter: drop-shadow(0 3px 4px rgba(0,0,0,.35));
-    transition: opacity .18s ease;
+    transition: opacity .18s ease, filter .35s ease;
   }
   #sprite.swapping { opacity: 0; }
+
+  /*
+    No agent connected: the pet greys out. Claude Code having exited is the one
+    quiet the character could not previously express — she went on looking
+    exactly as alive as when something was running, which is the wrong thing to
+    say when nothing is there.
+
+    The whole filter is restated because `filter` replaces rather than adds,
+    and dropping the shadow here would make her flatten against the wallpaper
+    at the same moment she loses her colour.
+  */
+  body.inactive #sprite {
+    filter: grayscale(1) drop-shadow(0 3px 4px rgba(0, 0, 0, .3));
+    opacity: .78;
+  }
 
   /* Paused when the window is hidden, so a pet nobody can see costs nothing. */
   body.paused #sprite { animation-play-state: paused !important; }
@@ -664,11 +679,24 @@ document.addEventListener("visibilitychange", () => {
 
 /* --- updates ------------------------------------------------------------- */
 
+// inactive reports that no agent is connected — Claude Code has exited, or has
+// not started. Sessions are what the pet is watching, so none of them means
+// there is nothing to watch.
+//
+// A forced state is excluded: `petctl test celebrate` exists to look at the
+// animation, and greying out the thing somebody asked to look at helps nobody.
+function inactive(v) {
+  const snap = (v && v.snapshot) || {};
+  if (snap.forced) return false;
+  return ((snap.sessions || []).length === 0);
+}
+
 function apply(v) {
   if (!v) return;
   view = v;
   muted = !!v.muted;
   renderAnimation(v.animation, v.scale);
+  document.body.classList.toggle("inactive", inactive(v));
   if (v.bubble && v.bubble.text) showBubble(v.bubble.text, v.bubble.ttl_ns);
   if (!el.panel.classList.contains("hidden")) {
     const kind = el.panel.dataset.kind;

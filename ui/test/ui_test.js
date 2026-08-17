@@ -249,6 +249,41 @@ test("apply ignores a null update", withPet(async (w) => {
   w.apply(undefined);
 }));
 
+/* --- no agent connected --------------------------------------------------- */
+
+// Claude Code exiting is the one quiet the character had no way to express:
+// she looked exactly as alive as when something was running.
+test("the pet greys out when no agent is connected", withPet(async (w, d) => {
+  w.apply(view({ snapshot: { state: "sleeping", forced: false, stats: {}, sessions: [] } }));
+  assert(d.body.classList.contains("inactive"), "no sessions should read as inactive");
+  const f = w.getComputedStyle(d.getElementById("sprite")).filter;
+  assert(f.includes("grayscale"), `sprite should be grey, filter is ${f}`);
+  // The shadow must survive: `filter` replaces, it does not add, so losing it
+  // here would flatten her against the wallpaper at the same moment.
+  assert(f.includes("drop-shadow"), `sprite should keep its shadow, filter is ${f}`);
+}));
+
+test("the pet has its colour while an agent is connected", withPet(async (w, d) => {
+  w.apply(view({ snapshot: { state: "working", forced: false, stats: {}, sessions: [session()] } }));
+  assert(!d.body.classList.contains("inactive"), "a live session is not inactive");
+  const f = w.getComputedStyle(d.getElementById("sprite")).filter;
+  assert(!f.includes("grayscale"), `sprite should keep its colour, filter is ${f}`);
+}));
+
+test("colour comes back when an agent connects again", withPet(async (w, d) => {
+  w.apply(view({ snapshot: { state: "sleeping", forced: false, stats: {}, sessions: [] } }));
+  assert(d.body.classList.contains("inactive"), "precondition: grey");
+  w.apply(view({ snapshot: { state: "working", forced: false, stats: {}, sessions: [session()] } }));
+  assert(!d.body.classList.contains("inactive"), "she should colour up when work starts");
+}));
+
+// `petctl test celebrate` exists to look at an animation. Greying out the
+// thing somebody asked to look at helps nobody.
+test("a forced state keeps its colour with no sessions", withPet(async (w, d) => {
+  w.apply(view({ snapshot: { state: "celebrate", forced: true, stats: {}, sessions: [] } }));
+  assert(!d.body.classList.contains("inactive"), "a forced state should not grey out");
+}));
+
 /* --- untrusted content (§26) --------------------------------------------- */
 
 const XSS = '<img src=x onerror="window.__pwned=true">';

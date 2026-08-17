@@ -108,6 +108,11 @@ the pet. See [ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
 The character comes in three sizes — small, medium and large — from the
 right-click menu or the `pet.scale` setting.
 
+When no agent is connected — Claude Code has exited, or has not started — the
+character greys out. Awake and in colour means something is there to watch;
+grey means the pet is running but nothing is. A state forced with
+`petctl test` keeps its colour, since the point of forcing one is to look at it.
+
 ## Configuration
 
 `~/.config/digital-pet/config.yaml` is written on first run.
