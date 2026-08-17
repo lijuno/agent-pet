@@ -56,6 +56,11 @@ class Palette:
     patch: tuple = None
     white: tuple = (252, 250, 246, 255)
     nose: tuple = None
+    # think is the colour of the thinking dots. They used to be drawn in
+    # `line`, the character's own outline, which made the one state that says
+    # "the agent is reasoning" the hardest of all to notice. Props that carry a
+    # state need to contrast with the animal, not match it.
+    think: tuple = None
 
 
 @dataclass
@@ -91,6 +96,7 @@ MOMO = Species(
         patch=(86, 62, 48, 255),
         white=(252, 250, 246, 255),
         nose=(214, 146, 138, 255),
+        think=(120, 196, 255, 255),    # cool blue, opposite her ginger
     ),
     ears="cat", face="muzzle", tail=True, body_w=24, body_h=22,
     markings="tortie",
@@ -108,6 +114,7 @@ BYTE = Species(
         accent=(96, 218, 228, 255),
         eye=(96, 218, 228, 255),
         blush=(96, 218, 228, 90),
+        think=(150, 236, 244, 255),
     ),
     ears="antenna", face="screen", tail=False, body_w=23, body_h=21,
 )
@@ -198,12 +205,20 @@ def sweat(d, x, y, c):
     px(d, x + 1, y + 3, c)
 
 
-def dots(d, x, y, c, phase):
-    """Thinking dots, filling in one at a time then clearing."""
+def dots(d, x, y, fill, edge, phase):
+    """Thinking dots, filling in one at a time then clearing.
+
+    Each dot is a bright square inside a dark one. The fill separates it from
+    the character; the edge separates it from whatever wallpaper is behind the
+    window, which may be any colour at all and is the reason a single flat
+    colour cannot work here.
+    """
     shown = phase % 4
     for i in range(3):
         if i < shown:
-            rect(d, x + i * 4, y - i, x + i * 4 + 2, y + 2 - i, c)
+            x0, y0 = x + i * 4, y - i
+            rect(d, x0 - 1, y0 - 1, x0 + 3, y0 + 3, edge)
+            rect(d, x0, y0, x0 + 2, y0 + 2, fill)
 
 
 # --------------------------------------------------------------------------
@@ -518,7 +533,7 @@ def draw_pet(s, state, i, n):
     elif state == "thinking":
         eyes(d, face_cx, ey, "closed" if blink else "dot", pal, look=(-1, -1))
         mouth(d, face_cx, my, "flat", pal, mstyle)
-        dots(d, PROP_X + 1, cy - 10, pal.line, i)
+        dots(d, PROP_X + 1, cy - 10, pal.think or pal.accent, pal.line, i)
     elif state == "working":
         eyes(d, face_cx, ey, "squint", pal)
         mouth(d, face_cx, my, "flat", pal, mstyle)
