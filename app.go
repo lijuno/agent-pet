@@ -29,11 +29,11 @@ type App struct {
 	muted       bool
 	addr        string
 
-	// The character-only window size, and how far the window is currently
-	// grown past it to make room for a panel.
+	// The character-only window size, and where the window was before an
+	// overlay grew it. Restoring that rect puts the character back exactly.
 	baseW, baseH int
-	grewBy       int
-	grewUp       bool
+	baseX, baseY int
+	grown        bool
 }
 
 func NewApp(eng *engine.Engine, log *slog.Logger, cfgPath, addr string) *App {
@@ -118,56 +118,189 @@ func (a *App) startup(ctx context.Context) {
 // have opened upward.
 const menuBarInset = 28
 
-// overlaySide decides which way the window should grow to fit an overlay of
-// `needed` points, given the window's distance from the top of the screen.
-// Pulled out of the runtime calls so the decision itself can be tested.
-func overlaySide(windowY, needed int) string {
-	if windowY-menuBarInset >= needed {
-		return "above"
-	}
-	return "below"
+// sideMargin keeps an overlay off the very edge of the window.
+const sideMargin = 8
+
+type rect struct{ X, Y, W, H int }
+
+// Placement is where the window goes while an overlay is open, and where the
+// character sits inside it. It crosses to the frontend, which cannot know any
+// of this: a webview has no idea where its window is on screen.
+type Placement struct {
+	// Side is "above" or "below" — which side of the character the overlay
+	// is drawn on.
+	Side string `json:"side"`
+	// PetX is the character's centre, measured from the window's left edge.
+	// It is normally half the window, but not when the window had to be
+	// pushed sideways to keep the overlay on screen.
+	PetX int `json:"pet_x"`
 }
 
-// OpenOverlay grows the window to fit a panel of h points and reports which
-// side of the character it should be drawn on.
+// placeOverlay fits a window containing both the character and an ow x oh
+// overlay onto the screen, without moving the character.
 //
-// Either way the character must not move. It is anchored to the bottom of the
-// window, so growing upward means moving the top edge up by exactly the amount
-// the window grew, leaving the bottom edge — and the pet — where they were.
-// Growing downward leaves the top edge alone, and the frontend anchors the pet
-// to the top instead, which holds it still for the same reason in reverse.
+// Vertically the overlay goes above when there is room and below when there is
+// not, and the window grows by exactly the overlay's height either way. That
+// keeps the character still: growing upward moves the top edge and leaves the
+// bottom, growing downward does the reverse, and the frontend anchors the pet
+// to whichever edge did not move.
 //
-// Size and position are both set explicitly rather than relying on which edge
-// a resize happens to anchor to, which is a platform detail.
-func (a *App) OpenOverlay(h int) string {
-	if a.ctx == nil || h <= 0 {
-		return "above"
+// Horizontally the window is widened to hold the overlay and then slid back
+// onto the screen if it hangs off an edge. Sliding the window would normally
+// drag the character with it, which is why PetX comes back out: the frontend
+// puts the character at that offset instead of in the middle, so it stays
+// exactly where the user parked it while the panel beside it moves.
+func placeOverlay(base rect, ow, oh, screenW, screenH int) (rect, Placement) {
+	petCX := base.X + base.W/2
+
+	roomAbove := base.Y - menuBarInset
+	roomBelow := screenH - (base.Y + base.H)
+	// Prefer above, which is where the panel has always been; drop below only
+	// when it genuinely does not fit and below is the roomier side.
+	below := roomAbove < oh && roomBelow > roomAbove
+
+	out := rect{W: base.W, H: base.H + oh, Y: base.Y}
+	if ow+2*sideMargin > out.W {
+		out.W = ow + 2*sideMargin
+	}
+	if !below {
+		out.Y = base.Y - oh
+	}
+
+	out.X = petCX - out.W/2
+	if limit := screenW - out.W; limit < 0 {
+		out.X = 0 // a window wider than the screen: nothing to choose between
+	} else if out.X > limit {
+		out.X = limit
+	} else if out.X < 0 {
+		out.X = 0
+	}
+
+	side := "above"
+	if below {
+		side = "below"
+	}
+	return out, Placement{Side: side, PetX: petCX - out.X}
+}
+
+// OpenOverlay makes room for an ow x oh overlay and reports where the frontend
+// should draw the character and the panel. See placeOverlay.
+func (a *App) OpenOverlay(ow, oh int) Placement {
+	centred := Placement{Side: "above", PetX: a.baseW / 2}
+	if a.ctx == nil || oh <= 0 {
+		return centred
 	}
 	a.CloseOverlay() // never stack two growths
+
 	x, y := wruntime.WindowGetPosition(a.ctx)
-	side := overlaySide(y, h)
-	top := y
-	if side == "above" {
-		top = y - h
-	}
-	wruntime.WindowSetSize(a.ctx, a.baseW, a.baseH+h)
-	wruntime.WindowSetPosition(a.ctx, x, top)
-	a.grewBy, a.grewUp = h, side == "above"
-	return side
+	a.baseX, a.baseY, a.grown = x, y, true
+
+	sw, sh := a.screenSize()
+	r, p := placeOverlay(rect{X: x, Y: y, W: a.baseW, H: a.baseH}, ow, oh, sw, sh)
+
+	// Size and position are both set explicitly rather than trusting which
+	// edge a resize anchors to, which is a platform detail.
+	wruntime.WindowSetSize(a.ctx, r.W, r.H)
+	wruntime.WindowSetPosition(a.ctx, r.X, r.Y)
+	return p
 }
 
-// CloseOverlay returns the window to the size of the character alone.
+// CloseOverlay returns the window to the character alone, exactly where it was.
 func (a *App) CloseOverlay() {
-	if a.ctx == nil || a.grewBy == 0 {
+	if a.ctx == nil || !a.grown {
 		return
 	}
-	x, y := wruntime.WindowGetPosition(a.ctx)
-	if a.grewUp {
-		y += a.grewBy
-	}
 	wruntime.WindowSetSize(a.ctx, a.baseW, a.baseH)
-	wruntime.WindowSetPosition(a.ctx, x, y)
-	a.grewBy, a.grewUp = 0, false
+	wruntime.WindowSetPosition(a.ctx, a.baseX, a.baseY)
+	a.grown = false
+}
+
+// Sizes are the presets offered in the menu. Free-form scales still work in
+// config.yaml; these are the three worth clicking.
+var Sizes = []struct {
+	Name  string  `json:"name"`
+	Scale float64 `json:"scale"`
+}{
+	{"Small", 0.7},
+	{"Medium", 1.0},
+	{"Large", 1.5},
+}
+
+// SizeName is the preset a scale corresponds to, or "" for a hand-edited one.
+// Matching on a tolerance rather than equality keeps a float that has been
+// through YAML and JSON from failing to tick its own box.
+func SizeName(scale float64) string {
+	for _, s := range Sizes {
+		if d := s.Scale - scale; d < 0.01 && d > -0.01 {
+			return s.Name
+		}
+	}
+	return ""
+}
+
+// ListSizes backs the size section of the menu.
+func (a *App) ListSizes() any { return Sizes }
+
+// SetScale resizes the character and remembers the choice.
+//
+// The window has to be resized with it, and repositioned so the character does
+// not walk across the screen every time the size changes: the pet is anchored
+// to the bottom centre of the window, so that point is what must stay put.
+func (a *App) SetScale(scale float64) {
+	if scale <= 0 {
+		return
+	}
+	cfg := a.eng.Config()
+	cfg.Pet.Scale = scale
+	a.eng.SetConfig(cfg)
+	if err := config.Save(a.cfgPath, cfg); err != nil {
+		a.log.Warn("could not save config", "err", err)
+	}
+
+	if a.ctx == nil {
+		return
+	}
+	a.CloseOverlay()
+	oldW, oldH := a.baseW, a.baseH
+	a.baseW, a.baseH = WindowSize(scale)
+
+	x, y := wruntime.WindowGetPosition(a.ctx)
+	// Keep the character's feet where they were.
+	petCX := x + oldW/2
+	petBottom := y + oldH
+	wruntime.WindowSetSize(a.ctx, a.baseW, a.baseH)
+	wruntime.WindowSetPosition(a.ctx, petCX-a.baseW/2, petBottom-a.baseH)
+
+	a.push()
+}
+
+// push re-sends the current view, so a change made here reaches the window
+// without waiting for the next agent event.
+func (a *App) push() {
+	if a.ctx == nil {
+		return
+	}
+	wruntime.EventsEmit(a.ctx, "pet:update", a.decorate(a.eng.Last()))
+}
+
+// screenSize is the display the window is on. A sane fallback matters more
+// than precision here: getting it wrong costs a panel that opens on the side
+// with less room, not a broken window.
+func (a *App) screenSize() (int, int) {
+	screens, err := wruntime.ScreenGetAll(a.ctx)
+	if err == nil {
+		for _, s := range screens {
+			if s.IsCurrent && s.Size.Width > 0 {
+				return s.Size.Width, s.Size.Height
+			}
+		}
+		for _, s := range screens {
+			if s.IsPrimary && s.Size.Width > 0 {
+				return s.Size.Width, s.Size.Height
+			}
+		}
+	}
+	return 1440, 900
 }
 
 func (a *App) shutdown(ctx context.Context) {

@@ -21,11 +21,14 @@
   #stage {
     position: relative;
     width: 100%; height: 100%;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: flex-end;
-    padding-bottom: 8px; box-sizing: border-box;
   }
 
+  /*
+    The character is placed rather than centred. Normally --pet-x is half the
+    window, but when a panel would hang off the side of the screen the window
+    slides back on and the backend sends the offset that keeps the character
+    where the user left it while the window moves under it.
+  */
   /* --- the pet ------------------------------------------------------- */
 
   #pet {
@@ -33,10 +36,14 @@
        character is draggable; panels and menus are not, so a click on a menu
        item never turns into a window drag. */
     --wails-draggable: drag;
-    position: relative;
+    position: absolute;
+    left: var(--pet-x, 50%);
+    bottom: 8px;
+    transform: translateX(-50%);
     display: grid; place-items: center;
     cursor: grab;
   }
+  body.overlay-below #pet { bottom: auto; top: 56px; }
   #pet:active { cursor: grabbing; }
 
   #sprite {
@@ -136,10 +143,6 @@
     gap WindowSize reserves in app.go — the two have to agree or the character
     jumps the moment a panel opens.
   */
-  body.overlay-below #stage {
-    justify-content: flex-start;
-    padding-bottom: 0; padding-top: 56px;
-  }
   body.overlay-below .panel, body.overlay-below #menu {
     top: auto; bottom: 6px;
   }
@@ -299,6 +302,7 @@ function closeOverlays() {
   if (wasOpen) {
     reserved = 0;
     document.body.classList.remove("overlay-below");
+    document.documentElement.style.removeProperty("--pet-x");
     call("CloseOverlay");
   }
 }
@@ -323,14 +327,36 @@ async function reveal(node) {
   const first = node.classList.contains("hidden");
   node.classList.remove("hidden");
   if (first) node.style.visibility = "hidden";
+  const box = node.getBoundingClientRect();
+  const wide = Math.ceil(box.width);
   // A little more than the overlay itself, for the gap between it and the pet.
-  const needed = Math.ceil(node.getBoundingClientRect().height) + 14;
+  const needed = Math.ceil(box.height) + 14;
   if (Math.abs(needed - reserved) > 8) {
     reserved = needed;
-    const side = await call("OpenOverlay", needed);
-    document.body.classList.toggle("overlay-below", side === "below");
+    const spot = await call("OpenOverlay", wide, needed);
+    if (spot) {
+      document.body.classList.toggle("overlay-below", spot.side === "below");
+      document.documentElement.style.setProperty("--pet-x", spot.pet_x + "px");
+    }
   }
+  placeBeside(node, wide);
   node.style.visibility = "";
+}
+
+// placeBeside centres the overlay on the character, then pulls it back inside
+// the window if that would hang it over an edge.
+//
+// The window is already wide enough and already on screen; what is left is
+// that the character may sit near one end of it, and an overlay centred on a
+// character in the corner would spill out of the window and be clipped.
+function placeBeside(node, wide) {
+  const petX = el.pet.getBoundingClientRect().left + el.pet.offsetWidth / 2;
+  const limit = document.documentElement.clientWidth - wide - 8;
+  let left = petX - wide / 2;
+  if (left > limit) left = limit;
+  if (left < 8) left = 8;
+  node.style.left = Math.round(left) + "px";
+  node.style.transform = "none";
 }
 
 function togglePanel(kind) {
@@ -496,6 +522,34 @@ function separator() {
   return d;
 }
 
+// SIZES mirrors Sizes in app.go. The menu is built before any backend call can
+// return, so the list is here too rather than the menu flickering into
+// existence one round trip late; the scales are what SetScale is called with.
+const SIZES = [
+  { name: "Small", scale: 0.7 },
+  { name: "Medium", scale: 1.0 },
+  { name: "Large", scale: 1.5 },
+];
+
+function sizeItems() {
+  const current = (view && view.scale) || 1;
+  const out = [];
+  const title = document.createElement("div");
+  title.className = "mtitle";
+  title.textContent = "Size";
+  out.push(title);
+  for (const s of SIZES) {
+    // A hand-edited scale from config.yaml ticks nothing, which is honest:
+    // it is not any of these.
+    const on = Math.abs(current - s.scale) < 0.01;
+    out.push(item(s.name, async () => {
+      closeOverlays();
+      await call("SetScale", s.scale);
+    }, on));
+  }
+  return out;
+}
+
 function asleep() {
   const snap = (view && view.snapshot) || {};
   return snap.forced && snap.state === "sleeping";
@@ -510,6 +564,8 @@ function openMenu() {
     item("Pet Status", () => { el.menu.classList.add("hidden"); togglePanel("status"); }),
     item("Statistics", () => { el.menu.classList.add("hidden"); togglePanel("stats"); }),
     item("Change Pet…", () => { el.menu.classList.add("hidden"); togglePanel("pets"); }),
+    separator(),
+    ...sizeItems(),
     separator(),
     item("Always on Top", async () => {
       const next = !(view && view.on_top);
@@ -566,6 +622,14 @@ document.addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeOverlays();
 });
+
+// Clicking away from the window closes the menu.
+//
+// The click handler above only sees clicks that land in the window, and the
+// window is now barely bigger than the character — so "outside" is almost
+// always somewhere the page never hears about. Losing focus is the same
+// gesture from this side of the glass.
+window.addEventListener("blur", () => closeOverlays());
 
 document.addEventListener("visibilitychange", () => {
   document.body.classList.toggle("paused", document.hidden);

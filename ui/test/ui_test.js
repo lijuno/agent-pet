@@ -415,7 +415,7 @@ function crowdedView() {
 // Whichever way the window grew, the panel must not end up on top of the
 // character — the entire reason the pet and the panel are separated at all.
 test("a full panel never covers the pet, opening upward", withPet(async (w, d) => {
-  stubBackend(w, { OpenOverlay: () => "above" });
+  stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
   w.apply(crowdedView());
   w.togglePanel("status");
   await tick();
@@ -428,7 +428,7 @@ test("a full panel never covers the pet, opening upward", withPet(async (w, d) =
 }, GROWN_H));
 
 test("a full panel never covers the pet, opening downward", withPet(async (w, d) => {
-  stubBackend(w, { OpenOverlay: () => "below" });
+  stubBackend(w, { OpenOverlay: () => ({ side: "below", pet_x: WINDOW_W / 2 }) });
   w.apply(crowdedView());
   w.togglePanel("status");
   await tick();
@@ -442,7 +442,7 @@ test("a full panel never covers the pet, opening downward", withPet(async (w, d)
 }, GROWN_H));
 
 test("the menu also stays clear of the pet", withPet(async (w, d) => {
-  stubBackend(w, { OpenOverlay: () => "above" });
+  stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
   w.apply(view());
   w.openMenu();
   await tick();
@@ -462,9 +462,9 @@ test("flipping the overlay does not move the pet", withPet(async (w, d, frame) =
   // keeps the window's top edge and extends the bottom, which is exactly what
   // changing the frame's height does.
   stubBackend(w, {
-    OpenOverlay: (h) => {
+    OpenOverlay: (w, h) => {
       frame.style.height = (WINDOW_H + h) + "px";
-      return "below";
+      return { side: "below", pet_x: WINDOW_W / 2 };
     },
   });
   w.apply(view());
@@ -477,14 +477,14 @@ test("flipping the overlay does not move the pet", withPet(async (w, d, frame) =
 }, WINDOW_H));
 
 test("opening an overlay asks the window for exactly the room it needs", withPet(async (w, d) => {
-  const calls = stubBackend(w, { OpenOverlay: () => "above" });
+  const calls = stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
   w.apply(crowdedView());
   w.togglePanel("status");
   await tick();
 
   const asked = called(calls, "OpenOverlay");
   assert(asked.length === 1, `want one request for room, got ${asked.length}`);
-  const wanted = asked[0].args[0];
+  const wanted = asked[0].args[1];
   const panel = d.getElementById("panel").getBoundingClientRect();
   assert(wanted >= panel.height,
     `asked for ${wanted} but the panel is ${Math.round(panel.height)} tall`);
@@ -493,7 +493,7 @@ test("opening an overlay asks the window for exactly the room it needs", withPet
 }, GROWN_H));
 
 test("closing an overlay gives the room back", withPet(async (w, d) => {
-  const calls = stubBackend(w, { OpenOverlay: () => "above" });
+  const calls = stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
   w.apply(view());
   w.togglePanel("status");
   await tick();
@@ -507,7 +507,7 @@ test("closing an overlay gives the room back", withPet(async (w, d) => {
 // An open panel is rebuilt on every state change. Asking the window to resize
 // each time would thrash it several times a second under a busy agent.
 test("a rebuild that does not change height does not resize the window", withPet(async (w, d) => {
-  const calls = stubBackend(w, { OpenOverlay: () => "above" });
+  const calls = stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
   w.apply(crowdedView());
   w.togglePanel("status");
   await tick();
@@ -642,6 +642,100 @@ test("clicking inside a panel does not dismiss it", withPet(async (w, d) => {
   d.getElementById("panel").dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
   assert(!d.getElementById("panel").classList.contains("hidden"), "clicking inside should keep the panel open");
 }));
+
+// The window is barely bigger than the character now, so a click "outside" it
+// lands on another application and the page never hears about it. Losing focus
+// is the same gesture from this side of the glass.
+test("clicking away from the window closes the menu", withPet(async (w, d) => {
+  stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
+  w.apply(view());
+  w.openMenu();
+  await tick();
+  assert(!d.getElementById("menu").classList.contains("hidden"), "precondition: menu open");
+
+  w.dispatchEvent(new w.Event("blur"));
+  assert(d.getElementById("menu").classList.contains("hidden"),
+    "losing focus should close the menu");
+}, GROWN_H));
+
+test("losing focus closes a panel too, and returns the room", withPet(async (w, d) => {
+  const calls = stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
+  w.apply(view());
+  w.togglePanel("status");
+  await tick();
+  w.dispatchEvent(new w.Event("blur"));
+  assert(d.getElementById("panel").classList.contains("hidden"), "panel should close");
+  eq(called(calls, "CloseOverlay").length, 1, "the window should shrink back");
+}, GROWN_H));
+
+// In a corner the window is slid back onto the screen but the character is
+// not, so an overlay centred on it would hang off the window and be clipped.
+test("an overlay stays inside the window when the pet is near its edge", withPet(async (w, d) => {
+  stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: 12 }) });
+  w.apply(crowdedView());
+  w.togglePanel("status");
+  await tick();
+
+  const panel = d.getElementById("panel").getBoundingClientRect();
+  assert(panel.left >= 0, `panel starts off the window at ${Math.round(panel.left)}`);
+  assert(panel.right <= d.documentElement.clientWidth + 1,
+    `panel ends at ${Math.round(panel.right)}, past the window's ${d.documentElement.clientWidth}`);
+}, GROWN_H));
+
+test("the character sits where the backend places it", withPet(async (w, d) => {
+  stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: 40 }) });
+  w.apply(view());
+  w.togglePanel("status");
+  await tick();
+  const pet = d.getElementById("pet").getBoundingClientRect();
+  const centre = pet.left + pet.width / 2;
+  assert(Math.abs(centre - 40) < 2,
+    `character centre should be at 40, got ${Math.round(centre)}`);
+}, GROWN_H));
+
+/* --- size ---------------------------------------------------------------- */
+
+test("the menu offers three sizes with the current one ticked", withPet(async (w, d) => {
+  stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
+  w.apply(view({ scale: 1 }));
+  w.openMenu();
+  await tick();
+
+  const rows = [...d.getElementById("menu").querySelectorAll(".mi")];
+  for (const name of ["Small", "Medium", "Large"]) {
+    assert(rows.some((r) => r.textContent.includes(name)), `${name} missing from the menu`);
+  }
+  const medium = rows.find((r) => r.textContent.includes("Medium"));
+  eq(medium.querySelector(".check").textContent, "✓", "scale 1 should tick Medium");
+  const small = rows.find((r) => r.textContent.includes("Small"));
+  eq(small.querySelector(".check").textContent, "", "only the current size is ticked");
+}, GROWN_H));
+
+test("the ticked size follows the scale in use", withPet(async (w, d) => {
+  stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
+  w.apply(view({ scale: 1.5 }));
+  w.openMenu();
+  await tick();
+  const rows = [...d.getElementById("menu").querySelectorAll(".mi")];
+  eq(rows.find((r) => r.textContent.includes("Large")).querySelector(".check").textContent, "✓");
+  eq(rows.find((r) => r.textContent.includes("Medium")).querySelector(".check").textContent, "");
+}, GROWN_H));
+
+test("picking a size asks the backend for it", withPet(async (w, d) => {
+  const calls = stubBackend(w, { OpenOverlay: () => ({ side: "above", pet_x: WINDOW_W / 2 }) });
+  w.apply(view());
+  w.openMenu();
+  await tick();
+  [...d.getElementById("menu").querySelectorAll(".mi")]
+    .find((r) => r.textContent.includes("Large"))
+    .dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+  await tick();
+
+  const set = called(calls, "SetScale");
+  eq(set.length, 1, "picking a size should call SetScale");
+  eq(set[0].args[0], 1.5, "Large should be 1.5");
+  assert(d.getElementById("menu").classList.contains("hidden"), "the menu should close after picking");
+}, GROWN_H));
 
 /* --- backend absence ----------------------------------------------------- */
 
