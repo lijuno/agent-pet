@@ -1,4 +1,4 @@
-.PHONY: help deps dev build build-tray petctl pets test test-ui vet fmt clean run-headless demo
+.PHONY: help deps dev build petctl pets test test-ui vet fmt clean run-headless demo
 BIN := bin
 VERSION ?= 0.1.0
 LDFLAGS := -X main.version=$(VERSION)

@@ -91,8 +91,12 @@ petctl event claude tests_passed --session demo
 | Right-click | Menu: status, statistics, change pet, always on top, mute, sleep, quit. |
 | Menu bar | The same commands under the `Pet` menu while the app is frontmost. |
 
-A persistent status-bar icon is available with `wails build -tags tray`; see
-[ADR 0005](docs/adr/0005-macos-menu-and-tray.md) for why it is opt-in.
+The pet also lives in the macOS menu bar. Its icon shows the current state and
+carries the same commands, so the pet can be reached even when it is behind
+something. See [ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
+
+The character comes in three sizes — small, medium and large — from the
+right-click menu or the `pet.scale` setting.
 
 ## Configuration
 

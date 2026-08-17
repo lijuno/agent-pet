@@ -31,6 +31,29 @@ Build with the icon:
 wails build -tags tray
 ```
 
+## Amendment (Milestone 2): surface 3 is native and always on
+
+The `fyne.io/systray` route never worked in a real build. It declares an
+Objective-C class named `AppDelegate`, and so does Wails' own desktop frontend,
+so `wails build -tags tray` fails to link:
+
+```
+duplicate symbol '_OBJC_CLASS_$_AppDelegate'
+```
+
+`go build -tags tray` links because it leaves the desktop frontend out
+entirely, which is why the build tag looked healthy while producing no app.
+
+The status item is now written directly against AppKit in
+`statusitem_darwin.{h,m,go}`: an `NSStatusItem` hung off the `NSApplication`
+Wails already runs, with its action target under a name of our own. It creates
+no application, no delegate and no run loop, so there is nothing left for it to
+fight over — which is what made the shared run loop risky in the first place.
+`fyne.io/systray` is no longer a dependency, and the build tag is gone with it.
+
+The reasoning above still holds for the other two surfaces, and still explains
+why there are three: the in-window menu remains the one with no platform risk.
+
 ## Consequences
 
 - The default build has no extra native dependency and cannot fail to compile

@@ -37,9 +37,5 @@ require (
 	golang.org/x/text v0.22.0 // indirect
 )
 
-// Only used by the optional status-bar icon: `wails build -tags tray`.
-// See docs/adr/0005-macos-menu-and-tray.md.
-require fyne.io/systray v1.11.0
-
 // Run `go mod tidy` once after cloning: it resolves the transitive
 // dependencies of Wails and writes go.sum.
