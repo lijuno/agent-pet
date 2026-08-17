@@ -21,11 +21,13 @@ after an error. Transients decay back to the session's base state.
 live sessions, using the §22 order:
 
 ```
-attention > worried > confused > celebrate > happy > working > thinking > idle > sleeping
+attention > worried > confused > celebrate > happy > heart > working > thinking > idle > sleeping
 ```
 
-Global overlays are applied last: inactivity turns the pet `sleeping`, and a
-long-running session turns an otherwise-idle pet `tired`.
+Sleep is applied last, as two rules with no exception inside either: no live
+sessions means `sleeping`, and so does a reduction of `idle` that has stayed
+idle for `sleeping_after`. A pending request reduces to `attention` rather than
+`idle`, so it falls outside the second rule instead of being carved out of it.
 
 **Determinism mechanics.** `Machine.Apply(now, event)` and `Machine.Tick(now)`
 both take the current time as an argument. The machine holds no clock, no
@@ -41,6 +43,6 @@ access through a single goroutine reading from a channel.
   each tick. The engine ticks once a second, which is also what decays
   transients and triggers the sleep transition.
 - Adding a new event type means adding one case to `applyToSession`. The
-  reduction and overlay layers do not change.
+  reduction and sleep layers do not change.
 - Unknown event types are recorded (they refresh the activity clock) but do not
   transition state, satisfying §6's "tolerate unknown event types".

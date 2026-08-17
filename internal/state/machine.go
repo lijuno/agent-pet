@@ -409,7 +409,6 @@ func (m *Machine) Tick(now time.Time) {
 }
 
 // Resolve computes the visible state. Call Tick first.
-// Resolve computes the visible state. Call Tick first.
 //
 // Two rules, and no special cases inside either:
 //
