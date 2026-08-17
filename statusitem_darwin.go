@@ -195,6 +195,22 @@ func goStatusClick(tag C.int) {
 	if a == nil {
 		return
 	}
+	// Hand the work to a goroutine and return to AppKit at once.
+	//
+	// This function runs on the main thread, inside the menu item's action.
+	// The Wails runtime must not be called from there: emitting an event ends
+	// in evaluateJavaScript on the webview, and running that from inside a
+	// main-thread callback segfaults the process — which is what "clicking Pet
+	// Status quits the program" was. Only the three items that emit an event
+	// crashed; the others never touched the webview.
+	//
+	// Every other call into Wails in this program is made from a goroutine.
+	// These are no different, and the menu should not be waiting on them
+	// anyway.
+	go a.handleStatusClick(tag)
+}
+
+func (a *App) handleStatusClick(tag C.int) {
 	switch tag {
 	case C.PET_SHOW:
 		// A toggle, so the same item both fetches the pet and puts it away.

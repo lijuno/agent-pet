@@ -61,6 +61,29 @@ for item in "Show Pet" "Pet Status" "Statistics" "Change Pet" "Always on Top" "M
 done
 
 echo
+echo "Every menu item survives being clicked"
+# The suite used to click only Show Pet. Three of the others emitted an event
+# from the main thread and killed the process, and nothing here noticed.
+for item in show show status stats change ontop ontop mute mute sleep; do
+	if ! curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
+		bad "clicking $item" "petd is gone — an earlier item killed it"
+		break
+	fi
+	post "{\"status_item\":\"$item\"}"
+	sleep 0.6
+	if curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
+		ok "clicking $item leaves the pet running"
+	else
+		bad "clicking $item" "the process died"
+	fi
+	post '{"panel":"close"}'
+	sleep 0.2
+done
+# Leave the toggles as they were found.
+post '{"shown":true}'
+sleep 0.4
+
+echo
 echo "Show Pet is a toggle"
 # Start from a known state. Asserting on whatever the last run left behind
 # makes the first check depend on the previous one, across invocations.
