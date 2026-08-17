@@ -121,6 +121,54 @@ func TestForeignOriginRejected(t *testing.T) {
 	}
 }
 
+// The guard compares hosts, not prefixes. Every rejected case below starts with
+// a string the pet legitimately accepts, and each one is a name an attacker can
+// register and resolve to 127.0.0.1.
+func TestOriginHostIsMatchedExactly(t *testing.T) {
+	allowed := []string{
+		"http://127.0.0.1:9876",
+		"http://127.0.0.1",
+		"http://localhost:9876",
+		"http://[::1]:9876",
+		"wails://wails",
+		"WAILS://WAILS",
+	}
+	refused := []string{
+		"http://localhost.evil.com",
+		"http://127.0.0.1.evil.com",
+		"http://localhost@evil.com",
+		"https://localhost",
+		"http://evil.com",
+		"null",
+		"",
+	}
+	for _, o := range allowed {
+		if !isLocalOrigin(o) {
+			t.Errorf("%q is this machine and must be allowed", o)
+		}
+	}
+	for _, o := range refused {
+		if isLocalOrigin(o) {
+			t.Errorf("%q is not this machine and must be refused", o)
+		}
+	}
+}
+
+func TestLookalikeOriginRejected(t *testing.T) {
+	ts := newTestServer(t)
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/event", strings.NewReader(`{"source":"x","event":"working"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://localhost.evil.com")
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("a host that merely begins with localhost must not be able to drive the pet, got %d", resp.StatusCode)
+	}
+}
+
 func TestWrongMethodRejected(t *testing.T) {
 	ts := newTestServer(t)
 	resp, err := ts.Client().Get(ts.URL + "/event")

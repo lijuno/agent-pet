@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -144,12 +145,31 @@ func (s *Server) withGuards(next http.Handler) http.Handler {
 	})
 }
 
+// isLocalOrigin reports whether an Origin header names this machine.
+//
+// The host is compared exactly rather than by prefix. `http://localhost` is a
+// prefix of `http://localhost.evil.com`, a name anyone may register and point
+// at 127.0.0.1; a page served from it would otherwise have passed this guard
+// and been able to read /diagnostics and drive /window.
 func isLocalOrigin(o string) bool {
-	o = strings.ToLower(o)
-	return strings.HasPrefix(o, "http://127.0.0.1") ||
-		strings.HasPrefix(o, "http://localhost") ||
-		strings.HasPrefix(o, "http://[::1]") ||
-		strings.HasPrefix(o, "wails://")
+	u, err := url.Parse(strings.ToLower(o))
+	if err != nil {
+		return false
+	}
+	// The Wails frontend is served from its own scheme, whose host is an
+	// internal detail of the webview rather than a network name.
+	if u.Scheme == "wails" {
+		return true
+	}
+	if u.Scheme != "http" {
+		return false
+	}
+	host := u.Hostname()
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
