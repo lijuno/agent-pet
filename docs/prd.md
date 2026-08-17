@@ -1,5 +1,13 @@
 # Personal Digital Pet for Claude Code and Codex
 
+> **This is the original design document, not a description of the software.**
+> It was written before any code and is kept for the reasoning behind the
+> decisions, not as a feature list. Much of what follows is unbuilt — the Codex
+> adapter, generating a pet from a photo, and the tiredness curve among it — and
+> some of what was built ended up different. The README describes what the
+> program actually does; [`docs/adr/`](adr/) records where and why this document
+> was departed from.
+
 ## 1. Overview
 
 Build a lightweight desktop digital pet that acts as a persistent companion while the user works with **Claude Code** and **OpenAI Codex CLI**.
