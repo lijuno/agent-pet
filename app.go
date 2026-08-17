@@ -101,6 +101,7 @@ func (a *App) startup(ctx context.Context) {
 	ch, cancel := a.eng.Subscribe()
 	go func() {
 		defer cancel()
+		lastPet := a.eng.Last().Pet
 		for {
 			select {
 			case <-ctx.Done():
@@ -108,6 +109,14 @@ func (a *App) startup(ctx context.Context) {
 			case up, ok := <-ch:
 				if !ok {
 					return
+				}
+				// Every route to a different character passes through here: the
+				// menu bar, the pet's own menu, and the loopback API. Hooking
+				// any one of them left the menu bar ticking a character that
+				// was no longer on screen.
+				if up.Pet != lastPet {
+					lastPet = up.Pet
+					a.refreshPetMenu()
 				}
 				if a.muted {
 					up.Bubble = nil

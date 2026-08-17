@@ -101,7 +101,9 @@ petctl event claude tests_passed --session demo
 The pet also lives in the macOS menu bar. Its icon shows the current state and
 carries the same commands. **Show Pet** is a checkbox there: it puts the pet
 away and brings it back, and bringing it back also retrieves one that has been
-dragged off the edge of the screen. See [ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
+dragged off the edge of the screen. **Change Pet** is a submenu listing the
+characters, so switching happens in the menu bar rather than in a panel beside
+the pet. See [ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
 
 The character comes in three sizes — small, medium and large — from the
 right-click menu or the `pet.scale` setting.

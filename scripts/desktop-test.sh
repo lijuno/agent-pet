@@ -64,7 +64,7 @@ echo
 echo "Every menu item survives being clicked"
 # The suite used to click only Show Pet. Three of the others emitted an event
 # from the main thread and killed the process, and nothing here noticed.
-for item in show show status stats change ontop ontop mute mute sleep; do
+for item in show show status stats change ontop ontop mute mute sleep pet:byte pet:momo; do
 	if ! curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
 		bad "clicking $item" "petd is gone — an earlier item killed it"
 		break
@@ -82,6 +82,23 @@ done
 # Leave the toggles as they were found.
 post '{"shown":true}'
 sleep 0.4
+
+echo
+echo "Change Pet is a submenu of the menu bar menu"
+menu=$(field status_menu)
+want "it lists the cat"   "$menu" ":>SanMao"
+want "it lists the robot" "$menu" ":>Byte"
+want "the character in use is ticked" "$menu" ">SanMao (三毛)[on]"
+
+post '{"status_item":"pet:byte"}'
+sleep 0.8
+want "picking one switches the character" "$(field status_menu)" ">Byte[on]"
+
+# The tick has to follow a change made anywhere, not only from this menu.
+curl -sS --max-time 5 -X POST "$BASE/pet" -H 'content-type: application/json' \
+	-d '{"id":"momo"}' >/dev/null
+sleep 0.8
+want "and follows a change made elsewhere" "$(field status_menu)" ">SanMao (三毛)[on]"
 
 echo
 echo "Show Pet is a toggle"

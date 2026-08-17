@@ -21,6 +21,7 @@ static NSStatusItem *petItem = nil;
 static PetStatusTarget *petTarget = nil;
 static NSMenuItem *petStateItem = nil;
 static NSMenuItem *petSleepItem = nil;
+static NSMenuItem *petChangeItem = nil;
 
 static NSMenuItem *addItem(NSMenu *menu, NSString *title, int tag) {
   NSMenuItem *it = [[NSMenuItem alloc] initWithTitle:title
@@ -77,7 +78,13 @@ void petStatusInstall(const void *png, int len, int onTop, int muted, int shown)
     [show setState:shown ? NSControlStateValueOn : NSControlStateValueOff];
     addItem(menu, @"Pet Status", PET_STATUS);
     addItem(menu, @"Statistics", PET_STATS);
-    addItem(menu, @"Change Pet…", PET_CHANGE);
+    // A submenu, so the characters appear beside the menu bar menu rather
+    // than in a panel next to the pet. An item with a submenu opens it instead
+    // of firing its action, which is what we want here.
+    petChangeItem = addItem(menu, @"Change Pet", PET_CHANGE);
+    NSMenu *pets = [[NSMenu alloc] init];
+    [pets setAutoenablesItems:NO];
+    petChangeItem.submenu = pets;
     [menu addItem:[NSMenuItem separatorItem]];
 
     NSMenuItem *top = addItem(menu, @"Always on Top", PET_ONTOP);
@@ -105,6 +112,27 @@ void petStatusSetCheck(int tag, int on) {
   onMain(^{
     NSMenuItem *it = [petItem.menu itemWithTag:tag];
     [it setState:on ? NSControlStateValueOn : NSControlStateValueOff];
+  });
+}
+
+void petStatusClearPets(void) {
+  onMain(^{
+    NSMenu *sub = [[NSMenu alloc] init];
+    [sub setAutoenablesItems:NO];
+    petChangeItem.submenu = sub;
+  });
+}
+
+void petStatusAddPet(const char *title, int tag, int checked) {
+  NSString *t = [NSString stringWithUTF8String:title];
+  onMain(^{
+    NSMenuItem *it = [[NSMenuItem alloc] initWithTitle:t
+                                                action:@selector(onClick:)
+                                         keyEquivalent:@""];
+    [it setTarget:petTarget];
+    [it setTag:tag];
+    [it setState:checked ? NSControlStateValueOn : NSControlStateValueOff];
+    [petChangeItem.submenu addItem:it];
   });
 }
 
@@ -173,6 +201,10 @@ int petStatusMenuDump(char *buf, int cap) {
       }
       [out appendFormat:@"%ld:%@%@|", (long)it.tag, it.title,
                         it.state == NSControlStateValueOn ? @"[on]" : @""];
+      for (NSMenuItem *sub in it.submenu.itemArray) {
+        [out appendFormat:@"%ld:>%@%@|", (long)sub.tag, sub.title,
+                          sub.state == NSControlStateValueOn ? @"[on]" : @""];
+      }
     }
   };
   if ([NSThread isMainThread]) {
@@ -193,6 +225,15 @@ int petStatusMenuDump(char *buf, int cap) {
 void petStatusClickItem(int tag) {
   onMain(^{
     NSMenuItem *it = [petItem.menu itemWithTag:tag];
+    if (it == nil) {
+      for (NSMenuItem *top in petItem.menu.itemArray) {
+        NSMenuItem *found = [top.submenu itemWithTag:tag];
+        if (found != nil) {
+          it = found;
+          break;
+        }
+      }
+    }
     if (it != nil) {
       // Dispatch through the responder chain, which is how AppKit delivers a
       // real click — rather than performSelector, which merely resembles one.

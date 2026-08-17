@@ -20,6 +20,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
 	"sync"
 	"unsafe"
 
@@ -35,6 +36,9 @@ var trayIcon []byte
 var (
 	statusMu  sync.Mutex
 	statusApp *App
+	// statusPetIDs is the pet list in the order the submenu was last built.
+	// A menu item carries an index, not a string; this turns it back into a pet.
+	statusPetIDs []string
 )
 
 var startTrayOnce sync.Once
@@ -58,6 +62,8 @@ func (a *App) startTray(ctx context.Context) {
 		}
 		C.petStatusInstall(unsafe.Pointer(&trayIcon[0]), C.int(len(trayIcon)),
 			C.int(onTop), C.int(muted), C.int(shown))
+
+		a.refreshPetMenu()
 
 		// Keep the disabled first line in step, so the pet's state is readable
 		// from the menu bar without opening anything.
@@ -151,7 +157,24 @@ func (a *App) ClickStatusItem(name string) error {
 	}
 	tag, ok := tags[name]
 	if !ok {
-		return fmt.Errorf("unknown status item %q", name)
+		// "pet:<id>" performs an item in the Change Pet submenu.
+		if id, found := strings.CutPrefix(name, "pet:"); found {
+			statusMu.Lock()
+			idx := -1
+			for i, p := range statusPetIDs {
+				if p == id {
+					idx = i
+					break
+				}
+			}
+			statusMu.Unlock()
+			if idx < 0 {
+				return fmt.Errorf("no pet %q in the menu", id)
+			}
+			tag = C.int(int(C.PET_PICK_BASE) + idx)
+		} else {
+			return fmt.Errorf("unknown status item %q", name)
+		}
 	}
 	C.petStatusClickItem(tag)
 	return nil
@@ -174,6 +197,39 @@ func statusItemReport() string {
 		out += ", no icon (showing a letter instead)"
 	}
 	return out
+}
+
+// refreshPetMenu rebuilds the Change Pet submenu from the pet library, ticking
+// the one in use. Called when the item is installed and whenever the pet
+// changes, from either surface — a menu that disagrees with the window about
+// which character is on screen is worse than no tick at all.
+func (a *App) refreshPetMenu() {
+	pets := a.eng.Library().List()
+	active := ""
+	if p, ok := a.eng.ActivePet(); ok {
+		active = p.ID
+	}
+
+	ids := make([]string, 0, len(pets))
+	C.petStatusClearPets()
+	for i, p := range pets {
+		name := p.Name
+		if name == "" {
+			name = p.ID
+		}
+		c := C.CString(name)
+		checked := C.int(0)
+		if p.ID == active {
+			checked = 1
+		}
+		C.petStatusAddPet(c, C.int(int(C.PET_PICK_BASE)+i), checked)
+		C.free(unsafe.Pointer(c))
+		ids = append(ids, p.ID)
+	}
+
+	statusMu.Lock()
+	statusPetIDs = ids
+	statusMu.Unlock()
 }
 
 // syncShownCheck keeps the Show Pet tick in step with the window.
@@ -211,6 +267,19 @@ func goStatusClick(tag C.int) {
 }
 
 func (a *App) handleStatusClick(tag C.int) {
+	if tag >= C.PET_PICK_BASE {
+		statusMu.Lock()
+		i := int(tag - C.PET_PICK_BASE)
+		id := ""
+		if i >= 0 && i < len(statusPetIDs) {
+			id = statusPetIDs[i]
+		}
+		statusMu.Unlock()
+		if id != "" {
+			a.SetPet(id)
+		}
+		return
+	}
 	switch tag {
 	case C.PET_SHOW:
 		// A toggle, so the same item both fetches the pet and puts it away.
@@ -221,7 +290,8 @@ func (a *App) handleStatusClick(tag C.int) {
 	case C.PET_STATS:
 		a.emitPanel("stats")
 	case C.PET_CHANGE:
-		a.emitPanel("pets")
+		// Nothing: the submenu is the picker. AppKit opens it on hover, and an
+		// item with a submenu does not fire its action anyway.
 	case C.PET_ONTOP:
 		next := !a.alwaysOnTop
 		a.SetAlwaysOnTop(next)

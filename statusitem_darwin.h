@@ -21,6 +21,9 @@ enum {
   PET_MUTE = 6,
   PET_SLEEP = 7,
   PET_QUIT = 8,
+  // Items in the Change Pet submenu are PET_PICK_BASE + the pet's index in the
+  // list the Go side last sent.
+  PET_PICK_BASE = 100,
 };
 
 // petStatusInstall adds the status item. png is a template icon. Safe to call
@@ -34,6 +37,13 @@ void petStatusSetState(const char *title);
 
 // petStatusSetCheck ticks or clears a checkbox item.
 void petStatusSetCheck(int tag, int on);
+
+// petStatusClearPets empties the Change Pet submenu, and petStatusAddPet
+// appends one character to it. The pet list is a Go fact — built-in packs plus
+// whatever the user dropped in their pets directory — so the menu is filled
+// from there rather than guessed at here.
+void petStatusClearPets(void);
+void petStatusAddPet(const char *title, int tag, int checked);
 
 // petStatusSetSleepTitle switches the sleep item between Sleep and Wake Up.
 void petStatusSetSleepTitle(const char *title);
