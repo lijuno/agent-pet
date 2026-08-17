@@ -79,17 +79,21 @@ func main() {
 	eng := engine.New(cfg, lib, log)
 	server.Version = version
 	srv := server.New(eng, log)
-	if err := srv.Listen(cfg.Server); err != nil {
-		fmt.Fprintln(os.Stderr, "petd:", err)
-		fmt.Fprintln(os.Stderr, "  (another petd may already be running — try `petctl status`)")
-		os.Exit(1)
-	}
-	go func() {
-		if err := srv.Serve(); err != nil {
-			log.Error("event api stopped", "err", err)
+	// Wails runs this binary to generate bindings; that pass must not take the
+	// port, or building while the pet is running fails.
+	if !generatingBindings {
+		if err := srv.Listen(cfg.Server); err != nil {
+			fmt.Fprintln(os.Stderr, "petd:", err)
+			fmt.Fprintln(os.Stderr, "  (another petd may already be running — try `petctl status`)")
+			os.Exit(1)
 		}
-	}()
-	log.Info("petd started", "version", version, "addr", srv.Addr(), "pets", lib.Len())
+		go func() {
+			if err := srv.Serve(); err != nil {
+				log.Error("event api stopped", "err", err)
+			}
+		}()
+		log.Info("petd started", "version", version, "addr", srv.Addr(), "pets", lib.Len())
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

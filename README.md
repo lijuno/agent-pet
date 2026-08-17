@@ -18,7 +18,14 @@ records which seam each deferred piece attaches to.
 
 - macOS (the architecture allows Windows and Linux; only macOS is exercised)
 - Go 1.23+
-- [Wails CLI v2](https://wails.io/docs/gettingstarted/installation)
+- [Wails CLI](https://wails.io/docs/gettingstarted/installation) **v2.10.2 or
+  newer** — matching the version in `go.mod`. An older CLI fails to build on a
+  recent Go toolchain with `internal error: package "strings" without types`,
+  which does not look like a version problem:
+
+  ```bash
+  go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.2
+  ```
 - Python 3 with Pillow, only if you want to regenerate the sprite art
 
 ## Quick start
