@@ -5,7 +5,7 @@ Claude Code starts, the pet wakes up. A tool runs, it gets to work. A permission
 prompt appears, it turns and asks for you. Tests pass, it celebrates.
 
 **This repository contains Milestones 1 and 2** — the pet engine, the local
-event API, `petctl`, the desktop window, three built-in pixel-art characters,
+event API, `petctl`, the desktop window, two built-in pixel-art characters,
 and the Claude Code adapter. The Codex adapter is Milestone 3;
 [`docs/adr/0006-milestone-1-boundaries.md`](docs/adr/0006-milestone-1-boundaries.md)
 records which seam each deferred piece attaches to.
@@ -112,7 +112,7 @@ right-click menu or the `pet.scale` setting.
 
 ```yaml
 pet:
-  active: momo          # momo | byte | pip, or your own pack
+  active: momo          # momo | byte, or your own pack
   always_on_top: true
   scale: 1.0
 
@@ -120,7 +120,7 @@ behavior:
   dialogue: true        # speech bubbles
 
 personality:
-  name: SanMao
+  name: SanMao (三毛)
   personality: gentle   # gentle cheerful calm mischievous sarcastic energetic
 
 thresholds:
@@ -176,13 +176,12 @@ hardening applied to untrusted input.
 
 ## Characters
 
-Three built-in packs ship in the binary:
+Two built-in packs ship in the binary:
 
 | id | | |
 |---|---|---|
-| `momo` | SanMao, a tortoiseshell tabby | white bib, white socks, green eyes — the default |
+| `momo` | SanMao (三毛), a tortoiseshell tabby | white bib, white socks, green eyes — the default |
 | `byte` | a terminal robot | screen face, blinking antenna |
-| `pip` | a slime | very squishy |
 
 Each provides all eleven states as 40×40 pixel-art sprite strips. Regenerate
 them with:

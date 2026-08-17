@@ -91,7 +91,7 @@ func TestSanitisation(t *testing.T) {
 func TestSaveRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	in := Default()
-	in.Pet.Active = "pip"
+	in.Pet.Active = "byte"
 	in.Personality.Preset = "sarcastic"
 	in.Thresholds.SleepingAfter = Duration(90 * time.Minute)
 	if err := Save(path, in); err != nil {
@@ -101,7 +101,7 @@ func TestSaveRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Pet.Active != "pip" || out.Personality.Preset != "sarcastic" {
+	if out.Pet.Active != "byte" || out.Personality.Preset != "sarcastic" {
 		t.Fatalf("round trip lost data: %+v", out)
 	}
 	if out.Thresholds.SleepingAfter.D() != 90*time.Minute {

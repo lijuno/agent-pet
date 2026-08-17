@@ -78,7 +78,7 @@ MOMO = Species(
     # The id stays `momo`: it is what config.yaml files in the wild already
     # name, and a display name is not worth breaking them over.
     pid="momo",
-    name="SanMao",
+    name="SanMao (三毛)",
     description="A tortoiseshell tabby with a white bib and white paws.",
     palette=Palette(
         # A ginger base with dark tortie patches over it, white underneath.
@@ -113,21 +113,8 @@ BYTE = Species(
     ears="antenna", face="screen", tail=False, body_w=23, body_h=21,
 )
 
-PIP = Species(
-    pid="pip",
-    name="Pip",
-    description="A cheerful slime. Very squishy.",
-    palette=Palette(
-        body=(140, 216, 166, 255),
-        body_dark=(104, 184, 131, 255),
-        belly=(216, 246, 226, 255),
-        line=(34, 62, 45, 255),
-        accent=(255, 212, 100, 255),
-    ),
-    ears="none", face="soft", tail=False, body_w=26, body_h=20,
-)
 
-SPECIES = [MOMO, BYTE, PIP]
+SPECIES = [MOMO, BYTE]
 
 
 # --------------------------------------------------------------------------
@@ -630,7 +617,7 @@ def build(s: Species):
         "animations": animations,
     }
     with open(os.path.join(out_dir, "manifest.json"), "w") as f:
-        json.dump(manifest, f, indent=2)
+        json.dump(manifest, f, indent=2, ensure_ascii=False)
         f.write("\n")
     return out_dir
 
