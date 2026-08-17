@@ -54,4 +54,17 @@ int petStatusProbe(void);
 // exactly like being off the edge.
 void petVisibleFrame(int *x, int *y, int *w, int *h);
 
+// petActivate brings the application to the front. Showing a window is not the
+// same as being able to see it: an unactivated app puts its window behind
+// whatever the user is looking at.
+void petActivate(void);
+
+// petStatusMenuDump writes the status menu as "tag:title[state]|..." so a test
+// can assert what the menu says. Returns the number of bytes written.
+int petStatusMenuDump(char *buf, int cap);
+
+// petStatusClickItem performs a menu item exactly as a click on it would,
+// target and all, so a test exercises the same path as the user.
+void petStatusClickItem(int tag);
+
 #endif

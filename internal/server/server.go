@@ -46,6 +46,10 @@ type Server struct {
 	Panel func(kind string) error
 	// MoveWindow parks the window, for the same reason.
 	MoveWindow func(x, y int) error
+	// StatusItem performs a menu-bar menu item, and StatusMenu reports what
+	// that menu says. Nothing else can see a menu bar.
+	StatusItem func(name string) error
+	StatusMenu func() string
 	// startedAt supports the uptime field in /healthz and `petctl doctor`.
 	startedAt time.Time
 }
@@ -406,9 +410,10 @@ func (s *Server) handleSetPet(w http.ResponseWriter, r *http.Request) {
 }
 
 type windowRequest struct {
-	Panel string `json:"panel"`
-	X     *int   `json:"x"`
-	Y     *int   `json:"y"`
+	Panel      string `json:"panel"`
+	X          *int   `json:"x"`
+	Y          *int   `json:"y"`
+	StatusItem string `json:"status_item"`
 }
 
 // handleWindow drives the window from outside the process, so the placement of
@@ -440,6 +445,16 @@ func (s *Server) handleWindow(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := s.Panel(req.Panel); err != nil {
+			badRequest(w, err.Error())
+			return
+		}
+	}
+	if req.StatusItem != "" {
+		if s.StatusItem == nil {
+			badRequest(w, "no status item: petd is running headless")
+			return
+		}
+		if err := s.StatusItem(req.StatusItem); err != nil {
 			badRequest(w, err.Error())
 			return
 		}

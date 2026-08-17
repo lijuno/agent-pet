@@ -147,10 +147,11 @@ curl -sS -X POST http://127.0.0.1:9876/event \
 | `POST /window` | Move the window or open a panel — see below |
 | `GET /pets`, `POST /pet` | List and switch characters |
 
-`POST /window` parks the window and opens its overlays, doing nothing you
-cannot do with a mouse. It exists because a test has no mouse, and the only way
-to know whether a menu is clipped in the corner of a screen is to open one in
-the corner of a screen and measure it:
+`POST /window` parks the window, opens its overlays and performs menu-bar items,
+doing nothing you cannot do with a mouse. It exists because a test has no mouse:
+the only way to know whether a menu is clipped in the corner of a screen is to
+open one in the corner of a screen and measure it, and nothing on macOS may read
+a menu bar without accessibility access. `make test-desktop` drives it; by hand:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:9876/window \
@@ -220,8 +221,9 @@ docs/adr/              architectural decisions
 ## Tests
 
 ```bash
-make test      # Go: engine, state machine, event API, adapter
-make test-ui   # the window, in a browser
+make test          # Go: engine, state machine, event API, adapter, placement
+make test-ui       # the window, in a browser
+make test-desktop  # the menu bar and corner placement, against a running app
 ```
 
 The state machine is a pure function of (events, clock), so its tests drive a

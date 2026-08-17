@@ -165,11 +165,16 @@ type Placement struct {
 func placeOverlay(base rect, ow, oh int, screen rect) (rect, Placement) {
 	petCX := base.X + base.W/2
 
-	roomAbove := base.Y - screen.Y
-	roomBelow := (screen.Y + screen.H) - (base.Y + base.H)
-	// Prefer above, which is where the panel has always been; drop below only
-	// when it genuinely does not fit and below is the roomier side.
-	below := roomAbove < oh && roomBelow > roomAbove
+	// With an unknown screen, keep the panel where it has always been rather
+	// than move it on a guess.
+	below := false
+	if screen.H > 0 {
+		roomAbove := base.Y - screen.Y
+		roomBelow := (screen.Y + screen.H) - (base.Y + base.H)
+		// Prefer above; drop below only when it genuinely does not fit and
+		// below is the roomier side.
+		below = roomAbove < oh && roomBelow > roomAbove
+	}
 
 	out := rect{W: base.W, H: base.H + oh, Y: base.Y}
 	if ow+2*sideMargin > out.W {
@@ -180,12 +185,14 @@ func placeOverlay(base rect, ow, oh int, screen rect) (rect, Placement) {
 	}
 
 	out.X = petCX - out.W/2
-	if limit := screen.X + screen.W - out.W; limit < screen.X {
-		out.X = screen.X // wider than the screen: nothing to choose between
-	} else if out.X > limit {
-		out.X = limit
-	} else if out.X < screen.X {
-		out.X = screen.X
+	if screen.W > 0 {
+		if limit := screen.X + screen.W - out.W; limit < screen.X {
+			out.X = screen.X // wider than the screen: nothing to choose between
+		} else if out.X > limit {
+			out.X = limit
+		} else if out.X < screen.X {
+			out.X = screen.X
+		}
 	}
 
 	petX := petCX - out.X
@@ -218,7 +225,7 @@ func (a *App) OpenOverlay(ow, oh int) Placement {
 	x, y := wruntime.WindowGetPosition(a.ctx)
 	a.baseX, a.baseY, a.grown = x, y, true
 
-	r, p := placeOverlay(rect{X: x, Y: y, W: a.baseW, H: a.baseH}, ow, oh, a.visibleFrame())
+	r, p := placeOverlay(rect{X: x, Y: y, W: a.baseW, H: a.baseH}, ow, oh, a.usableArea())
 
 	// Size and position are both set explicitly rather than trusting which
 	// edge a resize anchors to, which is a platform detail.
@@ -360,7 +367,7 @@ func (a *App) overlayReport() string {
 		return "none open"
 	}
 	wx, wy := wruntime.WindowGetPosition(a.ctx)
-	v := a.visibleFrame()
+	v := a.usableArea()
 	l, t := wx+o.X, wy+o.Y
 	r, b := l+o.W, t+o.H
 
@@ -393,6 +400,7 @@ func (a *App) DesktopDiagnostics() map[string]string {
 		return out
 	}
 	out["overlay"] = a.overlayReport()
+	out["status_menu"] = a.StatusMenu()
 	x, y := wruntime.WindowGetPosition(a.ctx)
 	w, h := wruntime.WindowGetSize(a.ctx)
 	out["window"] = fmt.Sprintf("%dx%d at %d,%d", w, h, x, y)
@@ -400,8 +408,13 @@ func (a *App) DesktopDiagnostics() map[string]string {
 
 	sw, sh := a.screenSize()
 	out["screen"] = fmt.Sprintf("%dx%d", sw, sh)
-	v := a.visibleFrame()
-	out["screen_usable"] = fmt.Sprintf("%dx%d at %d,%d", v.W, v.H, v.X, v.Y)
+	v := a.usableArea()
+	// Window positions are relative to the usable area, so it always starts at
+	// 0,0 — printing its size next to the display's is the difference that
+	// matters, and the one that was being got wrong.
+	ix, iy := a.displayInset()
+	out["usable"] = fmt.Sprintf("%dx%d (windows are placed in this, from 0,0)", v.W, v.H)
+	out["display_inset"] = fmt.Sprintf("%d left, %d top taken by the Dock and menu bar", ix, iy)
 	if screens, err := wruntime.ScreenGetAll(a.ctx); err == nil {
 		for _, s := range screens {
 			if s.IsCurrent {
@@ -570,9 +583,56 @@ func (a *App) Quit() { wruntime.Quit(a.ctx) }
 
 // showWindow and emitPanel exist for the optional status-bar menu, which has to
 // reach into the window from outside the webview.
+// showWindow is "Show Pet". Three things have to be true for that to mean
+// anything, and only the first was being done:
+//
+//   - the window is shown and un-minimised;
+//   - the application is frontmost, or the window is shown behind whatever the
+//     user is actually looking at;
+//   - the window is somewhere on the screen. The pet can be dragged almost
+//     entirely off an edge, and "Show Pet" is exactly what someone reaches for
+//     when they have lost it — so if it is outside the usable area, bring it
+//     back to the nearest point inside.
 func (a *App) showWindow() {
+	if a.ctx == nil {
+		return
+	}
+	a.CloseOverlay()
+	wruntime.WindowUnminimise(a.ctx)
 	wruntime.WindowShow(a.ctx)
 	wruntime.WindowSetAlwaysOnTop(a.ctx, a.alwaysOnTop)
+	a.activate()
+
+	v := a.usableArea()
+	if v.W == 0 {
+		return
+	}
+	x, y := wruntime.WindowGetPosition(a.ctx)
+	nx, ny := clampToArea(x, y, a.baseW, a.baseH, v)
+	if nx != x || ny != y {
+		wruntime.WindowSetPosition(a.ctx, nx, ny)
+	}
+}
+
+// clampToArea brings a window fully back inside the usable area, moving it as
+// little as possible.
+func clampToArea(x, y, w, h int, v rect) (int, int) {
+	if v.W <= 0 || v.H <= 0 {
+		return x, y // unknown screen: leave the window alone
+	}
+	if right := v.X + v.W - w; x > right {
+		x = right
+	}
+	if x < v.X {
+		x = v.X
+	}
+	if bottom := v.Y + v.H - h; y > bottom {
+		y = bottom
+	}
+	if y < v.Y {
+		y = v.Y
+	}
+	return x, y
 }
 
 func (a *App) emitPanel(kind string) {

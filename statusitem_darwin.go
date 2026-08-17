@@ -19,6 +19,7 @@ import "C"
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"sync"
 	"unsafe"
 
@@ -94,18 +95,63 @@ func setSleepTitle(s state.State) {
 	C.petStatusSetSleepTitle(c)
 }
 
-// visibleFrame is the area a window can actually occupy, from AppKit rather
-// than from arithmetic on the display size.
-func (a *App) visibleFrame() rect {
+// usableArea is where a window may sit, in the coordinates Wails uses for
+// window positions.
+//
+// Those are relative to the screen's visible frame, not to the display:
+// Application.m computes them as `windowFrame.origin - [screen visibleFrame]
+// .origin`. So the origin is already past the menu bar and past a Dock on the
+// left, and the usable area is simply (0,0) to the visible frame's size.
+//
+// Getting that wrong in either direction is a real bug. Treating the origin as
+// the display's puts every window one Dock-width off; using the display's
+// *size* as the limit — which this did — lets a window hang exactly one
+// Dock-width past the edge, which is what "the menu goes off the screen" was.
+//
+// A zero rect means the size is unknown, and nothing gets clamped: leaving a
+// window where the user put it beats moving it by a guess.
+func (a *App) usableArea() rect {
 	var x, y, w, h C.int
 	C.petVisibleFrame(&x, &y, &w, &h)
 	if w <= 0 || h <= 0 {
-		// AppKit had no answer. Fall back to the whole display less a guess at
-		// the menu bar, which is what this code did before it could ask.
-		sw, sh := a.screenSize()
-		return rect{X: 0, Y: menuBarInset, W: sw, H: sh - menuBarInset}
+		return rect{}
 	}
-	return rect{X: int(x), Y: int(y), W: int(w), H: int(h)}
+	return rect{W: int(w), H: int(h)}
+}
+
+// displayInset is the menu bar and Dock, for diagnostics only. Nothing
+// positions anything with it.
+func (a *App) displayInset() (int, int) {
+	var x, y, w, h C.int
+	C.petVisibleFrame(&x, &y, &w, &h)
+	return int(x), int(y)
+}
+
+func (a *App) activate() { C.petActivate() }
+
+// StatusMenu is what the menu-bar menu currently says, as
+// "tag:title[on]|...". A test can assert on it; nothing else can see a menu
+// bar, and accessibility access is refused to anything that tries.
+func (a *App) StatusMenu() string {
+	buf := make([]C.char, 1024)
+	n := C.petStatusMenuDump(&buf[0], C.int(len(buf)))
+	return C.GoStringN(&buf[0], n)
+}
+
+// ClickStatusItem performs a status-menu item through its own target and
+// action, so a test drives the same path as a click rather than a copy of it.
+func (a *App) ClickStatusItem(name string) error {
+	tags := map[string]C.int{
+		"show": C.PET_SHOW, "status": C.PET_STATUS, "stats": C.PET_STATS,
+		"change": C.PET_CHANGE, "ontop": C.PET_ONTOP, "mute": C.PET_MUTE,
+		"sleep": C.PET_SLEEP, "quit": C.PET_QUIT,
+	}
+	tag, ok := tags[name]
+	if !ok {
+		return fmt.Errorf("unknown status item %q", name)
+	}
+	C.petStatusClickItem(tag)
+	return nil
 }
 
 // statusItemReport is what `petctl doctor` prints about the menu bar. There is

@@ -1,4 +1,4 @@
-.PHONY: help deps dev build petctl pets test test-ui vet fmt clean run-headless demo
+.PHONY: help deps dev build test-desktop petctl pets test test-ui vet fmt clean run-headless demo
 BIN := bin
 VERSION ?= 0.1.0
 LDFLAGS := -X main.version=$(VERSION)
@@ -9,6 +9,7 @@ help:
 	@echo "make petctl         build the CLI into $(BIN)/"
 	@echo "make test           run the Go test suite"
 	@echo "make test-ui        open the UI tests in a browser"
+	@echo "make test-desktop   check the menu bar and window placement (app must be running)"
 	@echo "make pets           regenerate the built-in sprite art"
 	@echo "make demo           drive the pet through a realistic session"
 deps:
@@ -31,6 +32,11 @@ test:
 # The UI tests load ui/dist/index.html into an iframe, so they need a real
 # browser and a real origin — file:// blocks same-origin access to the frame.
 # Any static server works; this one is already on every Mac.
+# The menu bar and where a menu lands in a corner cannot be unit-tested and
+# cannot be seen from a test. This drives a running app and checks its answers.
+test-desktop:
+	@./scripts/desktop-test.sh
+
 UI_TEST_PORT ?= 8899
 test-ui:
 	@python3 -m http.server $(UI_TEST_PORT) --bind 127.0.0.1 & \

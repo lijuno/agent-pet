@@ -2,14 +2,25 @@
 
 package main
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // The status-bar item is macOS-only. See statusitem_darwin.go.
 func (a *App) startTray(context.Context) {}
 
 func statusItemReport() string { return "not supported on this platform" }
 
-func (a *App) visibleFrame() rect {
+func (a *App) usableArea() rect {
 	sw, sh := a.screenSize()
-	return rect{X: 0, Y: menuBarInset, W: sw, H: sh - menuBarInset}
+	return rect{W: sw, H: sh - menuBarInset}
+}
+
+func (a *App) displayInset() (int, int) { return 0, menuBarInset }
+func (a *App) activate()                {}
+func (a *App) StatusMenu() string       { return "" }
+
+func (a *App) ClickStatusItem(string) error {
+	return errors.New("no status item on this platform")
 }

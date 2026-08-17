@@ -106,6 +106,8 @@ func main() {
 	srv.Desktop = app.DesktopDiagnostics
 	srv.Panel = app.OpenPanel
 	srv.MoveWindow = app.MoveWindow
+	srv.StatusItem = app.ClickStatusItem
+	srv.StatusMenu = app.StatusMenu
 	// Only as big as the character. The window grows when a panel opens and
 	// shrinks again when it closes — see App.OpenOverlay for why it must not
 	// simply stay large.

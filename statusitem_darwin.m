@@ -116,8 +116,19 @@ void petVisibleFrame(int *x, int *y, int *w, int *h) {
   __block NSRect frame = NSZeroRect;
   __block NSRect visible = NSZeroRect;
   void (^read)(void) = ^{
-    // The screen the window is on, falling back to the main one.
-    NSScreen *screen = [NSApp keyWindow].screen;
+    // The screen the pet's own window is on. Wails reports window positions
+    // relative to that screen, so asking a different one — the main screen,
+    // say, on a two-monitor desk — would answer in the wrong coordinate space.
+    NSScreen *screen = nil;
+    for (NSWindow *win in [NSApp windows]) {
+      if (win.screen != nil && win.isVisible) {
+        screen = win.screen;
+        break;
+      }
+    }
+    if (screen == nil) {
+      screen = [NSApp keyWindow].screen;
+    }
     if (screen == nil) {
       screen = [NSScreen mainScreen];
     }
@@ -142,6 +153,49 @@ void petVisibleFrame(int *x, int *y, int *w, int *h) {
              (visible.origin.y + visible.size.height));
   *w = (int)visible.size.width;
   *h = (int)visible.size.height;
+}
+
+void petActivate(void) {
+  onMain(^{
+    [NSApp activateIgnoringOtherApps:YES];
+  });
+}
+
+int petStatusMenuDump(char *buf, int cap) {
+  __block NSMutableString *out = [NSMutableString string];
+  void (^dump)(void) = ^{
+    for (NSMenuItem *it in petItem.menu.itemArray) {
+      if (it.isSeparatorItem) {
+        continue;
+      }
+      [out appendFormat:@"%ld:%@%@|", (long)it.tag, it.title,
+                        it.state == NSControlStateValueOn ? @"[on]" : @""];
+    }
+  };
+  if ([NSThread isMainThread]) {
+    dump();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), dump);
+  }
+  const char *s = [out UTF8String];
+  int n = (int)strlen(s);
+  if (n >= cap) {
+    n = cap - 1;
+  }
+  memcpy(buf, s, n);
+  buf[n] = 0;
+  return n;
+}
+
+void petStatusClickItem(int tag) {
+  onMain(^{
+    NSMenuItem *it = [petItem.menu itemWithTag:tag];
+    if (it != nil) {
+      // Dispatch through the responder chain, which is how AppKit delivers a
+      // real click — rather than performSelector, which merely resembles one.
+      [NSApp sendAction:it.action to:it.target from:it];
+    }
+  });
 }
 
 int petStatusProbe(void) {
