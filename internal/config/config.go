@@ -135,7 +135,7 @@ func Default() Config {
 		},
 		Thresholds: Thresholds{
 			IdleAfter:        Duration(30 * time.Second),
-			SleepingAfter:    Duration(30 * time.Minute),
+			SleepingAfter:    Duration(60 * time.Second),
 			TiredAfter:       Duration(120 * time.Minute),
 			AttentionTimeout: Duration(10 * time.Minute),
 			SessionStale:     Duration(2 * time.Hour),

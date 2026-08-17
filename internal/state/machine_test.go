@@ -142,11 +142,19 @@ func TestAttentionTimesOut(t *testing.T) {
 	m := New(o)
 	step(m, c, ev(events.PermissionRequested, "a"))
 
-	if got := advance(m, c, o.AttentionTimeout-time.Second); got != Attention {
+	// The pet dozes off quickly now, and a request for the user is the one
+	// thing it must never doze through: nobody is coming to answer a prompt
+	// they were never shown.
+	if got := advance(m, c, o.SleepingAfter+time.Second); got != Attention {
+		t.Fatalf("a pending request must outlast the sleep threshold, got %s", got)
+	}
+	if got := advance(m, c, o.AttentionTimeout-o.SleepingAfter-2*time.Second); got != Attention {
 		t.Fatalf("attention should persist until the timeout, got %s", got)
 	}
-	if got := advance(m, c, 2*time.Second); got != Idle {
-		t.Fatalf("an unanswered request should give up eventually, got %s", got)
+	// Having given up, and with nothing having happened for far longer than
+	// the sleep threshold, sleeping is where it lands.
+	if got := advance(m, c, 2*time.Second); got != Sleeping {
+		t.Fatalf("an unanswered request should give up and sleep, got %s", got)
 	}
 }
 

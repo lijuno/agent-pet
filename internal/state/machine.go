@@ -14,6 +14,12 @@ type Options struct {
 	// idle. Covers agents that never send an explicit idle event.
 	IdleAfter time.Duration
 	// SleepingAfter: no events from anyone for this long and the pet sleeps.
+	// Short on purpose. A cat dozes the moment nothing is happening, and an
+	// agent between turns is nothing happening — the pet is more restful and
+	// more honest asleep than staring at a prompt nobody has typed yet. What
+	// makes this affordable is that grey, not open eyes, is what says an agent
+	// is connected: asleep in colour reads as "Claude is there and quiet",
+	// asleep in grey as "Claude is gone".
 	SleepingAfter time.Duration
 	// TiredAfter: a session running this long makes an otherwise-idle pet tired.
 	TiredAfter time.Duration
@@ -51,7 +57,7 @@ const DefaultMaxSessions = 64
 func DefaultOptions() Options {
 	return Options{
 		IdleAfter:        30 * time.Second,
-		SleepingAfter:    30 * time.Minute,
+		SleepingAfter:    60 * time.Second,
 		TiredAfter:       120 * time.Minute,
 		AttentionTimeout: 10 * time.Minute,
 		SessionStale:     2 * time.Hour,

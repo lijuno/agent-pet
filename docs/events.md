@@ -89,7 +89,7 @@ event, so a crashed agent cannot leak one.
 | Condition | Result |
 |---|---|
 | A `working`/`thinking` session goes quiet for `idle_after` (30s) | that session reads as `idle` |
-| No events at all for `sleeping_after` (30m) | `sleeping` |
+| No events at all for `sleeping_after` (60s) | `sleeping` |
 | An unanswered `attention` for `attention_timeout` (10m) | gives up, back to `idle` |
 | A session running longer than `tired_after` (2h), pet otherwise idle | `tired` |
 

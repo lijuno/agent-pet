@@ -108,6 +108,11 @@ the pet. See [ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
 The character comes in three sizes — small, medium and large — from the
 right-click menu or the `pet.scale` setting.
 
+She dozes off a minute after the agent goes quiet, and wakes on the next
+event — a cat's answer to an idle prompt. A request for you is the exception:
+`attention` is never slept through, because nobody answers a prompt they were
+never shown.
+
 When no agent is connected — Claude Code has exited, or has not started — the
 character greys out. Awake and in colour means something is there to watch;
 grey means the pet is running but nothing is. A state forced with
@@ -132,7 +137,7 @@ personality:
 
 thresholds:
   idle_after: 30s       # a quiet agent stops looking busy
-  sleeping_after: 30m
+  sleeping_after: 60s   # ... and shortly after that, dozes off
   tired_after: 2h
 
 server:

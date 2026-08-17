@@ -37,7 +37,9 @@ func TestPartialConfigKeepsDefaults(t *testing.T) {
 	if cfg.Server.Addr != "127.0.0.1:9876" {
 		t.Fatalf("unmentioned keys should keep their defaults, got %q", cfg.Server.Addr)
 	}
-	if cfg.Thresholds.SleepingAfter.D() != 30*time.Minute {
+	// Compared against the default rather than a literal: this test is about
+	// unmentioned keys keeping their defaults, not about what the default is.
+	if cfg.Thresholds.SleepingAfter != Default().Thresholds.SleepingAfter {
 		t.Fatalf("thresholds should keep their defaults, got %v", cfg.Thresholds.SleepingAfter.D())
 	}
 }
