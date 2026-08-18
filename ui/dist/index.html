@@ -72,6 +72,28 @@
     opacity: .78;
   }
 
+  /*
+    Shadow off (pet.drop_shadow: false). On a light wallpaper the same shadow
+    stops lifting her off the background and starts tracing a grey contour
+    around every edge, and nothing here can see the wallpaper to decide.
+
+    Both rules are needed, and both must stay below the two above: `filter`
+    replaces rather than adds, so the inactive case has to restate grayscale
+    to avoid handing her colour back at the moment she is meant to lose it.
+    They rely on source order against `body.inactive #sprite`, which has the
+    same specificity as the first of them.
+
+    The ellipse under her feet is in the PNG frames and is unaffected.
+
+    The filter transition is dropped with them. `filter` animates from
+    whatever the base rule says, so leaving it on fades *out* of a shadow —
+    and since the classes land in the same frame as the first sprite, the one
+    user who asked not to see a shadow saw one for .35s at every launch. The
+    grey swap turns instant in exchange, which is the cheaper of the two.
+  */
+  body.no-shadow #sprite { filter: none; transition: opacity .18s ease; }
+  body.no-shadow.inactive #sprite { filter: grayscale(1); transition: opacity .18s ease; }
+
   /* Paused when the window is hidden, so a pet nobody can see costs nothing. */
   body.paused #sprite { animation-play-state: paused !important; }
 
@@ -590,6 +612,14 @@ function openMenu() {
       openMenu();
       flashBadge(next ? "Always on top" : "Normal window");
     }, view ? view.on_top : false),
+    item("Drop Shadow", async () => {
+      const next = !(view && view.drop_shadow);
+      await call("SetDropShadow", next);
+      if (view) view.drop_shadow = next;
+      document.body.classList.toggle("no-shadow", !next);
+      openMenu();
+      flashBadge(next ? "Shadow on" : "Shadow off");
+    }, view ? view.drop_shadow !== false : true),
     item("Mute", async () => {
       muted = !muted;
       await call("SetMuted", muted);
@@ -665,6 +695,9 @@ function apply(v) {
   muted = !!v.muted;
   renderAnimation(v.animation, v.scale);
   document.body.classList.toggle("inactive", inactive(v));
+  // Only an explicit false turns it off, so a payload from a build that
+  // predates the setting keeps its shadow rather than silently losing it.
+  document.body.classList.toggle("no-shadow", v.drop_shadow === false);
   if (v.bubble && v.bubble.text) showBubble(v.bubble.text, v.bubble.ttl_ns);
   if (!el.panel.classList.contains("hidden")) {
     const kind = el.panel.dataset.kind;

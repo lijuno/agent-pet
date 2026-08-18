@@ -484,11 +484,12 @@ func (a *App) shutdown(ctx context.Context) {
 // everything needed to draw: which pet, which animation, where the frames are.
 type View struct {
 	engine.Update
-	Animation *AnimationView `json:"animation"`
-	PetName   string         `json:"pet_name"`
-	Muted     bool           `json:"muted"`
-	OnTop     bool           `json:"on_top"`
-	Scale     float64        `json:"scale"`
+	Animation  *AnimationView `json:"animation"`
+	PetName    string         `json:"pet_name"`
+	Muted      bool           `json:"muted"`
+	OnTop      bool           `json:"on_top"`
+	Scale      float64        `json:"scale"`
+	DropShadow bool           `json:"drop_shadow"`
 }
 
 type AnimationView struct {
@@ -506,10 +507,11 @@ type AnimationView struct {
 
 func (a *App) decorate(up engine.Update) View {
 	v := View{
-		Update: up,
-		Muted:  a.muted,
-		OnTop:  a.alwaysOnTop,
-		Scale:  a.eng.Config().Pet.Scale,
+		Update:     up,
+		Muted:      a.muted,
+		OnTop:      a.alwaysOnTop,
+		Scale:      a.eng.Config().Pet.Scale,
+		DropShadow: a.eng.Config().Pet.DropShadow,
 	}
 	p, ok := a.eng.ActivePet()
 	if !ok {
@@ -563,6 +565,18 @@ func (a *App) SetAlwaysOnTop(b bool) {
 }
 
 func (a *App) SetMuted(b bool) { a.muted = b }
+
+// SetDropShadow turns the shadow behind the sprite on or off and remembers the
+// choice. Unlike the size, nothing about the window changes: the shadow is
+// drawn inside the frame the character already occupies.
+func (a *App) SetDropShadow(b bool) {
+	cfg := a.eng.Config()
+	cfg.Pet.DropShadow = b
+	a.eng.SetConfig(cfg)
+	if err := config.Save(a.cfgPath, cfg); err != nil {
+		a.log.Warn("could not save config", "err", err)
+	}
+}
 
 // Info backs the status and statistics panels.
 type Info struct {

@@ -263,6 +263,36 @@ test("the pet greys out when no agent is connected", withPet(async (w, d) => {
   assert(f.includes("drop-shadow"), `sprite should keep its shadow, filter is ${f}`);
 }));
 
+// --- the shadow ------------------------------------------------------------
+// It lifts her off a busy wallpaper; on a light one the same shadow reads as a
+// grey contour around every edge. Nothing here can see the wallpaper, so which
+// of those it is doing is the user's call.
+test("the shadow goes when drop_shadow is off", withPet(async (w, d) => {
+  w.apply(view({ drop_shadow: false, snapshot: { state: "working", forced: false, stats: {}, sessions: [session()] } }));
+  assert(d.body.classList.contains("no-shadow"), "drop_shadow: false should mark the body");
+  const f = w.getComputedStyle(d.getElementById("sprite")).filter;
+  assert(!f.includes("drop-shadow"), `sprite should have no shadow, filter is ${f}`);
+}));
+
+// `filter` replaces rather than adds, so the rule that drops the shadow while
+// she is greyed out has to restate grayscale. Leaving it out hands her colour
+// back at the exact moment she is meant to lose it.
+test("a shadowless pet still greys out", withPet(async (w, d) => {
+  w.apply(view({ drop_shadow: false, snapshot: { state: "sleeping", forced: false, stats: {}, sessions: [] } }));
+  const f = w.getComputedStyle(d.getElementById("sprite")).filter;
+  assert(f.includes("grayscale"), `sprite should still be grey, filter is ${f}`);
+  assert(!f.includes("drop-shadow"), `sprite should have no shadow, filter is ${f}`);
+}));
+
+// A payload from a build that predates the setting has no such field, and an
+// absent field is not the same answer as "off".
+test("a view without the field keeps the shadow", withPet(async (w, d) => {
+  w.apply(view({ snapshot: { state: "working", forced: false, stats: {}, sessions: [session()] } }));
+  assert(!d.body.classList.contains("no-shadow"), "an absent drop_shadow should not turn it off");
+  const f = w.getComputedStyle(d.getElementById("sprite")).filter;
+  assert(f.includes("drop-shadow"), `sprite should keep its shadow, filter is ${f}`);
+}));
+
 test("the pet has its colour while an agent is connected", withPet(async (w, d) => {
   w.apply(view({ snapshot: { state: "working", forced: false, stats: {}, sessions: [session()] } }));
   assert(!d.body.classList.contains("inactive"), "a live session is not inactive");

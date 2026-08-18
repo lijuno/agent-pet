@@ -31,7 +31,14 @@ type Pet struct {
 	Active      string  `yaml:"active"`
 	AlwaysOnTop bool    `yaml:"always_on_top"`
 	Scale       float64 `yaml:"scale"`
-	Sound       bool    `yaml:"sound"`
+	// DropShadow is the soft shadow the UI casts behind the whole sprite. It
+	// lifts her off a busy wallpaper, but on a light one it reads as a grey
+	// contour tracing every edge, which there is no way to detect from here.
+	//
+	// It is only that shadow. The ellipse under her feet is drawn into the
+	// PNG frames themselves and stays either way — hence the narrow name.
+	DropShadow bool `yaml:"drop_shadow"`
+	Sound      bool `yaml:"sound"`
 }
 
 type Behavior struct {
@@ -118,6 +125,7 @@ func Default() Config {
 			Active:      "momo",
 			AlwaysOnTop: true,
 			Scale:       1.0,
+			DropShadow:  true,
 			Sound:       false,
 		},
 		Behavior: Behavior{Dialogue: true, XP: true, ClickFocusesAgent: false},

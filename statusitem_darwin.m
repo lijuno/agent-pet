@@ -92,7 +92,7 @@ void petStatusInstall(const void *png, int len, int onTop, int muted, int shown)
     [mute setState:muted ? NSControlStateValueOn : NSControlStateValueOff];
     [menu addItem:[NSMenuItem separatorItem]];
 
-    addItem(menu, @"Quit Digital Pet", PET_QUIT);
+    addItem(menu, @"Quit Pet", PET_QUIT);
 
     petItem.menu = menu;
   });

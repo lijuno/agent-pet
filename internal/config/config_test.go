@@ -123,3 +123,41 @@ func TestIsLoopback(t *testing.T) {
 		}
 	}
 }
+
+// The shadow defaults on, which makes it the one boolean here that a config
+// file written before it existed could silently turn off — an absent key and
+// an explicit `false` decode to the same zero value unless the defaults are
+// what the file is decoded into. They are; this holds that.
+func TestShadowSurvivesAConfigThatPredatesIt(t *testing.T) {
+	dir := t.TempDir()
+
+	old := filepath.Join(dir, "old.yaml")
+	os.WriteFile(old, []byte("pet:\n  active: momo\n  scale: 1\n"), 0o644)
+	cfg, err := Load(old)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.Pet.DropShadow {
+		t.Fatal("a file with no drop_shadow key should keep the shadow")
+	}
+
+	off := filepath.Join(dir, "off.yaml")
+	os.WriteFile(off, []byte("pet:\n  drop_shadow: false\n"), 0o644)
+	cfg, err = Load(off)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Pet.DropShadow {
+		t.Fatal("an explicit false should turn the shadow off")
+	}
+
+	// And it has to survive the rewrite on shutdown, or the setting lasts
+	// exactly as long as the session that changed it.
+	back := filepath.Join(dir, "saved.yaml")
+	if err := Save(back, cfg); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if cfg, err = Load(back); err != nil || cfg.Pet.DropShadow {
+		t.Fatalf("the shadow should still be off after a round trip: %+v %v", cfg.Pet, err)
+	}
+}

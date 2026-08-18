@@ -147,6 +147,7 @@ pet:
   active: momo          # momo, or your own pack
   always_on_top: true
   scale: 1.0
+  drop_shadow: true     # off if it reads as a halo on a light wallpaper
 
 behavior:
   dialogue: true        # speech bubbles
