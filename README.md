@@ -1,5 +1,7 @@
 # Digital Pet
 
+[![CI](https://github.com/lijuno/agent-pet/actions/workflows/ci.yml/badge.svg)](https://github.com/lijuno/agent-pet/actions/workflows/ci.yml)
+
 A small desktop companion that reacts to what your coding agent is doing.
 Claude Code starts, the pet wakes up. A tool runs, it gets to work. A permission
 prompt appears, it turns and asks for you. Tests pass, it celebrates.
@@ -270,6 +272,11 @@ make test          # Go: engine, state machine, event API, adapter, placement
 make test-ui       # the window, in a browser
 make test-desktop  # the menu bar and corner placement, against a running app
 ```
+
+CI runs the first of those on every push, against the Go version `go.mod`
+declares and against current stable, and builds the app bundle. It cannot run
+the other two: one needs a browser and the other needs the app running and
+drives its menu bar. A green tick is not evidence that a menu handler works.
 
 The state machine is a pure function of (events, clock), so its tests drive a
 synthetic clock and never sleep. See

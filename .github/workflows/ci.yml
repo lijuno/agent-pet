@@ -1,0 +1,88 @@
+name: CI
+
+# macOS only. The menu-bar item is Objective-C compiled through cgo and the
+# window is Wails' WebKit view, so there is nothing to learn from a Linux
+# runner that a compile error on macOS would not say first.
+#
+# This covers the Go suite. It does not cover `make test-ui`, which needs a
+# browser, or `make test-desktop`, which needs the app running and drives its
+# menu bar. A green tick here does not mean a menu handler works — one shipped
+# broken that way. See CLAUDE.md.
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A second push to the same branch makes the first run pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (go ${{ matrix.go }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The version go.mod declares, so the claimed minimum is actually
+        # tested, and current stable, so a new toolchain cannot break the build
+        # unnoticed.
+        go: ["1.23.0", "stable"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "these files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      # -race because the engine runs timers and subscribers on their own
+      # goroutines; a data race there would otherwise surface as a pet that is
+      # occasionally, unreproducibly wrong.
+      - name: go test
+        run: go test -race ./...
+
+  build:
+    name: build the app bundle
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Pinned to the version go.mod requires. An older CLI fails on a recent
+      # toolchain with `internal error: package "strings" without types`, which
+      # does not look like a version problem — see the README.
+      - name: install the Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.2
+
+      # `wails build` failing leaves any previous bundle in place, so the exit
+      # code is not enough on a machine that has built before. The runner is
+      # clean, but assert the bundle exists anyway: that is the check a person
+      # would forget.
+      - name: wails build
+        run: |
+          wails build -clean
+          test -x build/bin/digital-pet.app/Contents/MacOS/petd
+          echo "built $(du -sh build/bin/digital-pet.app | cut -f1)"
