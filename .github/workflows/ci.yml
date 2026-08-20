@@ -81,8 +81,26 @@ jobs:
       # code is not enough on a machine that has built before. The runner is
       # clean, but assert the bundle exists anyway: that is the check a person
       # would forget.
-      - name: wails build
+      # `make build` rather than `wails build`, so the universal flag and the
+      # embedded petctl are covered too. A green run against a bundle missing
+      # petctl would mean the plugin's shim has nothing to resolve.
+      - name: make build
+        run: make build
+
+      # `wails build` failing leaves any previous bundle in place, so the exit
+      # code is not enough on a machine that has built before. The runner is
+      # clean, but assert the shape anyway: that is the check a person would
+      # forget.
+      - name: check the bundle
         run: |
-          wails build -clean
-          test -x build/bin/digital-pet.app/Contents/MacOS/petd
-          echo "built $(du -sh build/bin/digital-pet.app | cut -f1)"
+          app=build/bin/digital-pet.app
+          test -x $app/Contents/MacOS/petd
+          test -x $app/Contents/MacOS/petctl
+          for b in petd petctl; do
+            archs=$(lipo -archs $app/Contents/MacOS/$b)
+            case "$archs" in
+              *x86_64*arm64*|*arm64*x86_64*) ;;
+              *) echo "$b is '$archs', not universal — Intel users would get nothing"; exit 1 ;;
+            esac
+          done
+          echo "built $(du -sh $app | cut -f1), both binaries universal"
