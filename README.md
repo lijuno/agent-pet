@@ -6,6 +6,17 @@ A small desktop companion that reacts to what your coding agent is doing.
 Claude Code starts, the pet wakes up. A tool runs, it gets to work. A permission
 prompt appears, it turns and asks for you. Tests pass, it celebrates.
 
+<p align="center">
+  <img src="docs/media/states.gif"
+       alt="The pet cycling through its ten states: idle, thinking, working, attention, confused, worried, happy, celebrate, heart and sleeping. Each is a four- to six-frame pixel-art animation of a tortoiseshell cat, labelled with its name and frame rate."
+       width="288">
+</p>
+
+<p align="center">
+  <sub>Every state the pet can be in, rendered from the sprites it actually
+  ships — <code>make states-gif</code>.</sub>
+</p>
+
 **This repository contains Milestones 1 and 2** — the pet engine, the local
 event API, `petctl`, the desktop window, a pixel-art character,
 and the Claude Code adapter. The Codex adapter is Milestone 3;

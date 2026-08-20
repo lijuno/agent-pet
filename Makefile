@@ -1,4 +1,4 @@
-.PHONY: help deps dev build test-desktop petctl pets test test-ui vet fmt clean run-headless demo plugin-hooks plugin-validate embed-petctl version-sync
+.PHONY: help deps dev build test-desktop petctl pets test test-ui vet fmt clean run-headless demo plugin-hooks plugin-validate embed-petctl version-sync states-gif
 BIN := bin
 APP := build/bin/digital-pet.app
 
@@ -22,6 +22,7 @@ help:
 	@echo "make plugin-hooks   regenerate the plugin hooks from the adapter"
 	@echo "make plugin-validate check the plugin and marketplace manifests"
 	@echo "make version-sync    write $(VERSION) into wails.json before a release"
+	@echo "make states-gif     rebuild the README state figure from the sprites"
 deps:
 	go mod tidy
 dev:
@@ -97,3 +98,8 @@ embed-petctl:
 # tag. Intended for the release workflow; it edits a tracked file.
 version-sync:
 	@python3 -c "import json,sys; p='wails.json'; d=json.load(open(p)); d['info']['productVersion']='$(VERSION)'; json.dump(d,open(p,'w'),indent=2); open(p,'a').write('\n'); print('wails.json productVersion ->','$(VERSION)')"
+
+# The README's state figure. Generated from the shipped sprites and manifest so
+# it cannot drift into advertising an animation the pet does not have.
+states-gif:
+	@python3 scripts/make-states-gif.py
