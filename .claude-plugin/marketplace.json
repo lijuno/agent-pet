@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "lijuno",
+  "description": "Plugins by lijuno.",
+  "owner": {
+    "name": "lijuno",
+    "url": "https://github.com/lijuno"
+  },
+  "plugins": [
+    {
+      "name": "agent-pet",
+      "source": "./plugin",
+      "description": "A desktop pet that reacts to what Claude Code is doing.",
+      "category": "productivity",
+      "tags": ["desktop-pet", "ambient", "macos"]
+    }
+  ]
+}

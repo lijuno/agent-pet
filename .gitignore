@@ -1,5 +1,8 @@
-bin/
-build/bin/
+# Anchored. An unanchored `bin/` matches at every depth, which silently
+# swallowed plugin/bin/petctl — the shim the plugin's hooks invoke — and
+# would have shipped a plugin pointing at a file that was never committed.
+/bin/
+/build/bin/
 node_modules/
 
 # Written by `petctl install claude`. It holds an absolute path to the petctl

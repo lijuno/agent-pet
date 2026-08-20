@@ -1,4 +1,4 @@
-.PHONY: help deps dev build test-desktop petctl pets test test-ui vet fmt clean run-headless demo embed-petctl version-sync
+.PHONY: help deps dev build test-desktop petctl pets test test-ui vet fmt clean run-headless demo plugin-hooks plugin-validate embed-petctl version-sync
 BIN := bin
 APP := build/bin/digital-pet.app
 
@@ -19,6 +19,8 @@ help:
 	@echo "make test-desktop   check the menu bar and window placement (app must be running)"
 	@echo "make pets           regenerate the built-in sprite art"
 	@echo "make demo           drive the pet through a realistic session"
+	@echo "make plugin-hooks   regenerate the plugin hooks from the adapter"
+	@echo "make plugin-validate check the plugin and marketplace manifests"
 	@echo "make version-sync    write $(VERSION) into wails.json before a release"
 deps:
 	go mod tidy
@@ -65,6 +67,17 @@ clean:
 	rm -rf $(BIN) build/bin
 demo: petctl
 	@./scripts/demo.sh
+
+# plugin/hooks/hooks.json has to agree with claude.Hooks exactly. Generating it
+# is the only way they stay in step; plugin_test.go fails if they drift.
+plugin-hooks:
+	@python3 scripts/gen-plugin-hooks.py
+
+# What the community-marketplace review pipeline runs, so a rejection is found
+# here rather than on submission.
+plugin-validate:
+	@claude plugin validate ./plugin
+	@claude plugin validate .
 
 # petctl ships inside the bundle so the plugin's bin/petctl shim has something
 # to resolve, and so the CLI and the petd it talks to can never be different

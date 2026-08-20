@@ -1,0 +1,71 @@
+#!/bin/sh
+# `petctl` as this plugin exposes it: a shim onto the real binary inside the
+# installed app bundle.
+#
+# The binary is not committed here on purpose. It is a universal build of a few
+# megabytes, and `bin/` is distributed over git — committing it would add a
+# fresh copy to the repository's history on every release, forever. Resolving
+# it at run time also means the CLI and the petd it talks to are always the
+# same build, so the version-skew case simply cannot arise.
+#
+# Deliberately does NOT search $PATH: this plugin's own bin/ is on $PATH while
+# the plugin is enabled, so a lookup would find this shim and re-exec itself
+# until the process ran out of stack.
+
+set -u
+
+# Candidates are appended one at a time, and only when the variable they are
+# built from is actually set: "${CLAUDE_PROJECT_DIR:-}/bin/petctl" collapses to
+# the absolute path /bin/petctl when that variable is unset, which is a real
+# path this script has no business executing.
+found=""
+
+try() {
+	[ -z "$found" ] || return 0
+	[ -x "$1" ] || return 0
+	found=$1
+}
+
+# $DIGITAL_PET_APP overrides the search entirely, for anyone keeping the app
+# somewhere other than /Applications.
+[ -n "${DIGITAL_PET_APP:-}" ] && try "$DIGITAL_PET_APP/Contents/MacOS/petctl"
+
+try "/Applications/digital-pet.app/Contents/MacOS/petctl"
+try "$HOME/Applications/digital-pet.app/Contents/MacOS/petctl"
+# The bundle is named from wails.json's `name`, but accept the product name too
+# in case that is what it is renamed to.
+try "/Applications/Digital Pet.app/Contents/MacOS/petctl"
+try "$HOME/Applications/Digital Pet.app/Contents/MacOS/petctl"
+
+# Working on the pet itself: prefer a local build over whatever is installed.
+if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+	try "$CLAUDE_PROJECT_DIR/build/bin/digital-pet.app/Contents/MacOS/petctl"
+	try "$CLAUDE_PROJECT_DIR/bin/petctl"
+fi
+
+if [ -n "$found" ]; then
+	exec "$found" "$@"
+fi
+
+# Nothing found. How loudly to complain depends entirely on who is calling.
+#
+# `petctl hook claude` is wired into ten Claude Code hooks, so it runs many
+# times per turn. It already exits 0 and prints nothing whatever happens —
+# a stray byte on stdout or a non-zero exit would interfere with the agent it
+# is attached to (see adapters/README.md). Someone who installs the plugin and
+# has not yet installed the app must not get ten error messages per tool call.
+if [ "${1:-}" = "hook" ]; then
+	exit 0
+fi
+
+# Anyone else asked a direct question and deserves a real answer.
+cat >&2 <<'MSG'
+petctl: the Digital Pet app is not installed.
+
+The plugin ships the hooks; the app is a separate signed download, because a
+macOS app bundle cannot sensibly live in a git repository.
+
+  Ask Claude Code:  /agent-pet:install
+  Or set DIGITAL_PET_APP=/path/to/digital-pet.app if it lives somewhere else.
+MSG
+exit 1
