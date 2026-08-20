@@ -50,6 +50,11 @@ func (a *App) startTray(ctx context.Context) {
 		statusApp = a
 		statusMu.Unlock()
 
+		// The menu bar is the only place the app needs to be reachable from,
+		// so drop the Dock icon. Info.plist asks for this with LSUIElement and
+		// Wails overrides it at launch — see petHideFromDock.
+		C.petHideFromDock()
+
 		onTop, muted, shown := 0, 0, 0
 		if a.alwaysOnTop {
 			onTop = 1
@@ -184,6 +189,22 @@ func statusItemReport() string {
 		out += ", no icon (showing a letter instead)"
 	}
 	return out
+}
+
+// dockReport is what `petctl doctor` prints about the Dock. LSUIElement is
+// overridden by Wails at launch and set back afterwards, so the only honest
+// answer is the policy actually in force, not the one Info.plist asked for.
+func dockReport() string {
+	switch int(C.petActivationPolicy()) {
+	case 0:
+		return "showing a Dock icon — LSUIElement did not take effect"
+	case 1:
+		return "hidden — menu bar only"
+	case 2:
+		return "prohibited"
+	default:
+		return "unknown"
+	}
 }
 
 // refreshPetMenu rebuilds the Change Pet submenu from the pet library, ticking

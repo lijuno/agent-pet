@@ -176,6 +176,31 @@ void petVisibleFrame(int *x, int *y, int *w, int *h) {
   *h = (int)visible.size.height;
 }
 
+void petHideFromDock(void) {
+  // Always dispatch_async, never onMain's synchronous path. Wails sets the
+  // policy to Regular in applicationWillFinishLaunching; if this ran inline on
+  // the main thread while that was still ahead of us, Wails would overwrite it
+  // and the Dock icon would come back. Queuing it guarantees we go last.
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+  });
+}
+
+int petActivationPolicy(void) {
+  __block int policy = 0;
+  // Synchronous for the same reason petStatusProbe is: an answer that arrived
+  // before the work happened would be worse than no answer.
+  void (^read)(void) = ^{
+    policy = (int)[NSApp activationPolicy];
+  };
+  if ([NSThread isMainThread]) {
+    read();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), read);
+  }
+  return policy;
+}
+
 void petActivate(void) {
   onMain(^{
     [NSApp activateIgnoringOtherApps:YES];

@@ -21,6 +21,12 @@
         <string>10.13.0</string>
         <key>NSHighResolutionCapable</key>
         <string>true</string>
+        <!-- The pet lives in the menu bar and draws a borderless, mostly
+             click-through window. Without this it also plants a Dock icon and
+             appears in the app switcher, which is wrong for something ambient:
+             cmd-tabbing to a cat you cannot type into is a dead end. -->
+        <key>LSUIElement</key>
+        <true/>
         <key>NSHumanReadableCopyright</key>
         <string>{{.Info.Copyright}}</string>
         {{if .Info.FileAssociations}}

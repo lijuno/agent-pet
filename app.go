@@ -408,7 +408,7 @@ func (a *App) overlayReport() string {
 // doing. None of it can be seen from a test — there is no screen to look at —
 // so the app is asked instead, and `petctl doctor` prints the answer.
 func (a *App) DesktopDiagnostics() map[string]string {
-	out := map[string]string{"menu_bar": statusItemReport()}
+	out := map[string]string{"menu_bar": statusItemReport(), "dock": dockReport()}
 	if a.ctx == nil {
 		return out
 	}

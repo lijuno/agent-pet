@@ -12,6 +12,8 @@ func (a *App) startTray(context.Context) {}
 
 func statusItemReport() string { return "not supported on this platform" }
 
+func dockReport() string { return "not supported on this platform" }
+
 func (a *App) usableArea() rect {
 	sw, sh := a.screenSize()
 	return rect{W: sw, H: sh - menuBarInset}

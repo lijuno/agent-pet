@@ -55,6 +55,11 @@ fi
 
 echo "Menu bar"
 want "the status item is installed" "$(field menu_bar)" "installed"
+# LSUIElement alone does not do this: Wails sets the activation policy back to
+# Regular at launch, and the app puts it to Accessory afterwards. Nothing about
+# that ordering is visible from the Go suite, and getting it wrong just means a
+# Dock icon nobody notices in review.
+want "the app keeps out of the Dock" "$(field dock)" "menu bar only"
 menu=$(field status_menu)
 for item in "Show Pet" "Pet Status" "Statistics" "Change Pet" "Always on Top" "Mute" "Quit"; do
 	want "the menu offers $item" "$menu" "$item"

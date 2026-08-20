@@ -60,6 +60,21 @@ int petStatusProbe(void);
 // exactly like being off the edge.
 void petVisibleFrame(int *x, int *y, int *w, int *h);
 
+// petHideFromDock drops the app out of the Dock and the app switcher.
+//
+// LSUIElement in Info.plist is not enough on its own: Wails' own AppDelegate
+// calls setActivationPolicy:NSApplicationActivationPolicyRegular in
+// applicationWillFinishLaunching, which overrides it. This sets the policy
+// back afterwards. Dispatched to the main thread, which both guarantees AppKit
+// accepts it and puts it after any launch work still on the queue.
+void petHideFromDock(void);
+
+// petActivationPolicy reports the policy actually in force: 0 regular (Dock
+// icon), 1 accessory (menu bar only), 2 prohibited. Wails setting it behind our
+// back is exactly the kind of thing that cannot be seen from a test, so the app
+// is asked and `petctl doctor` prints the answer.
+int petActivationPolicy(void);
+
 // petActivate brings the application to the front. Showing a window is not the
 // same as being able to see it: an unactivated app puts its window behind
 // whatever the user is looking at.
