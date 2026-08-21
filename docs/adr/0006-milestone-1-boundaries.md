@@ -10,7 +10,7 @@ but not built, and the seam each one will attach to.
 | SQLite persistence, XP, levels, statistics | 4 | `engine.Engine` already emits every event to a `Sink` interface. The store becomes a second sink. Nothing else changes. |
 | Claude Code hook adapter, `petctl install claude` | 2 | Adapters are HTTP clients. `adapters/claude/` gets a hook payload → `events.Event` translator and a settings.json patcher. The engine is untouched. |
 | Codex adapter | 3 | Same seam. `source: "codex"`. |
-| Custom pet from a photo | 5 | `petassets` already loads packs from `~/.local/share/digital-pet/pets/`. The generator writes a pack there and calls `POST /pet` to switch. |
+| Custom pet from a photo | 5 | `petassets` already loads packs from `~/.local/share/agent-pet/pets/`. The generator writes a pack there and calls `POST /pet` to switch. |
 | Git adapter | secondary | `source: "git"`, event `git_commit`, already in the event vocabulary and the XP table. |
 | LLM-generated dialogue | optional | `internal/bubble` is a `Speaker` interface with a template implementation. An LLM speaker would be a second implementation, off by default. |
 | Sound | — | Config field `pet.sound` exists and is threaded through; no audio assets in V1. |

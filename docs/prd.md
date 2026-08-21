@@ -1,4 +1,4 @@
-# Personal Digital Pet for Claude Code and Codex
+# Personal Agent Pet for Claude Code and Codex
 
 > **This is the original design document, not a description of the software.**
 > It was written before any code and is kept for the reasoning behind the
@@ -10,7 +10,7 @@
 
 ## 1. Overview
 
-Build a lightweight desktop digital pet that acts as a persistent companion while the user works with **Claude Code** and **OpenAI Codex CLI**.
+Build a lightweight desktop agent pet that acts as a persistent companion while the user works with **Claude Code** and **OpenAI Codex CLI**.
 
 The pet should react to coding-agent activity such as:
 
@@ -366,7 +366,7 @@ Personality must not affect permission/security behavior.
 
 This is a key feature.
 
-Users should be able to create a digital pet from a supplied image.
+Users should be able to create an agent pet from a supplied image.
 
 Supported source types:
 
@@ -855,7 +855,7 @@ But there should still be one coherent pet.
 Suggested config location:
 
 ```text
-~/.config/digital-pet/config.yaml
+~/.config/agent-pet/config.yaml
 ```
 
 Example:
@@ -1017,7 +1017,7 @@ petctl doctor
 Example:
 
 ```text
-Digital Pet Doctor
+Agent Pet Doctor
 
 ✓ petd running
 ✓ UI connected
@@ -1064,7 +1064,7 @@ Logs should be concise.
 Location:
 
 ```text
-~/.local/share/digital-pet/logs/
+~/.local/share/agent-pet/logs/
 ```
 
 Avoid storing:
@@ -1125,7 +1125,7 @@ The target application should consume little memory while idle.
 # 34. Suggested Repository Structure
 
 ```text
-digital-pet/
+agent-pet/
 ├── cmd/
 │   ├── petd/
 │   └── petctl/

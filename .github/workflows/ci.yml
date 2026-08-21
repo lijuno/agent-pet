@@ -93,7 +93,7 @@ jobs:
       # forget.
       - name: check the bundle
         run: |
-          app=build/bin/digital-pet.app
+          app=build/bin/agent-pet.app
           test -x $app/Contents/MacOS/petd
           test -x $app/Contents/MacOS/petctl
           for b in petd petctl; do

@@ -1,4 +1,4 @@
-// Package config loads ~/.config/digital-pet/config.yaml (§24).
+// Package config loads ~/.config/agent-pet/config.yaml (§24).
 //
 // Loading never fails hard: a missing file yields defaults and is written back,
 // and a malformed file yields defaults plus a warning. A pet that refuses to
@@ -155,40 +155,105 @@ func Default() Config {
 	}
 }
 
+// appDir names the config and data directories. legacyDir is what they were
+// called before the app was renamed, and exists only so MigrateLegacy can find
+// what the old name left behind.
+const (
+	appDir    = "agent-pet"
+	legacyDir = "digital-pet"
+)
+
+// env reads a variable, falling back to its pre-rename spelling. Someone who
+// exported DIGITAL_PET_ADDR into their shell profile should not silently get
+// the default instead.
+func env(name string) string {
+	if v := os.Getenv(name); v != "" {
+		return v
+	}
+	return os.Getenv(strings.Replace(name, "AGENT_PET_", "DIGITAL_PET_", 1))
+}
+
+func configBase() string {
+	if base := os.Getenv("XDG_CONFIG_HOME"); base != "" {
+		return base
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".config")
+}
+
+func dataBase() string {
+	if base := os.Getenv("XDG_DATA_HOME"); base != "" {
+		return base
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".local", "share")
+}
+
 // Path returns the config file location, honouring XDG_CONFIG_HOME.
 func Path() string {
-	if p := os.Getenv("DIGITAL_PET_CONFIG"); p != "" {
+	if p := env("AGENT_PET_CONFIG"); p != "" {
 		return p
 	}
-	base := os.Getenv("XDG_CONFIG_HOME")
+	base := configBase()
 	if base == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "config.yaml"
-		}
-		base = filepath.Join(home, ".config")
+		return "config.yaml"
 	}
-	return filepath.Join(base, "digital-pet", "config.yaml")
+	return filepath.Join(base, appDir, "config.yaml")
 }
 
 // DataDir is where pets, logs and (from Milestone 4) the database live.
 func DataDir() string {
-	if p := os.Getenv("DIGITAL_PET_DATA"); p != "" {
+	if p := env("AGENT_PET_DATA"); p != "" {
 		return p
 	}
-	base := os.Getenv("XDG_DATA_HOME")
+	base := dataBase()
 	if base == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "data"
-		}
-		base = filepath.Join(home, ".local", "share")
+		return "data"
 	}
-	return filepath.Join(base, "digital-pet")
+	return filepath.Join(base, appDir)
 }
 
 func PetsDir() string { return filepath.Join(DataDir(), "pets") }
 func LogsDir() string { return filepath.Join(DataDir(), "logs") }
+
+// MigrateLegacy moves the directories the app used before it was renamed from
+// digital-pet to agent-pet. Without it an upgrade starts from defaults and
+// leaves the user's pet packs where nothing looks any more — and because the
+// config is rewritten from memory on shutdown, their settings would be gone
+// before they noticed.
+//
+// It only ever renames onto a path that does not exist, so it cannot overwrite
+// what this version already wrote, and a second run does nothing. Errors are
+// returned rather than fatal, for the same reason Load never fails hard.
+func MigrateLegacy() []error {
+	var errs []error
+	move := func(base, override string) {
+		// An explicit override means the user chose where this lives, and
+		// moving the default directory underneath them would be a surprise.
+		if base == "" || override != "" {
+			return
+		}
+		old, cur := filepath.Join(base, legacyDir), filepath.Join(base, appDir)
+		if _, err := os.Stat(old); err != nil {
+			return
+		}
+		if _, err := os.Stat(cur); err == nil {
+			return
+		}
+		if err := os.Rename(old, cur); err != nil {
+			errs = append(errs, fmt.Errorf("moving %s to %s: %w", old, cur, err))
+		}
+	}
+	move(configBase(), env("AGENT_PET_CONFIG"))
+	move(dataBase(), env("AGENT_PET_DATA"))
+	return errs
+}
 
 // Load reads the config, filling in defaults for anything absent. The returned
 // error is advisory: cfg is always usable.

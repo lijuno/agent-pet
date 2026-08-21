@@ -11,7 +11,7 @@
 # Run the app, then:  make test-desktop
 set -eu
 
-P="${DIGITAL_PET_ADDR:-127.0.0.1:9876}"
+P="${AGENT_PET_ADDR:-127.0.0.1:9876}"
 BASE="http://$P"
 fails=0
 
@@ -102,7 +102,7 @@ want "the character in use is ticked" "$menu" ">SanMao (三毛)[on]"
 
 # Switching needs somewhere to switch to. Only SanMao ships today, so these
 # checks describe themselves as skipped rather than passing on nothing — add a
-# pack to ~/.local/share/digital-pet/pets and they run by themselves.
+# pack to ~/.local/share/agent-pet/pets and they run by themselves.
 others=$(curl -sS --max-time 5 "$BASE/pets" | python3 -c "
 import sys, json
 d = json.load(sys.stdin)

@@ -26,22 +26,31 @@ try() {
 	found=$1
 }
 
-# $DIGITAL_PET_APP overrides the search entirely, for anyone keeping the app
-# somewhere other than /Applications.
+# $AGENT_PET_APP overrides the search entirely, for anyone keeping the app
+# somewhere other than /Applications. $DIGITAL_PET_APP is its pre-rename name.
+[ -n "${AGENT_PET_APP:-}" ] && try "$AGENT_PET_APP/Contents/MacOS/petctl"
 [ -n "${DIGITAL_PET_APP:-}" ] && try "$DIGITAL_PET_APP/Contents/MacOS/petctl"
 
-try "/Applications/digital-pet.app/Contents/MacOS/petctl"
-try "$HOME/Applications/digital-pet.app/Contents/MacOS/petctl"
+try "/Applications/agent-pet.app/Contents/MacOS/petctl"
+try "$HOME/Applications/agent-pet.app/Contents/MacOS/petctl"
 # The bundle is named from wails.json's `name`, but accept the product name too
 # in case that is what it is renamed to.
-try "/Applications/Digital Pet.app/Contents/MacOS/petctl"
-try "$HOME/Applications/Digital Pet.app/Contents/MacOS/petctl"
+try "/Applications/Agent Pet.app/Contents/MacOS/petctl"
+try "$HOME/Applications/Agent Pet.app/Contents/MacOS/petctl"
 
 # Working on the pet itself: prefer a local build over whatever is installed.
 if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
-	try "$CLAUDE_PROJECT_DIR/build/bin/digital-pet.app/Contents/MacOS/petctl"
+	try "$CLAUDE_PROJECT_DIR/build/bin/agent-pet.app/Contents/MacOS/petctl"
 	try "$CLAUDE_PROJECT_DIR/bin/petctl"
 fi
+
+# The app was called digital-pet before it was renamed, and the plugin updates
+# independently of it — so a session may well be running against the old bundle
+# still. Tried last, so anything current wins.
+try "/Applications/digital-pet.app/Contents/MacOS/petctl"
+try "$HOME/Applications/digital-pet.app/Contents/MacOS/petctl"
+try "/Applications/Digital Pet.app/Contents/MacOS/petctl"
+try "$HOME/Applications/Digital Pet.app/Contents/MacOS/petctl"
 
 if [ -n "$found" ]; then
 	exec "$found" "$@"
@@ -60,12 +69,12 @@ fi
 
 # Anyone else asked a direct question and deserves a real answer.
 cat >&2 <<'MSG'
-petctl: the Digital Pet app is not installed.
+petctl: the Agent Pet app is not installed.
 
 The plugin ships the hooks; the app is a separate signed download, because a
 macOS app bundle cannot sensibly live in a git repository.
 
   Ask Claude Code:  /agent-pet:install
-  Or set DIGITAL_PET_APP=/path/to/digital-pet.app if it lives somewhere else.
+  Or set AGENT_PET_APP=/path/to/agent-pet.app if it lives somewhere else.
 MSG
 exit 1

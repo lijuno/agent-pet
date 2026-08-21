@@ -38,7 +38,7 @@ A bare string means one frame at 1 fps unless the image dimensions imply more.
 
 - **Built-in pets** are embedded in the binary under `ui/dist/pets/<id>/` and
   served by the Wails asset server. Nothing to install, nothing to lose.
-- **User pets** live on disk at `~/.local/share/digital-pet/pets/<id>/` and are
+- **User pets** live on disk at `~/.local/share/agent-pet/pets/<id>/` and are
   served by a custom asset handler. This is where the Milestone 5 character
   pipeline writes its output, and where a user can drop a hand-made pack.
 

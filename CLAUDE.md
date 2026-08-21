@@ -22,7 +22,7 @@ for statistics (Milestone 4, currently in-memory only).
 
 ```bash
 go mod tidy                       # once
-make build && open build/bin/digital-pet.app
+make build && open build/bin/agent-pet.app
 go build -o bin/petctl ./cmd/petctl
 bin/petctl doctor                 # says more than you expect
 ```
@@ -83,6 +83,11 @@ Each of these cost an hour or more to find.
 - **Changing a default in `config.go` does not touch an existing
   `config.yaml`.** Your machine keeps the old value; test on a fresh config or
   edit both.
+- **The pre-rename directories only move if the new name is free.**
+  `config.MigrateLegacy` renames `digital-pet` to `agent-pet` and never merges,
+  so a machine where anything created `~/.local/share/agent-pet` first keeps a
+  stale `digital-pet` beside it, packs and all. Check both before concluding a
+  pack is not being loaded.
 - **The UI test runner and its iframes are cache-busted deliberately.** Without
   it the browser serves a stale `index.html` and the suite passes against a
   file no longer on disk. It did exactly that, twice.

@@ -1,5 +1,5 @@
 ---
-description: Diagnose a Digital Pet that is not reacting, not visible, or stuck on an old version. Use when the user says the pet is not responding, not showing up, or did not update.
+description: Diagnose a Agent Pet that is not reacting, not visible, or stuck on an old version. Use when the user says the pet is not responding, not showing up, or did not update.
 ---
 
 # The pet is not doing what it should
@@ -53,7 +53,7 @@ then talks to the old one and reports the old version.
 Quit the app completely, confirm nothing is left, then start the new one:
 
 ```bash
-pkill -f 'MacOS/petd'; sleep 1; open "/Applications/digital-pet.app"
+pkill -f 'MacOS/petd'; sleep 1; open "/Applications/agent-pet.app"
 ```
 
 Then confirm the version actually changed:
@@ -62,8 +62,10 @@ Then confirm the version actually changed:
 petctl doctor
 ```
 
-If it still reports the old version, the new bundle did not land in
-`/Applications` — re-run `/agent-pet:install`.
+If it still reports the old version, either the new bundle did not land in
+`/Applications` — re-run `/agent-pet:install` — or the pre-rename
+`digital-pet.app` is still installed and winning the race for the port. Remove
+it; the config and pet packs it stored are moved across on first run.
 
 ## The plugin and the app disagree
 

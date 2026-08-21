@@ -25,7 +25,13 @@ const defaultAddr = "127.0.0.1:9876"
 
 func main() {
 	args := os.Args[1:]
-	addr := os.Getenv("DIGITAL_PET_ADDR")
+	addr := os.Getenv("AGENT_PET_ADDR")
+	if addr == "" {
+		// The variable was DIGITAL_PET_ADDR before the app was renamed. petctl
+		// shares no code with the engine, so this fallback is spelled out here
+		// as well as in internal/config.
+		addr = os.Getenv("DIGITAL_PET_ADDR")
+	}
 	if addr == "" {
 		addr = defaultAddr
 	}
@@ -103,7 +109,7 @@ Usage:
   petctl version
 
 Options:
-  --addr HOST:PORT   petd address (default 127.0.0.1:9876, $DIGITAL_PET_ADDR)
+  --addr HOST:PORT   petd address (default 127.0.0.1:9876, $AGENT_PET_ADDR)
 
 States:
   idle thinking working attention confused worried happy celebrate sleeping heart
@@ -353,7 +359,7 @@ type diagnostics struct {
 }
 
 func cmdDoctor(c *client) error {
-	fmt.Println("Digital Pet Doctor")
+	fmt.Println("Agent Pet Doctor")
 	fmt.Println()
 
 	var d diagnostics

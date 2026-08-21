@@ -1,4 +1,4 @@
-# Digital Pet
+# Agent Pet
 
 [![CI](https://github.com/lijuno/agent-pet/actions/workflows/ci.yml/badge.svg)](https://github.com/lijuno/agent-pet/actions/workflows/ci.yml)
 
@@ -71,18 +71,18 @@ bin/petctl watch
 A release build:
 
 ```bash
-make build           # produces build/bin/digital-pet.app
+make build           # produces build/bin/agent-pet.app
 ```
 
 The bundle is neither signed nor notarized — there is no Apple Developer
 account behind this project. One you built yourself runs without complaint,
 because Gatekeeper only quarantines what arrives from elsewhere. One you
-downloaded is quarantined, and macOS refuses it with *"Digital Pet" is damaged
+downloaded is quarantined, and macOS refuses it with *"Agent Pet" is damaged
 and can't be opened*, which is not what has happened: the app is intact and
 unsigned. To run it anyway:
 
 ```bash
-xattr -d com.apple.quarantine /Applications/digital-pet.app
+xattr -d com.apple.quarantine /Applications/agent-pet.app
 ```
 
 Do that only if you trust where the bundle came from. Building from source is
@@ -160,7 +160,9 @@ grey means the pet is running but nothing is. A state forced with
 
 ## Configuration
 
-`~/.config/digital-pet/config.yaml` is written on first run.
+`~/.config/agent-pet/config.yaml` is written on first run. The app was called
+`digital-pet` before it was renamed; a directory left under that name is moved
+into place — config and pet packs both — the first time the renamed app starts.
 
 ```yaml
 pet:
@@ -246,7 +248,7 @@ them with:
 make pets     # python3 tools/genpets/genpets.py
 ```
 
-Your own packs go in `~/.local/share/digital-pet/pets/<id>/` and are picked up
+Your own packs go in `~/.local/share/agent-pet/pets/<id>/` and are picked up
 at startup. A pack with the same id as a built-in replaces it. The format is one
 PNG strip per state plus a `manifest.json`; see [`docs/pets.md`](docs/pets.md).
 

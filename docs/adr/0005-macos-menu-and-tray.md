@@ -19,7 +19,7 @@ Three surfaces, in order of reliability:
    rendered in the transparent window. This is the primary control surface and
    has no platform risk.
 2. **Native macOS application menu.** Wails' `Menu` option puts a real
-   `Digital Pet` menu in the macOS menu bar with the same items, available
+   `Agent Pet` menu in the macOS menu bar with the same items, available
    whenever the app is frontmost.
 3. **Persistent status-bar icon** — implemented in `tray_darwin.go` behind the
    `tray` build tag, using `fyne.io/systray`'s `Register` (external-run-loop)

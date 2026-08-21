@@ -161,3 +161,129 @@ func TestShadowSurvivesAConfigThatPredatesIt(t *testing.T) {
 		t.Fatalf("the shadow should still be off after a round trip: %+v %v", cfg.Pet, err)
 	}
 }
+
+// The app stored its config and pet packs under "digital-pet" before it was
+// renamed. An upgrade that does not carry those across starts from defaults
+// and loses the user's packs — and since the config is rewritten from memory
+// on shutdown, the old file would be gone before anyone noticed.
+func TestMigrateLegacyMovesThePreRenameDirectories(t *testing.T) {
+	cfgBase, dataBase := legacyEnv(t)
+
+	os.MkdirAll(filepath.Join(cfgBase, "digital-pet"), 0o755)
+	os.WriteFile(filepath.Join(cfgBase, "digital-pet", "config.yaml"),
+		[]byte("pet:\n  active: byte\n"), 0o644)
+	os.MkdirAll(filepath.Join(dataBase, "digital-pet", "pets", "mine"), 0o755)
+
+	if errs := MigrateLegacy(); len(errs) != 0 {
+		t.Fatalf("migrate: %v", errs)
+	}
+
+	cfg, err := Load(Path())
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Pet.Active != "byte" {
+		t.Fatalf("the old config should be readable at the new path, got %q", cfg.Pet.Active)
+	}
+	if _, err := os.Stat(filepath.Join(PetsDir(), "mine")); err != nil {
+		t.Fatalf("the user's pet pack should have come across: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(cfgBase, "digital-pet")); err == nil {
+		t.Fatal("the old directory should be gone, not copied")
+	}
+}
+
+// Both directories present means the migration already happened, or the user
+// has both installs. Either way it is a state to leave alone and not complain
+// about: the rename would fail anyway, and reporting that as an error puts a
+// warning in the log on every single start.
+func TestMigrateLegacyIsQuietWhenBothExist(t *testing.T) {
+	cfgBase, _ := legacyEnv(t)
+
+	os.MkdirAll(filepath.Join(cfgBase, "digital-pet"), 0o755)
+	os.WriteFile(filepath.Join(cfgBase, "digital-pet", "config.yaml"),
+		[]byte("pet:\n  active: old\n"), 0o644)
+	os.MkdirAll(filepath.Join(cfgBase, "agent-pet"), 0o755)
+	os.WriteFile(filepath.Join(cfgBase, "agent-pet", "config.yaml"),
+		[]byte("pet:\n  active: current\n"), 0o644)
+
+	if errs := MigrateLegacy(); len(errs) != 0 {
+		t.Fatalf("already-migrated is not a failure: %v", errs)
+	}
+
+	cfg, _ := Load(Path())
+	if cfg.Pet.Active != "current" {
+		t.Fatalf("the current config should have been left alone, got %q", cfg.Pet.Active)
+	}
+}
+
+// The same when the destination is empty, which is easy to assume rename would
+// simply absorb. It does not — it refuses that too — so without the guard a
+// leftover digital-pet is a warning on every start rather than a no-op, and
+// its stale packs stay invisible either way.
+func TestMigrateLegacyLeavesAnEmptyDestinationAlone(t *testing.T) {
+	_, dataBase := legacyEnv(t)
+
+	os.MkdirAll(filepath.Join(dataBase, "digital-pet", "pets", "stale"), 0o755)
+	os.MkdirAll(filepath.Join(dataBase, "agent-pet"), 0o755)
+
+	if errs := MigrateLegacy(); len(errs) != 0 {
+		t.Fatalf("migrate: %v", errs)
+	}
+
+	if _, err := os.Stat(filepath.Join(PetsDir(), "stale")); err == nil {
+		t.Fatal("the old directory should not have replaced the one in use")
+	}
+}
+
+// Someone who pointed the app at a directory of their own did not ask for the
+// default one to be moved underneath them.
+func TestMigrateLegacyLeavesOverriddenLocationsAlone(t *testing.T) {
+	cfgBase, dataBase := legacyEnv(t)
+	t.Setenv("AGENT_PET_CONFIG", filepath.Join(t.TempDir(), "elsewhere.yaml"))
+	t.Setenv("AGENT_PET_DATA", t.TempDir())
+
+	os.MkdirAll(filepath.Join(cfgBase, "digital-pet"), 0o755)
+	os.MkdirAll(filepath.Join(dataBase, "digital-pet"), 0o755)
+
+	MigrateLegacy()
+
+	for _, base := range []string{cfgBase, dataBase} {
+		if _, err := os.Stat(filepath.Join(base, "digital-pet")); err != nil {
+			t.Fatalf("%s should still be there: %v", base, err)
+		}
+	}
+}
+
+// The variables were DIGITAL_PET_* before the rename. Ignoring them would send
+// anyone with one exported to the default location without saying so.
+func TestEnvAcceptsThePreRenameVariables(t *testing.T) {
+	legacyEnv(t)
+	old := filepath.Join(t.TempDir(), "old.yaml")
+	t.Setenv("DIGITAL_PET_CONFIG", old)
+	if got := Path(); got != old {
+		t.Fatalf("the old variable should still be honoured, got %q", got)
+	}
+
+	current := filepath.Join(t.TempDir(), "current.yaml")
+	t.Setenv("AGENT_PET_CONFIG", current)
+	if got := Path(); got != current {
+		t.Fatalf("the current variable should win, got %q", got)
+	}
+}
+
+// Points the config and data directories at temporary ones and clears every
+// override, so a variable in the developer's own shell cannot decide the
+// result of a test about which directory is chosen.
+func legacyEnv(t *testing.T) (cfgBase, dataBase string) {
+	t.Helper()
+	cfgBase, dataBase = t.TempDir(), t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgBase)
+	t.Setenv("XDG_DATA_HOME", dataBase)
+	for _, k := range []string{
+		"AGENT_PET_CONFIG", "AGENT_PET_DATA", "DIGITAL_PET_CONFIG", "DIGITAL_PET_DATA",
+	} {
+		t.Setenv(k, "")
+	}
+	return cfgBase, dataBase
+}

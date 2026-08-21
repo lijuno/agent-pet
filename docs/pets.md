@@ -3,7 +3,7 @@
 A pack is a directory of PNGs and one JSON file. No build step, no tooling.
 
 ```
-~/.local/share/digital-pet/pets/
+~/.local/share/agent-pet/pets/
 └── momo/
     ├── manifest.json
     ├── idle.png

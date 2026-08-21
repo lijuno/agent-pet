@@ -1,6 +1,6 @@
 .PHONY: help deps dev build require-wails test-desktop petctl pets test test-ui vet fmt clean run-headless demo plugin-hooks plugin-validate embed-petctl version-sync states-gif
 BIN := bin
-APP := build/bin/digital-pet.app
+APP := build/bin/agent-pet.app
 
 # The tag is the single source of truth for the version. wails.json carries a
 # copy because Info.plist is templated from it; `make version-sync` rewrites it

@@ -62,7 +62,7 @@ void petStatusInstall(const void *png, int len, int onTop, int muted, int shown)
       // Better a visible letter than an invisible item.
       petItem.button.title = @"P";
     }
-    petItem.button.toolTip = @"Digital Pet";
+    petItem.button.toolTip = @"Agent Pet";
 
     NSMenu *menu = [[NSMenu alloc] init];
     [menu setAutoenablesItems:NO];

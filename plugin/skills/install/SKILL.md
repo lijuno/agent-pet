@@ -1,9 +1,9 @@
 ---
-description: Install or update the Digital Pet macOS app that this plugin drives. Use when the user asks to install, set up, or update the pet app.
+description: Install or update the Agent Pet macOS app that this plugin drives. Use when the user asks to install, set up, or update the pet app.
 disable-model-invocation: true
 ---
 
-# Install the Digital Pet app
+# Install the Agent Pet app
 
 This plugin ships the Claude Code hooks. The app they drive is a separate
 download, because a macOS `.app` bundle cannot sensibly live in a git
@@ -69,11 +69,11 @@ inside a bundle.
 This is the step the whole procedure exists for. Run both:
 
 ```bash
-codesign --verify --strict --deep --verbose=2 "$tmp/digital-pet.app"
+codesign --verify --strict --deep --verbose=2 "$tmp/agent-pet.app"
 ```
 
 ```bash
-spctl -a -t exec -vv "$tmp/digital-pet.app"
+spctl -a -t exec -vv "$tmp/agent-pet.app"
 ```
 
 The first says the bundle is intact and unmodified since signing. The second
@@ -86,12 +86,24 @@ they would like you to install it anyway.
 ### 5. Install and launch
 
 ```bash
-rm -rf "/Applications/digital-pet.app" && mv "$tmp/digital-pet.app" /Applications/ && open "/Applications/digital-pet.app"
+rm -rf "/Applications/agent-pet.app" && mv "$tmp/agent-pet.app" /Applications/ && open "/Applications/agent-pet.app"
 ```
 
 If the app was already running, quit it first — a still-running copy holds the
 event port, and a second instance exits immediately on startup rather than
 complaining, which looks exactly like an update that did nothing.
+
+The app was called `digital-pet.app` before it was renamed. If that bundle is
+still there, quit it and remove it — otherwise two apps compete for the event
+port and the one that wins is whichever started first, not the one you just
+installed:
+
+```bash
+pkill -f 'MacOS/petd'; rm -rf "/Applications/digital-pet.app"
+```
+
+Nothing is lost: the config and any pet packs under the old name are moved
+across the first time the renamed app starts.
 
 ### 6. Prove it works
 

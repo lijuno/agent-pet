@@ -36,8 +36,8 @@ done
 # Prefer the installed bundle so the demo runs the build a viewer would get.
 if [ -z "$PETCTL" ]; then
 	for c in \
-		"/Applications/digital-pet.app/Contents/MacOS/petctl" \
-		"build/bin/digital-pet.app/Contents/MacOS/petctl" \
+		"/Applications/agent-pet.app/Contents/MacOS/petctl" \
+		"build/bin/agent-pet.app/Contents/MacOS/petctl" \
 		"bin/petctl"; do
 		[ -x "$c" ] && PETCTL=$c && break
 	done

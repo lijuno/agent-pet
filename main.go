@@ -1,4 +1,4 @@
-// Command petd is the digital pet: event API, state machine and desktop window
+// Command petd is the agent pet: event API, state machine and desktop window
 // in one process (ADR 0001).
 package main
 
@@ -49,6 +49,10 @@ func main() {
 		return
 	}
 
+	// Before anything resolves a path: an install from before the rename keeps
+	// its config and its pet packs under the old directory name.
+	migrateErrs := config.MigrateLegacy()
+
 	cfgPath := *configFlag
 	if cfgPath == "" {
 		cfgPath = config.Path()
@@ -62,6 +66,9 @@ func main() {
 	defer closeLog()
 	if cfgErr != nil {
 		log.Warn("config", "err", cfgErr)
+	}
+	for _, err := range migrateErrs {
+		log.Warn("migrating pre-rename directories", "err", err)
 	}
 
 	lib := petassets.NewLibrary()
@@ -118,7 +125,7 @@ func main() {
 	// simply stay large.
 	winW, winH := WindowSize(cfg.Pet.Scale)
 	err := wails.Run(&options.App{
-		Title:  "Digital Pet",
+		Title:  "Agent Pet",
 		Width:  winW,
 		Height: winH,
 
@@ -138,7 +145,7 @@ func main() {
 			WindowIsTranslucent: false,
 			DisableZoom:         true,
 			About: &mac.AboutInfo{
-				Title:   "Digital Pet",
+				Title:   "Agent Pet",
 				Message: "An ambient companion for Claude Code and Codex.\nVersion " + version,
 			},
 		},
@@ -155,7 +162,7 @@ func main() {
 		Bind:       []any{app},
 
 		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId: "com.digitalpet.petd",
+			UniqueId: "com.agentpet.petd",
 		},
 	})
 	if err != nil {

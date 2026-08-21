@@ -7,7 +7,7 @@ build time. They are served by the Wails asset server at `/pets/<id>/<file>`, so
 a fresh install has characters with nothing to install and nothing to lose.
 Regenerate them with `make pets`.
 
-**Your packs** go in `~/.local/share/digital-pet/pets/<id>/`. They are read from
+**Your packs** go in `~/.local/share/agent-pet/pets/<id>/`. They are read from
 disk at startup and served at `/userpets/<id>/<file>`. A pack whose `id` matches
 a built-in replaces it, which is how you override a shipped character with your
 own version.
