@@ -1,4 +1,4 @@
-.PHONY: help deps dev build test-desktop petctl pets test test-ui vet fmt clean run-headless demo plugin-hooks plugin-validate embed-petctl version-sync states-gif
+.PHONY: help deps dev build require-wails test-desktop petctl pets test test-ui vet fmt clean run-headless demo plugin-hooks plugin-validate embed-petctl version-sync states-gif
 BIN := bin
 APP := build/bin/digital-pet.app
 
@@ -9,6 +9,24 @@ APP := build/bin/digital-pet.app
 GIT_VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
 VERSION ?= $(if $(GIT_VERSION),$(GIT_VERSION),0.1.0)
 LDFLAGS := -X main.version=$(VERSION)
+
+# `go install` puts wails in $(go env GOPATH)/bin, and nothing puts that
+# directory on PATH — on macOS it is not there by default. The README tells you
+# to run exactly that install, so the Makefile looks where it landed rather
+# than reporting `wails: command not found` for a binary that is sitting on
+# disk. PATH still wins, so a wails installed anywhere else is used as-is.
+GO_BIN := $(shell go env GOBIN 2>/dev/null)
+ifeq ($(strip $(GO_BIN)),)
+GOPATH_DIR := $(shell go env GOPATH 2>/dev/null)
+# Not just $(GOPATH_DIR)/bin: with go missing that expands to the string "/bin",
+# and the error below then tells you to put /bin on your PATH.
+ifeq ($(strip $(GOPATH_DIR)),)
+GO_BIN := $(HOME)/go/bin
+else
+GO_BIN := $(GOPATH_DIR)/bin
+endif
+endif
+WAILS := $(shell command -v wails 2>/dev/null || echo $(GO_BIN)/wails)
 help:
 	@echo "make deps           resolve Go modules (run this first)"
 	@echo "make dev            run the pet with hot reload"
@@ -25,19 +43,19 @@ help:
 	@echo "make states-gif     rebuild the README state figure from the sprites"
 deps:
 	go mod tidy
-dev:
-	wails dev -ldflags "$(LDFLAGS)"
+dev: require-wails
+	$(WAILS) dev -ldflags "$(LDFLAGS)"
 # darwin/universal because half the audience is on Intel and a release that
 # silently excludes them looks identical to one that does not.
-build:
-	wails build -clean -platform darwin/universal -ldflags "$(LDFLAGS)"
+build: require-wails
+	$(WAILS) build -clean -platform darwin/universal -ldflags "$(LDFLAGS)"
 	@$(MAKE) --no-print-directory embed-petctl
 # BROKEN: fyne.io/systray declares an Objective-C class named AppDelegate and
 # so does Wails' own desktop frontend, so a production build fails to link with
 # a duplicate symbol. `go build -tags tray` links only because it leaves the
 # desktop frontend out. See ADR 0005.
-build-tray:
-	wails build -clean -tags tray -ldflags "$(LDFLAGS)"
+build-tray: require-wails
+	$(WAILS) build -clean -tags tray -ldflags "$(LDFLAGS)"
 petctl:
 	@mkdir -p $(BIN)
 	go build -ldflags "$(LDFLAGS)" -o $(BIN)/petctl ./cmd/petctl
@@ -103,3 +121,15 @@ version-sync:
 # it cannot drift into advertising an animation the pet does not have.
 states-gif:
 	@python3 scripts/make-states-gif.py
+
+# Fails with the command that fixes it, rather than "command not found" for a
+# binary that may well be installed.
+require-wails:
+	@test -x "$(WAILS)" || { \
+	  echo "wails not found (looked on PATH and in $(GO_BIN))"; \
+	  echo; \
+	  echo "  go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.2"; \
+	  echo; \
+	  echo "If that already ran, $(GO_BIN) is not on your PATH:"; \
+	  echo "  export PATH=\"$$PATH:$(GO_BIN)\""; \
+	  exit 1; }

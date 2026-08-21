@@ -39,6 +39,15 @@ records which seam each deferred piece attaches to.
   ```bash
   go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.2
   ```
+
+  That installs into `$(go env GOPATH)/bin`, which is not on `PATH` by default
+  on macOS — so `wails` may be on disk and still not be a command you can run.
+  The Makefile looks there as well as on `PATH`, so `make build` works either
+  way; add it to your shell if you want to run `wails` yourself:
+
+  ```bash
+  export PATH="$PATH:$(go env GOPATH)/bin"
+  ```
 - Python 3 with Pillow, only if you want to regenerate the sprite art
 
 ## Quick start
