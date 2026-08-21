@@ -27,9 +27,8 @@ try() {
 }
 
 # $AGENT_PET_APP overrides the search entirely, for anyone keeping the app
-# somewhere other than /Applications. $DIGITAL_PET_APP is its pre-rename name.
+# somewhere other than /Applications.
 [ -n "${AGENT_PET_APP:-}" ] && try "$AGENT_PET_APP/Contents/MacOS/petctl"
-[ -n "${DIGITAL_PET_APP:-}" ] && try "$DIGITAL_PET_APP/Contents/MacOS/petctl"
 
 try "/Applications/agent-pet.app/Contents/MacOS/petctl"
 try "$HOME/Applications/agent-pet.app/Contents/MacOS/petctl"
@@ -43,14 +42,6 @@ if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
 	try "$CLAUDE_PROJECT_DIR/build/bin/agent-pet.app/Contents/MacOS/petctl"
 	try "$CLAUDE_PROJECT_DIR/bin/petctl"
 fi
-
-# The app was called digital-pet before it was renamed, and the plugin updates
-# independently of it — so a session may well be running against the old bundle
-# still. Tried last, so anything current wins.
-try "/Applications/digital-pet.app/Contents/MacOS/petctl"
-try "$HOME/Applications/digital-pet.app/Contents/MacOS/petctl"
-try "/Applications/Digital Pet.app/Contents/MacOS/petctl"
-try "$HOME/Applications/Digital Pet.app/Contents/MacOS/petctl"
 
 if [ -n "$found" ]; then
 	exec "$found" "$@"

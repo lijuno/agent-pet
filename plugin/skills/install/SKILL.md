@@ -93,18 +93,6 @@ If the app was already running, quit it first — a still-running copy holds the
 event port, and a second instance exits immediately on startup rather than
 complaining, which looks exactly like an update that did nothing.
 
-The app was called `digital-pet.app` before it was renamed. If that bundle is
-still there, quit it and remove it — otherwise two apps compete for the event
-port and the one that wins is whichever started first, not the one you just
-installed:
-
-```bash
-pkill -f 'MacOS/petd'; rm -rf "/Applications/digital-pet.app"
-```
-
-Nothing is lost: the config and any pet packs under the old name are moved
-across the first time the renamed app starts.
-
 ### 6. Prove it works
 
 ```bash

@@ -27,12 +27,6 @@ func main() {
 	args := os.Args[1:]
 	addr := os.Getenv("AGENT_PET_ADDR")
 	if addr == "" {
-		// The variable was DIGITAL_PET_ADDR before the app was renamed. petctl
-		// shares no code with the engine, so this fallback is spelled out here
-		// as well as in internal/config.
-		addr = os.Getenv("DIGITAL_PET_ADDR")
-	}
-	if addr == "" {
 		addr = defaultAddr
 	}
 	// A global --addr may appear anywhere.

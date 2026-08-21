@@ -160,9 +160,7 @@ grey means the pet is running but nothing is. A state forced with
 
 ## Configuration
 
-`~/.config/agent-pet/config.yaml` is written on first run. The app was called
-`digital-pet` before it was renamed; a directory left under that name is moved
-into place — config and pet packs both — the first time the renamed app starts.
+`~/.config/agent-pet/config.yaml` is written on first run.
 
 ```yaml
 pet:

@@ -1,5 +1,5 @@
 ---
-description: Diagnose a Agent Pet that is not reacting, not visible, or stuck on an old version. Use when the user says the pet is not responding, not showing up, or did not update.
+description: Diagnose an Agent Pet that is not reacting, not visible, or stuck on an old version. Use when the user says the pet is not responding, not showing up, or did not update.
 ---
 
 # The pet is not doing what it should
@@ -62,10 +62,8 @@ Then confirm the version actually changed:
 petctl doctor
 ```
 
-If it still reports the old version, either the new bundle did not land in
-`/Applications` — re-run `/agent-pet:install` — or the pre-rename
-`digital-pet.app` is still installed and winning the race for the port. Remove
-it; the config and pet packs it stored are moved across on first run.
+If it still reports the old version, the new bundle did not land in
+`/Applications` — re-run `/agent-pet:install`.
 
 ## The plugin and the app disagree
 
