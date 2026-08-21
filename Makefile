@@ -1,4 +1,4 @@
-.PHONY: help deps dev build require-wails test-desktop petctl pets test test-ui vet fmt clean run-headless demo plugin-hooks plugin-validate embed-petctl version-sync states-gif
+.PHONY: help deps dev build require-wails test-desktop petctl pets test test-ui vet fmt clean run-headless demo notarize plugin-hooks plugin-validate embed-petctl version-sync states-gif
 BIN := bin
 APP := build/bin/agent-pet.app
 
@@ -41,6 +41,7 @@ help:
 	@echo "make plugin-validate check the plugin and marketplace manifests"
 	@echo "make version-sync    write $(VERSION) into wails.json before a release"
 	@echo "make states-gif     rebuild the README state figure from the sprites"
+	@echo "make notarize       sign, notarize and staple the built bundle"
 deps:
 	go mod tidy
 dev: require-wails
@@ -133,3 +134,10 @@ require-wails:
 	  echo "If that already ran, $(GO_BIN) is not on your PATH:"; \
 	  echo "  export PATH=\"$$PATH:$(GO_BIN)\""; \
 	  exit 1; }
+
+# Signs, notarizes and staples whatever `make build` produced. Needs a
+# Developer ID Application certificate and a notarytool keychain profile; the
+# script says how to get both if either is missing. NOTARY_PROFILE names the
+# profile.
+notarize:
+	@./scripts/notarize.sh $(if $(NOTARY_PROFILE),--profile $(NOTARY_PROFILE),)
