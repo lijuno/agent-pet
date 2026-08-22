@@ -64,6 +64,9 @@ ui/test/               its tests
 scripts/desktop-test.sh
 ```
 
+Releasing a signed build — the Apple setup, what the signing script does and
+why each step is load-bearing — is [docs/signing.md](docs/signing.md).
+
 Decisions live in `docs/adr/`. The commit messages carry the reasoning for
 most of what is here and are worth reading before changing something that
 looks arbitrary — much of it is load-bearing.

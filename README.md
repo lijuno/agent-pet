@@ -74,8 +74,9 @@ A release build:
 make build           # produces build/bin/agent-pet.app
 ```
 
-The bundle is neither signed nor notarized — there is no Apple Developer
-account behind this project. One you built yourself runs without complaint,
+A bundle you build yourself is neither signed nor notarized. Released ones
+are: see [`docs/signing.md`](docs/signing.md) for how that is done, and for the
+one-time Apple setup behind it. One you built yourself runs without complaint,
 because Gatekeeper only quarantines what arrives from elsewhere. One you
 downloaded is quarantined, and macOS refuses it with *"Agent Pet" is damaged
 and can't be opened*, which is not what has happened: the app is intact and
@@ -85,8 +86,9 @@ unsigned. To run it anyway:
 xattr -d com.apple.quarantine /Applications/agent-pet.app
 ```
 
-Do that only if you trust where the bundle came from. Building from source is
-the honest way, and it is two commands.
+Do that only if you trust where the bundle came from, and never on a release —
+a signed one needs no such thing, and an agent asked to install this app will
+run that command without hesitating if the README implies it is routine.
 
 ## Connecting Claude Code
 
