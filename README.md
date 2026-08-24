@@ -384,6 +384,18 @@ git diff updates/release.json
 git commit -am "Offer 0.2.0 on the release channel" && git push
 ```
 
+**Attach the assets to the GitHub release before pushing that commit** — both
+of them, if you are cutting both apps. The manifest names a URL, and pushing it
+first points every installed pet at a file that is not there yet.
+
+This has already happened once: the manifest commit landed 41 seconds before
+the dev release was created, and
+[`.github/workflows/updates.yml`](.github/workflows/updates.yml) failed exactly
+as it is meant to — it downloads each asset and checks its size and SHA-256
+against the file you just committed. Re-run it once the assets are up. It is
+the only thing standing between a typo and a broken update for everybody, now
+that releases are cut by hand rather than by a runner.
+
 Publishing an asset and offering it over the air are deliberately two acts. You
 can build a release, install it yourself, live with it for a week, and only then
 decide — and the decision has a diff, a commit message, and `git revert` as the
