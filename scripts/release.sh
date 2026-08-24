@@ -73,11 +73,17 @@ done
   HEAD currently has: $(git tag --points-at HEAD | tr '\n' ' ')"
 VERSION=${TAG#v}
 
-[ -z "$(git status --porcelain)" ] ||
+# updates/ is excluded: it is this script's own output. Cutting both apps from
+# one commit means running this twice, and the first run leaves a manifest
+# modified — which is the intended end state, not a dirty tree.
+DIRTY=$(git status --porcelain | grep -v '^.. updates/' || true)
+[ -z "$DIRTY" ] ||
 	die "the working tree has uncommitted changes.
 
   What gets built here is not what is committed at $TAG, and there would be no
-  way to tell afterwards. Commit or stash first."
+  way to tell afterwards. Commit or stash first.
+
+$DIRTY"
 
 # wails.json is not checked against the tag any more, and no longer can be: the
 # release app and the dev app ship from the same commit at different versions,
