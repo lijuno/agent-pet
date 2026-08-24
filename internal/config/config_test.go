@@ -164,18 +164,35 @@ func TestShadowSurvivesAConfigThatPredatesIt(t *testing.T) {
 	}
 }
 
-// The default has to be "checks nothing": an app that has never contacted a
-// server does not start doing so because it was upgraded.
-func TestUpdateChecksAreOffByDefault(t *testing.T) {
+// A fresh installation checks once a day. This test asserted the opposite
+// until the default was flipped and it was left behind, which is worth a note:
+// it is the kind of test that reads as policy, so a stale one describes a
+// promise the program no longer keeps.
+//
+// The half that still has to hold is the second one. Load decodes into
+// Default(), so every key a config file omits takes the current default —
+// which is what lets a new default reach an installation that predates it.
+// Somebody who turned checks off has that written down, and no upgrade may
+// talk them round.
+func TestUpdateChecksAreOnByDefault(t *testing.T) {
 	cfg, err := Load(filepath.Join(t.TempDir(), "config.yaml"))
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if cfg.Update.Check {
-		t.Error("update.check defaults to on")
+	if !cfg.Update.Check {
+		t.Error("update.check defaults to off")
 	}
 	if cfg.Update.Interval.D() != 24*time.Hour {
 		t.Errorf("update.interval = %s, want 24h", cfg.Update.Interval.D())
+	}
+
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	os.WriteFile(path, []byte("update:\n  check: false\n"), 0o644)
+	if cfg, err = Load(path); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Update.Check {
+		t.Error("an upgrade turned checks back on for somebody who had switched them off")
 	}
 }
 
