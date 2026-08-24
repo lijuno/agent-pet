@@ -181,6 +181,14 @@ code=$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' -X POST "$BASE/updat
 want "a $other result is refused by the $mine build" "$code" "400"
 want "and the menu still shows the real one" "$(field status_menu)" "Update to 9.9.9…"
 
+# Put it back on the way out as well as on the way in. Restoring at the top is
+# what lets this section run alone; clearing here is for the human afterwards,
+# whose menu bar otherwise offers "Update to 9.9.9…" until they next quit the
+# app. A stale test is a nuisance, but a product telling somebody a release
+# exists when it does not is a different kind of wrong.
+curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json' \
+	-d '{"available":false}' >/dev/null
+
 echo
 echo "Show Pet is a toggle"
 # Start from a known state. Asserting on whatever the last run left behind
