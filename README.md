@@ -147,7 +147,7 @@ firing at all.
 
 ```yaml
 pet:
-  active: momo          # momo, or your own pack
+  active: momo          # momo, peach, or your own pack
   always_on_top: true
   scale: 1.0
   drop_shadow: true     # off if it reads as a halo on a light wallpaper
@@ -514,18 +514,18 @@ hardening applied to untrusted input.
 
 ### Characters
 
-One built-in pack ships in the binary:
+Two built-in packs ship in the binary:
 
 | id | | |
 |---|---|---|
-| `momo` | SanMao (三毛), a tortoiseshell tabby | white bib, white socks, green eyes |
+| `momo` | SanMao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
+| `peach` | Peach (桃桃), a girl with long dark hair | swept over one shoulder, peach bow, gold necklace |
 
-Everything that makes a second character work is still here — the library, the
-Change Pet submenu, `GET /pets`, `POST /pet` and their tests. `tools/genpets`
-still carries a second species definition as a worked example; shipping it
-again is one line.
+Pick one from the menu-bar item's **Change Pet** submenu, or with
+`petctl pet peach`. `tools/genpets` carries a third species, `byte`, as a
+worked example of a species that is neither of these; shipping it is one line.
 
-It provides all ten states as 40×40 pixel-art sprite strips. Regenerate
+Both provide all ten states as 40×40 pixel-art sprite strips. Regenerate
 them with:
 
 ```bash

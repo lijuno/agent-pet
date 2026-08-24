@@ -10,9 +10,9 @@ working on it.
 ## Where it stands
 
 Milestones 1 and 2 are in: the engine, the loopback event API, `petctl`, the
-window, the menu-bar item, and the Claude Code adapter. One character ships
-(SanMao, `momo`), though everything for more is still here — see the note in
-the README's Characters section.
+window, the menu-bar item, and the Claude Code adapter. Two characters ship —
+SanMao (`momo`) and Peach (`peach`) — and a third stays defined but unshipped
+in `tools/genpets` as the worked example; see the README's Characters section.
 
 Over-the-air updates are in too. Two things about them are load-bearing and
 neither is obvious from the code: the updater lives in `petctl` rather than

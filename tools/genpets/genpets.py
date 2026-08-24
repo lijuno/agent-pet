@@ -51,11 +51,25 @@ class Palette:
     # only an open round eye has one.
     eye: tuple = (40, 32, 42, 255)
     iris: tuple = None
+    # The lit foot of a lashed pupil. Separate from `iris` because `iris` also
+    # fills the sclera of the `wide` and `confused` eyes, where a warm brown
+    # reads as a bruise rather than as an eye.
+    eye_light: tuple = None
     blush: tuple = (242, 152, 152, 150)
     # Only a patched coat needs these; the robot and the slime leave them unset.
     patch: tuple = None
     white: tuple = (252, 250, 246, 255)
     nose: tuple = None
+    # A character with hair and clothes rather than a coat needs these; the
+    # cat and the robot leave them unset.
+    hair: tuple = None
+    hair_light: tuple = None
+    cloth: tuple = None
+    lip: tuple = None
+    ribbon: tuple = None
+    ribbon_dark: tuple = None
+    gold: tuple = None
+    gold_dark: tuple = None
     # think is the colour of the thinking dots. They used to be drawn in
     # `line`, the character's own outline, which made the one state that says
     # "the agent is reasoning" the hardest of all to notice. Props that carry a
@@ -75,6 +89,9 @@ class Species:
     body_w: int = 24
     body_h: int = 22
     markings: str = "none"  # none | tortie
+    hair: str = "none"      # none | long | side
+    lashes: bool = False
+    accessory: str = "none"  # none | bow
     extras: dict = field(default_factory=dict)
 
 
@@ -102,6 +119,39 @@ MOMO = Species(
     markings="tortie",
 )
 
+PEACH = Species(
+    pid="peach",
+    name="Peach (桃桃)",
+    description="A girl with long dark hair swept over one shoulder, a peach bow and a gold necklace.",
+    palette=Palette(
+        # Skin, hair and eyes are sampled from the reference photo and then
+        # pushed apart: at 40px, tones a camera can tell apart collapse into
+        # one flat shape, so the shadow is darker and the hair blacker than
+        # they photograph.
+        body=(244, 210, 186, 255),
+        body_dark=(214, 170, 146, 255),
+        belly=(250, 226, 208, 255),
+        line=(92, 60, 52, 255),        # warm outline; a black one reads as ink
+        accent=(160, 198, 228, 255),   # the pale blue of her top, for sparkles
+        eye=(46, 32, 30, 255),
+        eye_light=(128, 86, 64, 255),  # a warm rim at the foot of the pupil
+        blush=(240, 148, 148, 150),
+        hair=(38, 30, 34, 255),
+        hair_light=(88, 68, 72, 255),
+        cloth=(250, 250, 250, 255),
+        lip=(206, 116, 116, 255),
+        ribbon=(255, 172, 142, 255),   # peach, for the girl called Peach
+        ribbon_dark=(226, 124, 104, 255),
+        gold=(244, 202, 108, 255),
+        gold_dark=(198, 152, 66, 255),
+        nose=None,
+        think=(255, 194, 108, 255),    # warm, against all that dark hair
+    ),
+    ears="none", face="human", tail=False, body_w=24, body_h=22,
+    hair="side", lashes=True, accessory="bow",
+)
+
+
 BYTE = Species(
     pid="byte",
     name="Byte",
@@ -120,11 +170,11 @@ BYTE = Species(
 )
 
 
-# Only SanMao ships. BYTE stays defined on purpose: it is the worked example of
-# a second species — antenna instead of ears, a lit screen instead of a muzzle —
-# and the reason the drawing code is parametric at all. Adding it back to this
-# list is the whole of shipping a second character again.
-SPECIES = [MOMO]
+# BYTE stays defined but unshipped, as the worked example of a third species —
+# antenna instead of ears, a lit screen instead of a face — and the reason the
+# drawing code is parametric at all. Adding it to this list is the whole of
+# shipping it.
+SPECIES = [MOMO, PEACH]
 
 
 # --------------------------------------------------------------------------
@@ -232,17 +282,34 @@ def dots(d, x, y, fill, edge, phase):
 # face centre so every species animates identically.
 # --------------------------------------------------------------------------
 
-def eyes(d, ex, ey, kind, pal, look=(0, 0)):
-    # An eye is three pixels wide, so the right one starts at +4 to sit the same
-    # distance from centre as the left at -6. At +3 both eyes were shifted one
-    # pixel left of the face, which is small enough to look like nothing in
-    # particular and wrong enough to notice.
+def eyes(d, ex, ey, kind, pal, look=(0, 0), lashes=False):
+    # A plain eye is three pixels wide, so the right one starts at +4 to sit the
+    # same distance from centre as the left at -6. At +3 both eyes were shifted
+    # one pixel left of the face, which is small enough to look like nothing in
+    # particular and wrong enough to notice. A lashed eye is four wide and sets
+    # its own origin, one pixel further out on each side.
     lx, rx = ex - 6, ex + 4
     ox, oy = look
     c = pal.eye
     white = (255, 255, 255, 255)
 
-    if kind == "dot":
+    if kind == "dot" and lashes:
+        # A tall oval with two catchlights, lined up with the arcs the other
+        # kinds draw. Eye size is most of what separates "a girl" from "a cute
+        # girl" at 40px — the three-pixel square this replaced read as a face
+        # with its eyes screwed shut.
+        for sx, x0 in ((-1, ex - 7), (1, ex + 4)):
+            d.line([(x0 - 1, ey - 1), (x0 + 4, ey - 1)], fill=c)
+            px(d, x0 + (4 if sx > 0 else -1), ey - 2, c)   # outer lash tick
+            d.ellipse([x0 + ox, ey + oy, x0 + 3 + ox, ey + 4 + oy], fill=c)
+            if pal.eye_light:
+                rect(d, x0 + 1 + ox, ey + 3 + oy, x0 + 2 + ox, ey + 3 + oy, pal.eye_light)
+            # The catchlight sits centred, not against the outer edge. Pushed
+            # out there it reads as both eyes glancing the same way, in every
+            # state, which is a squint she never recovers from.
+            rect(d, x0 + 1 + ox, ey + 1 + oy, x0 + 2 + ox, ey + 1 + oy, white)
+            px(d, x0 + 1 + ox, ey + 2 + oy, (255, 255, 255, 190))
+    elif kind == "dot":
         for x in (lx, rx):
             if pal.iris:
                 # A cat's eye is an iris with a slit pupil, not a solid disc,
@@ -259,6 +326,9 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0)):
                 rect(d, x + ox, ey + oy, x + 2 + ox, ey + 2 + oy, c)
                 px(d, x + ox, ey + oy, (255, 255, 255, 170))
     elif kind == "wide":
+        if lashes:
+            for x in (lx, rx):
+                d.line([(x - 1, ey - 3), (x + 3, ey - 3)], fill=c)
         for x in (lx - 1, rx - 1):
             # Startled: the pupil dilates and swallows the iris.
             d.ellipse([x, ey - 2, x + 4, ey + 3], fill=pal.iris or white, outline=pal.line)
@@ -272,6 +342,18 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0)):
             d.line([(x, ey + 1), (x + 4, ey + 1)], fill=c)
             px(d, x, ey, c)
             px(d, x + 4, ey, c)
+    elif kind == "squint" and lashes:
+        # A lowered lid with the eye still under it. `working` is the state she
+        # is in most of the time, and the plain squint's two flat bars read as
+        # a face switched off rather than a face concentrating.
+        for sx, x0 in ((-1, ex - 7), (1, ex + 4)):
+            d.line([(x0 - 1, ey - 1), (x0 + 4, ey - 1)], fill=c)
+            px(d, x0 + (4 if sx > 0 else -1), ey - 2, c)
+            # The same eye, narrowed and dropped a row, rather than a lid drawn
+            # on top of it: a bar joined to a pupil reads as a heavy brow, and
+            # she spends her working hours looking cross.
+            d.ellipse([x0, ey + 1, x0 + 3, ey + 3], fill=c)
+            px(d, x0 + 1, ey + 1, (255, 255, 255, 210))
     elif kind == "squint":
         # A brow with a pupil under it. A bare bar would be indistinguishable
         # from the closed eyes of `sleeping` at this size.
@@ -290,7 +372,10 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0)):
         d.line([(rx + 4, ey - 4), (rx + 1, ey - 1)], fill=pal.line)
         d.line([(rx + 4, ey - 3), (rx + 1, ey)], fill=pal.line)
         for x in (lx, rx + 1):
-            rect(d, x, ey + 1, x + 1, ey + 3, c)
+            if lashes:
+                rect(d, x - 1, ey + 1, x + 1, ey + 4, c)
+            else:
+                rect(d, x, ey + 1, x + 1, ey + 3, c)
     elif kind == "sparkle":
         for x in (lx - 1, rx - 1):
             d.line([(x, ey + 2), (x + 2, ey - 1)], fill=c)
@@ -300,7 +385,9 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0)):
 
 
 def mouth(d, mx, my, kind, pal, muzzle_style="cat"):
-    c = pal.line
+    # Lips, on a character that has them: a mouth drawn in the outline colour
+    # is a scar on skin. The cat and the robot leave `lip` unset.
+    c = pal.lip or pal.line
     # A pink nose, on a cat that has one. Drawn under the mouth so the mouth
     # line still reads as the boundary of the muzzle.
     if pal.nose and muzzle_style == "cat" and kind in ("cat", "flat", "smile", "wobble"):
@@ -336,13 +423,26 @@ def mouth(d, mx, my, kind, pal, muzzle_style="cat"):
 # the character
 # --------------------------------------------------------------------------
 
-def blush(d, s, cx, ey, pal):
+def blush(d, s, cx, ey, pal, soft=False):
     """Cheeks. Skipped for screen faces: a robot has no cheeks, and the marks
-    would land outside the panel and read as damage."""
+    would land outside the panel and read as damage.
+
+    A lashed eye is five rows tall against the plain eye's three, so the cheeks
+    drop by two — drawn at the old height they sit on the eye itself and read
+    as bloodshot rather than as a blush.
+
+    `soft` is the version she wears in every state. A permanent faint blush is
+    most of what makes a character read as cute rather than merely drawn; the
+    full-strength one still goes on top in `happy` and `heart`.
+    """
     if s.face == "screen":
         return
-    d.ellipse([cx - 10, ey + 3, cx - 7, ey + 5], fill=pal.blush)
-    d.ellipse([cx + 7, ey + 3, cx + 10, ey + 5], fill=pal.blush)
+    c = pal.blush
+    if soft:
+        c = c[:3] + (max(1, c[3] // 3),)
+    dy = 5 if s.lashes else 3
+    d.ellipse([cx - 10, ey + dy, cx - 7, ey + dy + 2], fill=c)
+    d.ellipse([cx + 7, ey + dy, cx + 10, ey + dy + 2], fill=c)
 
 
 def markings(img, s, top, bw, bh, cy, pal):
@@ -407,6 +507,160 @@ def whiskers(d, cx, my, pal):
             d.line([(x, my + dy), (x + sx * 4, my + dy - 1 + k)], fill=pal.white)
 
 
+def bow(d, x, y, pal):
+    """One accessory that is not part of the body. At this size that, and the
+    eyes, is what cuteness is made of — there is no room for anything subtler."""
+    c, dark = pal.ribbon, pal.ribbon_dark or pal.ribbon
+    d.polygon([(x - 4, y - 2), (x - 1, y), (x - 4, y + 2)], fill=c)
+    d.polygon([(x + 4, y - 2), (x + 1, y), (x + 4, y + 2)], fill=c)
+    px(d, x - 3, y, dark)
+    px(d, x + 3, y, dark)
+    rect(d, x - 1, y - 1, x + 1, y + 1, dark)
+
+
+def hair_back(d, s, top, bw, bh, cy, pal):
+    """The mass of hair behind the head, and the only part of the character
+    allowed outside the body silhouette.
+
+    It is deliberately lopsided: everything falls forward over her right
+    shoulder and runs to the waist, while the far side is tucked behind and
+    stops at the jaw. A symmetrical curtain of the same hair reads as a helmet,
+    which is exactly what the first version of this looked like.
+
+    Drawn before the body ellipse, so the face lands on top of the half of
+    these shapes that crosses it.
+    """
+    if s.hair != "side":
+        return
+    x0, x1 = CX - bw // 2, CX + bw // 2
+
+    # The crown. It hugs the head on the side the hair is swept *away* from,
+    # and stops at the head's own edge on the other: swept hair is tighter over
+    # the ear it leaves, not puffier. That also keeps it out of the top-right
+    # prop column, which is the difference between a Z that reads and a Z lost
+    # in black hair — the props are drawn last but they are drawn dark.
+    d.ellipse([x0 - 2, top - 5, x1, top + 11], fill=pal.hair)
+
+    # The long side: out over the shoulder at the jaw, then straight down to a
+    # tip below the body. It only swings wide *below* the props, which all sit
+    # above y=18.
+    d.polygon([(CX + 3, top + 1), (x1 + 2, top + 4), (x1 + 5, top + 11),
+               (x1 + 5, top + 20), (CX + 10, top + 25), (CX + 6, top + 19),
+               (CX + 4, top + 10)], fill=pal.hair)
+    # The short side, tucked behind the shoulder.
+    d.polygon([(CX - 3, top + 1), (x0 - 2, top + 4), (x0 - 2, top + 11),
+               (CX - 9, top + 17), (CX - 5, top + 10)], fill=pal.hair)
+
+    # Lit strands, following each fall. Straight black hair with no highlight
+    # is a flat blob whatever shape it is cut into, and the two strands are
+    # also what tells you the two sides are different lengths.
+    light = pal.hair_light or pal.hair
+    d.line([(x1 + 3, top + 8), (x1 + 3, top + 19)], fill=light)
+    d.line([(CX + 8, top + 21), (CX + 9, top + 24)], fill=light)
+    d.line([(x0 - 1, top + 6), (x0 - 1, top + 13)], fill=light)
+
+
+def hairline(img, s, top, bw, bh, cy, pal):
+    """Fringe and the locks that frame the face.
+
+    Clipped to the head ellipse for the same reason the tortie markings are:
+    the bob squashes and stretches the body every frame, and redoing that
+    ellipse arithmetic per feature gets it wrong in one of them.
+
+    The fringe stops four rows above the eyes on purpose. Drawn any lower it
+    touches the lash line and the eyes stop reading as eyes — they become the
+    bottom edge of the hair. `worried` needs the room too: its brows are drawn
+    in the outline colour, which on hair this dark is no colour at all.
+    """
+    if s.hair != "side":
+        return
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    o = ImageDraw.Draw(overlay)
+    x0, x1 = CX - bw // 2, CX + bw // 2
+
+    rect(o, x0 - 3, top - 4, x1 + 3, top + 3, pal.hair)
+    # Swept across to the long side, so the parting sits off centre and agrees
+    # with where the weight of the hair is.
+    o.polygon([(x0 - 3, top + 3), (CX - 5, top + 3), (x0 - 3, top + 8)], fill=pal.hair)
+    o.polygon([(x1 + 3, top + 3), (CX + 2, top + 3), (x1 + 3, top + 11)], fill=pal.hair)
+    # A broken highlight across the crown. Two segments with a gap, not one
+    # arc: a continuous line reads as a hairband, and the gap is what makes
+    # hair this dark look glossy rather than matte.
+    light = pal.hair_light or pal.hair
+    o.line([(CX - 8, top + 2), (CX - 4, top + 1)], fill=light)
+    o.line([(CX - 1, top), (CX + 3, top + 1)], fill=light)
+
+    # Locks down the cheeks: two pixels on the tucked side, four on the side
+    # the hair falls, because that is the asymmetry read from the front.
+    rect(o, x0, top + 3, x0 + 1, top + bh - 8, pal.hair)
+    rect(o, x1 - 3, top + 3, x1, top + bh - 6, pal.hair)
+
+    mask = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mask).ellipse([x0 + 1, top + 1, x1 - 1, top + bh - 1], fill=255)
+    overlay.putalpha(ImageChops.multiply(overlay.getchannel("A"), mask))
+    img.alpha_composite(overlay)
+
+
+def necklace(d, s, top, bw, bh, cy, pal):
+    """A fine gold chain in the open neck, with a pendant in the notch.
+
+    Drawn after the top, and shaped to sit *inside* the neck opening rather
+    than along its edge: a chain that follows the collar reads as piping on the
+    garment instead of as jewellery on her. The two limbs pass a pixel outside
+    the mouth at its widest, which is the whole vertical budget there is
+    between a chin and a collarbone.
+    """
+    if not pal.gold:
+        return
+    hem = top + bh - 4
+    g, gd = pal.gold, pal.gold_dark or pal.gold
+    for k in range(4):
+        px(d, CX - 4 + k, hem - 3 + k, g)
+        px(d, CX + 4 - k, hem - 3 + k, g)
+    # The pendant hangs in the open neck, just clear of the collar.
+    px(d, CX, hem, gd)
+    px(d, CX, hem + 1, g)
+
+
+def outfit(img, s, top, bw, bh, cy, pal):
+    """The white top, clipped to the body the same way.
+
+    Without it the skin runs to the bottom of the ellipse and she reads as a
+    floating head. But the body is a head and a torso merged into one shape, so
+    every row the top takes is a row the face loses: at the cat's bib height it
+    was a quarter of her visible pixels and looked like a shirt pulled up over
+    her jaw. It sits four rows off the bottom now, not six.
+
+    The shoulders are the high points and the neck the low one, which is what
+    makes it a scoop neck. A collar drawn straight across is a stripe.
+    """
+    if not pal.cloth:
+        return
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    o = ImageDraw.Draw(overlay)
+    x0, x1 = CX - bw // 2, CX + bw // 2
+    hem = top + bh - 4
+
+    # Shoulders five rows above the notch. Cut straight across at the notch's
+    # height — which is where it sat when the neckline was raised to make room
+    # for the chain — the top becomes a band at the bottom of the frame and she
+    # reads as bare to the collarbone. The garment needs somewhere to hang from.
+    neck = [(x0 - 3, hem - 5), (CX - 7, hem - 3), (CX - 3, hem), (CX, hem + 2),
+            (CX + 3, hem), (CX + 7, hem - 3), (x1 + 3, hem - 5),
+            (x1 + 3, top + bh + 3), (x0 - 3, top + bh + 3)]
+    # No trim. It edged the neckline first, a pixel from the chain, and the two
+    # parallel lines read as piping with the gold lost inside it; moved to the
+    # shoulders it became two dashes floating clear of a garment that is barely
+    # there at that height. One accent at the neck is the whole idea, and the
+    # accent is the necklace.
+    o.polygon(neck, fill=pal.cloth)
+
+    mask = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mask).ellipse([x0 + 1, top + 1, x1 - 1, top + bh - 1], fill=255)
+    overlay.putalpha(ImageChops.multiply(overlay.getchannel("A"), mask))
+    img.alpha_composite(overlay)
+
+
 BOB = {
     "idle":      [0, 0, 1, 0],
     "thinking":  [0, 0, 1, 1],
@@ -448,6 +702,9 @@ def draw_pet(s, state, i, n):
 
     top = cy - bh // 2
 
+    # --- hair, behind the body: it is the silhouette, so it goes down first
+    hair_back(d, s, top, bw, bh, cy, pal)
+
     # --- tail, behind the body, bottom-left so it never hits the prop column
     if s.tail:
         wag = [0, 1, 2, 1][i % 4] if state in ("happy", "celebrate", "heart", "working") else [0, 0, 1, 0][i % 4]
@@ -481,16 +738,27 @@ def draw_pet(s, state, i, n):
     # --- body
     d.ellipse([CX - bw // 2, top, CX + bw // 2, top + bh], fill=pal.body, outline=pal.line)
     markings(img, s, top, bw, bh, cy, pal)
+    outfit(img, s, top, bw, bh, cy, pal)
+    hairline(img, s, top, bw, bh, cy, pal)
+    necklace(d, s, top, bw, bh, cy, pal)
+    if s.accessory == "bow":
+        # On the tucked side: the other one is under the fall of the hair, and
+        # a bow you cannot see is three pixels of nothing.
+        bow(d, CX - bw // 2 + 2, top + 4, pal)
 
     # White socks, on a cat that has them.
     paw = pal.white if s.markings == "tortie" else pal.body
 
     # --- limbs that must sit on top of the body
     if state == "celebrate":
+        # A head that fills the top of the body has no room above it for an
+        # arm: raised to the cat's height the hands sit level with her temples
+        # and read as a second pair of ears. So they start at the shoulder.
+        shoulder, reach = (cy + 5, cy - 1) if s.face == "human" else (cy + 1, cy - 6)
         for sx in (-1, 1):
             ax = CX + sx * (bw // 2 - 1)
-            d.line([(ax, cy + 1), (ax + sx * 4, cy - 6)], fill=pal.body_dark, width=3)
-            d.ellipse([ax + sx * 4 - 2, cy - 9, ax + sx * 4 + 2, cy - 5],
+            d.line([(ax, shoulder), (ax + sx * 4, reach)], fill=pal.body_dark, width=3)
+            d.ellipse([ax + sx * 4 - 2, reach - 3, ax + sx * 4 + 2, reach + 1],
                       fill=paw, outline=pal.line)
     elif state == "working":
         # A tiny keyboard with two paws tapping out of phase.
@@ -507,7 +775,12 @@ def draw_pet(s, state, i, n):
     ey = cy - 4
     my = cy + 4
 
-    if s.face == "screen":
+    if s.face == "human":
+        # A face, not a muzzle: nothing is drawn between the eyes and the
+        # mouth, and the mouth sits higher so it lands on the chin rather than
+        # on the collar.
+        my = cy + 2
+    elif s.face == "screen":
         # A robot reads better with a lit panel than with fur-and-muzzle.
         d.rounded_rectangle([CX - 8, cy - 8, CX + 8, cy + 4], radius=2,
                             fill=(38, 46, 58, 255), outline=pal.line)
@@ -527,30 +800,31 @@ def draw_pet(s, state, i, n):
     blink = i == 2 and state in ("idle", "thinking")
     mstyle = "cat" if s.face == "muzzle" else "round"
 
+    # The faint permanent blush, under whatever the state draws over it.
+    if s.lashes and state != "sleeping":
+        blush(d, s, CX, ey, pal, soft=True)
+
     # Whiskers sit under the expression, so a brow or a wide eye still wins.
     if s.markings == "tortie" and state != "sleeping":
         whiskers(d, face_cx, my, pal)
 
     if state == "idle":
-        eyes(d, face_cx, ey, "closed" if blink else "dot", pal)
+        eyes(d, face_cx, ey, "closed" if blink else "dot", pal, lashes=s.lashes)
         mouth(d, face_cx, my, "cat", pal, mstyle)
     elif state == "thinking":
-        eyes(d, face_cx, ey, "closed" if blink else "dot", pal, look=(-1, -1))
+        eyes(d, face_cx, ey, "closed" if blink else "dot", pal, look=(-1, -1), lashes=s.lashes)
         mouth(d, face_cx, my, "flat", pal, mstyle)
         dots(d, PROP_X + 1, cy - 10, pal.think or pal.accent, pal.line, i)
     elif state == "working":
-        eyes(d, face_cx, ey, "squint", pal)
+        eyes(d, face_cx, ey, "squint", pal, lashes=s.lashes)
         mouth(d, face_cx, my, "flat", pal, mstyle)
         for k in range(2):
             if (i + k) % 2 == 0:
                 sparkle(d, PROP_X + 3 + k * 5, cy - 9 + k * 4, pal.accent, 1)
     elif state == "attention":
-        eyes(d, face_cx, ey, "wide", pal)
+        eyes(d, face_cx, ey, "wide", pal, lashes=s.lashes)
         mouth(d, face_cx, my, "o", pal, mstyle)
-        if i % 2 == 0:
-            bang(d, PROP_X + 4, cy - 16, (236, 78, 78, 255))
-        else:
-            bang(d, PROP_X + 4, cy - 15, (236, 78, 78, 255))
+        bang(d, PROP_X + 4, cy - 16 + i % 2, (236, 78, 78, 255))
     elif state == "confused":
         eyes(d, face_cx, ey, "confused", pal)
         mouth(d, face_cx, my, "wobble", pal, mstyle)

@@ -98,11 +98,11 @@ curl -sS --max-time 5 -X POST "$BASE/pet" -H 'content-type: application/json' \
 sleep 0.6
 menu=$(field status_menu)
 want "it lists the cat" "$menu" ":>SanMao"
+want "it lists the girl" "$menu" ">Peach"
 want "the character in use is ticked" "$menu" ">SanMao (三毛)[on]"
 
-# Switching needs somewhere to switch to. Only SanMao ships today, so these
-# checks describe themselves as skipped rather than passing on nothing — add a
-# pack to ~/.local/share/agent-pet/pets and they run by themselves.
+# Switching needs somewhere to switch to. Two characters ship, so this runs;
+# it stays guarded because a build with one pack should skip rather than fail.
 others=$(curl -sS --max-time 5 "$BASE/pets" | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
