@@ -30,6 +30,9 @@ records which seam each deferred piece attaches to.
 ## Requirements
 
 - macOS (the architecture allows Windows and Linux; only macOS is exercised)
+- Xcode Command Line Tools — `xcode-select --install`. The menu-bar item is
+  Objective-C compiled through cgo, so a build needs clang; `codesign`,
+  `notarytool` and `stapler` come from here too. Full Xcode is never needed.
 - Go 1.23+
 - [Wails CLI](https://wails.io/docs/gettingstarted/installation) **v2.10.2 or
   newer** — matching the version in `go.mod`. An older CLI fails to build on a
@@ -68,19 +71,56 @@ bin/petctl event claude permission_requested
 bin/petctl watch
 ```
 
-A release build:
+## Cutting a release
 
 ```bash
-make build           # produces build/bin/agent-pet.app
-make notarize        # signs it, sends it to Apple, staples the ticket
+git tag v0.2.0 && make version-sync   # VERSION comes from `git describe`
+make build                            # produces build/bin/agent-pet.app
+make notarize                         # signs it, submits it, staples the ticket
 ```
 
-The second needs a Developer ID certificate and a stored notarytool profile, so
-it runs only on the machine holding them. Releases here are cut by hand for
-that reason: signing on a runner would mean putting a copy of the private key
-in the repository's secrets, and Apple caps how many of those certificates an
-account may have. [`docs/signing.md`](docs/signing.md) is the one-time Apple
-setup behind it.
+That leaves `build/bin/agent-pet-<version>-universal.zip`, stapled and ready to
+attach to a GitHub release. Apple usually answers within a few minutes.
+
+Skip the tag and the build is `0.1.0` whatever you meant to call it — `VERSION`
+falls back when `git describe` finds nothing, and `wails.json` is where the
+version reaches `Info.plist`.
+
+`make build` alone needs nothing beyond the Requirements above. `make notarize`
+needs Apple credentials, and those do not travel with a clone — on a machine
+that has never signed:
+
+1. **The certificate.** Import your `.p12` backup (double-click it, give the
+   export password). Do not create a second one: Apple caps how many Developer
+   ID certificates an account may hold, and a certificate whose private key is
+   on another Mac cannot sign anything. Confirm with
+
+   ```bash
+   security find-identity -v -p codesigning
+   ```
+
+   You want one `Developer ID Application: Your Name (TEAMID)`.
+
+2. **The notary credentials**, from the App Store Connect API key. The `.p8`
+   downloads exactly once and can never be re-fetched, so it is in your
+   password manager or it is gone:
+
+   ```bash
+   xcrun notarytool store-credentials agent-pet --key AuthKey_XXXXX.p8 --key-id YOUR_KEY_ID
+   ```
+
+3. **The profile name**, so `make notarize` takes no arguments. The file is
+   git-ignored, because it names a keychain item that exists only here:
+
+   ```bash
+   echo agent-pet > .notary-profile
+   ```
+
+Releases are cut by hand for the same reason step 1 is fiddly: signing on a
+runner would mean a copy of that private key in the repository's secrets.
+[`docs/signing.md`](docs/signing.md) covers the first-time Apple setup behind
+all three — enrolment, creating the certificate, and creating the API key —
+and what to do when a step fails.
 
 A bundle you build yourself is neither signed nor notarized; a released one is.
 One you built yourself runs without complaint, because Gatekeeper only

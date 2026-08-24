@@ -92,9 +92,15 @@ You want `Developer ID Application: Your Name (TEAMID)`.
 
 **Then export a backup immediately.** In Keychain Access, confirm a private key
 sits under the certificate, select both, right-click → Export as `.p12` with a
-password. Without the private key the certificate is inert, only a small number
-of Developer ID certificates may exist per account, and this same file becomes
-the CI secret later.
+password. Without the private key the certificate is inert, and only a small
+number of Developer ID certificates may exist per account — so this file is not
+a convenience. It is the only way to sign from a second machine, or from this
+one after a reinstall.
+
+**On a machine that is not the first one**, import that `.p12` instead of
+repeating this section: double-click it, give the export password, and check
+`security find-identity -v -p codesigning` again. Generating a second
+certificate would spend one of the few the account may hold, to no end.
 
 ### 3. Notary credentials
 
