@@ -14,6 +14,13 @@ window, the menu-bar item, and the Claude Code adapter. One character ships
 (SanMao, `momo`), though everything for more is still here — see the note in
 the README's Characters section.
 
+Over-the-air updates are in too. Two things about them are load-bearing and
+neither is obvious from the code: the updater lives in `petctl` rather than
+`petd` so the daemon stays offline, and the "dev channel" is a **second
+application** (`Agent Pet (dev)`) rather than a setting. Read
+[ADR 0008](docs/adr/0008-over-the-air-updates.md) before touching any of it —
+a channel picker was built first and deliberately deleted.
+
 Next, per [ADR 0006](docs/adr/0006-milestone-1-boundaries.md): the Codex
 adapter (Milestone 3), a git `post-commit` adapter, and a durable SQLite store
 for statistics (Milestone 4, currently in-memory only).
@@ -32,9 +39,9 @@ Requires the Wails CLI **v2.10.2 or newer**; see the README for why.
 ## Three test suites, and what each needs
 
 ```bash
-make test          # Go. Engine, state machine, event API, adapter, placement.
+make test          # Go. Engine, state machine, event API, adapter, placement, updater.
 make test-ui       # Opens a browser. Runs against the real ui/dist/index.html.
-make test-desktop  # Needs the app running. Checks the menu bar and window placement.
+make test-desktop  # Needs the app running. Menu bar, window placement, updates.
 ```
 
 Run all three before committing anything that touches the window or the menu
@@ -57,8 +64,15 @@ internal/state/        the state machine: pure, no clock, no goroutines
 internal/engine/       event intake, timers, subscribers
 internal/server/       the loopback event API
 internal/{events,petassets,bubble,config}/
+internal/flavor/       what makes the two apps two apps: bundle id, port, config
+                       and data paths, icons. Shared values collide silently, so
+                       there is a test
+internal/update/       manifest, channels, semver. No net/http, no os/exec —
+                       that is the boundary that keeps petd offline
 adapters/claude/       hook payload → event, and the settings.json patcher
 cmd/petctl/            the CLI. Shares no code with the engine, on purpose.
+                       update.go and apply.go are the whole updater.
+updates/               the channel manifests. Committing one publishes a release
 tools/genpets/         the sprite generator. All art is generated.
 ui/dist/index.html     the whole frontend, one file
 ui/test/               its tests
@@ -113,6 +127,28 @@ Each of these cost an hour or more to find.
 - **The hooks are installed in this repo's `.claude/settings.json`,** so your
   own Claude Code session drives the pet while you work. A session in
   `petctl status` you did not create is probably you.
+- **Signing a release does not offer it to anybody.** `make release` leaves
+  `updates/<channel>.json` uncommitted on purpose; the commit is the release.
+  Expect `petctl update --check` to report nothing published until then, and do
+  not "fix" it by pointing the updater at the releases API.
+- **`petctl update` re-execs a copy of itself out of the bundle** before
+  touching it, passing `os.Args` through. A new flag works automatically; a
+  flag read from somewhere other than `os.Args` will silently not survive.
+- **Nothing has been published on either channel yet.** A 404 from
+  `raw.githubusercontent.com` is the correct answer today, and there is a test
+  asserting it reads as "nothing yet" rather than as a broken updater.
+- **The Wails single-instance lock is keyed by bundle identifier.** With a
+  shared key the second app to start binds its port, logs `petd started`, and
+  then exits with **status 0 and no error at all** — Wails checks the lock
+  inside `Run`. It looks exactly like an app that declined to launch for no
+  reason. Anything new that both apps touch belongs in `internal/flavor` with a
+  line in `TestFlavoursDoNotCollide`.
+- **`make build` builds one app, and `-clean` deletes the other.** To run both,
+  build one, move it aside, build the other, move it back. `build/bin` holds
+  whichever flavor you built last.
+- **`go build` with no ldflags is the release flavor.** A `bin/petctl` built by
+  `make petctl` talks to 9876 and reports on `agent-pet.app`, whatever you were
+  working on. The one inside the dev bundle is the dev one.
 
 ## Conventions
 

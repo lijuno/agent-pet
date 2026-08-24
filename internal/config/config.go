@@ -14,6 +14,9 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/lijuno/agent-pet/internal/flavor"
+	"github.com/lijuno/agent-pet/internal/update"
 )
 
 type Config struct {
@@ -25,6 +28,7 @@ type Config struct {
 	Personality  Personality       `yaml:"personality"`
 	Thresholds   Thresholds        `yaml:"thresholds"`
 	Logging      Logging           `yaml:"logging"`
+	Update       Update            `yaml:"update"`
 }
 
 type Pet struct {
@@ -91,6 +95,37 @@ type Thresholds struct {
 	WorriedAfter     int      `yaml:"worried_after"`
 }
 
+// Update is the over-the-air update settings (ADR 0008).
+//
+// Nothing here makes petd reach the network — it cannot; the code to do so is
+// not linked into it. These settings are read by petctl, which does the
+// checking and the installing.
+type Update struct {
+	// Check enables the automatic check that runs from the Claude Code
+	// SessionStart hook. Off by default, and deliberately: an app that has
+	// never contacted a server should not start doing so because it was
+	// upgraded. `petctl update --check` always works, because typing it is
+	// consent.
+	Check bool `yaml:"check"`
+	// ManifestURL is a template; {channel} is filled in from the build's own
+	// flavor. A fork points this at its own manifest.
+	//
+	// There is no channel setting. Which channel a build follows is a fact
+	// about the build, not a preference — following the other one means running
+	// the other app (ADR 0008).
+	ManifestURL string `yaml:"manifest_url"`
+	// Interval is the minimum gap between automatic checks. Releases here are
+	// cut by hand, so checking often would only be checking more often than
+	// anything can change.
+	Interval Duration `yaml:"interval"`
+}
+
+// DefaultManifestURL is where the two channels are published. It is a file in
+// the repository rather than the GitHub releases API on purpose: a release can
+// exist for days before anybody is offered it, because the offer is a separate
+// commit. See docs/adr/0008-over-the-air-updates.md.
+const DefaultManifestURL = "https://raw.githubusercontent.com/" + update.Repo + "/master/updates/{channel}.json"
+
 type Logging struct {
 	Level string `yaml:"level"`
 	// Verbose enables logging of event metadata (tool names, messages).
@@ -130,7 +165,7 @@ func Default() Config {
 		},
 		Behavior: Behavior{Dialogue: true, XP: true, ClickFocusesAgent: false},
 		Window:   Window{X: -1, Y: -1},
-		Server:   Server{Addr: "127.0.0.1:9876"},
+		Server:   Server{Addr: flavor.Current().Addr},
 		Integrations: map[string]Toggle{
 			"claude": {Enabled: true},
 			"codex":  {Enabled: true},
@@ -152,6 +187,11 @@ func Default() Config {
 			WorriedAfter:     3,
 		},
 		Logging: Logging{Level: "info", Verbose: false},
+		Update: Update{
+			Check:       false,
+			ManifestURL: DefaultManifestURL,
+			Interval:    Duration(24 * time.Hour),
+		},
 	}
 }
 
@@ -168,7 +208,9 @@ func Path() string {
 		}
 		base = filepath.Join(home, ".config")
 	}
-	return filepath.Join(base, "agent-pet", "config.yaml")
+	// Named after the flavor, so the dev app and the release app never edit
+	// each other's settings.
+	return filepath.Join(base, flavor.Current().Slug, "config.yaml")
 }
 
 // DataDir is where pets, logs and (from Milestone 4) the database live.
@@ -184,11 +226,21 @@ func DataDir() string {
 		}
 		base = filepath.Join(home, ".local", "share")
 	}
-	return filepath.Join(base, "agent-pet")
+	return filepath.Join(base, flavor.Current().Slug)
 }
 
 func PetsDir() string { return filepath.Join(DataDir(), "pets") }
 func LogsDir() string { return filepath.Join(DataDir(), "logs") }
+
+// UpdateStamp is when the automatic update check last ran, recorded as a file's
+// modification time.
+//
+// A file rather than a config key, because config.yaml is rewritten from memory
+// when the app exits: a timestamp stored there would be lost or resurrected
+// depending on when the pet happened to quit. Both petctl (which writes it) and
+// the desktop shell (which deletes it when the channel changes) need the path,
+// so it lives here rather than in either of them.
+func UpdateStamp() string { return filepath.Join(DataDir(), "update-check") }
 
 // Load reads the config, filling in defaults for anything absent. The returned
 // error is advisory: cfg is always usable.
@@ -217,7 +269,7 @@ func (c Config) sanitised() Config {
 		c.Pet.Active = "momo"
 	}
 	if c.Server.Addr == "" {
-		c.Server.Addr = "127.0.0.1:9876"
+		c.Server.Addr = flavor.Current().Addr
 	}
 	if c.Thresholds.WorriedAfter <= 0 {
 		c.Thresholds.WorriedAfter = 3
@@ -236,6 +288,13 @@ func (c Config) sanitised() Config {
 	fix(&c.Thresholds.CelebrateFor, d.CelebrateFor)
 	fix(&c.Thresholds.ConfusedFor, d.ConfusedFor)
 	fix(&c.Thresholds.HeartFor, d.HeartFor)
+
+	if strings.TrimSpace(c.Update.ManifestURL) == "" {
+		c.Update.ManifestURL = DefaultManifestURL
+	}
+	if c.Update.Interval <= 0 {
+		c.Update.Interval = Default().Update.Interval
+	}
 	return c
 }
 

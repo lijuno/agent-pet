@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/lijuno/agent-pet/internal/flavor"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -73,8 +74,16 @@ func Run(app *App, opts Options) error {
 		OnShutdown: app.shutdown,
 		Bind:       []any{app},
 
+		// Keyed by the bundle identifier, which is unique per flavor.
+		//
+		// A single shared key here is a trap worth spelling out: the release
+		// app and the dev app both start, both bind their own port, both log
+		// "petd started" — and then whichever came second exits silently with
+		// status 0, because Wails checks this lock inside Run. There is no
+		// error anywhere. It looks exactly like an app that declined to launch
+		// for no reason.
 		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId: "com.agentpet.petd",
+			UniqueId: flavor.Current().BundleID,
 		},
 	})
 }

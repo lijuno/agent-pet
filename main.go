@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"github.com/lijuno/agent-pet/internal/config"
 	"github.com/lijuno/agent-pet/internal/desktop"
 	"github.com/lijuno/agent-pet/internal/engine"
+	"github.com/lijuno/agent-pet/internal/flavor"
 	"github.com/lijuno/agent-pet/internal/petassets"
 	"github.com/lijuno/agent-pet/internal/server"
 )
@@ -35,6 +37,7 @@ func main() {
 		headless   = flag.Bool("headless", false, "run the daemon without the window (useful for testing adapters)")
 		addrFlag   = flag.String("addr", "", "override the event API address")
 		showVer    = flag.Bool("version", false, "print version and exit")
+		showFlavor = flag.Bool("flavor", false, "print this build's identity as JSON and exit")
 		configFlag = flag.String("config", "", "path to config.yaml")
 	)
 	flag.Parse()
@@ -42,6 +45,31 @@ func main() {
 	if *showVer {
 		fmt.Println("petd", version)
 		return
+	}
+	// How scripts/brand.sh learns the bundle identifier and name to stamp into
+	// Info.plist. Asking the binary rather than repeating the values in shell
+	// keeps internal/flavor the only place they exist — and proves the build
+	// flags actually took effect, which a second copy of the values could not.
+	if *showFlavor {
+		f := flavor.Current()
+		out, err := json.Marshal(map[string]string{
+			"id": f.ID, "slug": f.Slug, "app_name": f.AppName,
+			"bundle_id": f.BundleID, "addr": f.Addr,
+			"channel": string(f.Channel), "version": version,
+		})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "petd:", err)
+			os.Exit(1)
+		}
+		fmt.Println(string(out))
+		return
+	}
+
+	// A build stamped with a flavor that does not exist would take the release
+	// app's port, config and data directory. Refuse rather than collide.
+	if err := flavor.Check(); err != nil {
+		fmt.Fprintln(os.Stderr, "petd:", err)
+		os.Exit(1)
 	}
 
 	cfgPath := *configFlag
@@ -109,6 +137,8 @@ func main() {
 	srv.StatusItem = app.ClickStatusItem
 	srv.StatusMenu = app.StatusMenu
 	srv.SetShown = app.SetShown
+	// How a check reaches the menu bar. petd is told; it never asks.
+	srv.OnUpdate = app.SetUpdate
 
 	if err := desktop.Run(app, desktop.Options{
 		Assets:  assets,

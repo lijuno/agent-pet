@@ -22,7 +22,9 @@ before the event vocabulary has been exercised against real Claude Code hooks.
 
 **No LLM anywhere.** Speech bubbles come from templates chosen by state,
 personality and a seeded RNG. The application has no network client at all
-besides its own loopback listener.
+besides its own loopback listener — still true of `petd` after
+[ADR 0008](0008-over-the-air-updates.md), which put the updater's network code
+in `petctl` for exactly this reason.
 
 **Custom pets are local-only, no AI.** Per the product decision: character packs
 are built from local image processing (crop, palette reduction, procedural

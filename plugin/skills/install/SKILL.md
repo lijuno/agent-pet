@@ -32,10 +32,30 @@ than the GitHub releases of `lijuno/agent-pet`.
 petctl doctor
 ```
 
-`petctl` is on your `PATH` while this plugin is enabled. If it reports a
-running app, tell the user the version and ask whether they want to update
-before you download anything. If it reports the app is not installed,
-continue.
+`petctl` is on your `PATH` while this plugin is enabled.
+
+**If it reports a running app, the rest of this skill is not what you want.**
+The app updates itself, and doing it by hand risks getting it wrong in ways the
+built-in path already handles — quitting the old daemon before replacing the
+bundle it is running from, and checking that what arrived is signed by the same
+developer as what is being replaced.
+
+```bash
+petctl update --check --json
+```
+
+That prints `{"available": true, "latest": "..."}` when there is something
+newer. Tell the user the version, and install it only if they say yes:
+
+```bash
+petctl update
+```
+
+It quits the pet, verifies the download, swaps the bundle and starts it again,
+and it refuses rather than guesses at every step. Then go to *Prove it works*.
+If it says this is a dev build, the user built it themselves — say so and stop.
+
+If `petctl doctor` reports the app is not installed, continue below.
 
 ### 2. Find the latest release
 
@@ -108,7 +128,23 @@ petctl test celebrate --for 5s
 
 Ask whether they saw it. If they did not, go to `/agent-pet:troubleshoot`.
 
-### 7. Tell them what happens next
+### 7. Mention the dev app, do not install it
+
+There is a second application, `Agent Pet (dev)`, that installs alongside this
+one and follows prereleases. It is not an alternative to what you just
+installed and it is not a setting — it is a separate app with its own icon,
+its own port and its own settings, and both can run at once.
+
+Say it exists and leave it there. Someone who wants prereleases will ask; the
+release app is the right thing for everyone else, and installing both without
+being asked leaves an extra menu-bar-only app on their machine.
+
+Also mention that automatic update checks are **off** — the app contacts no
+server at all until they turn them on. `petctl update --check` is the manual
+version, and `update.check: true` in the config file that `petctl doctor` names
+turns on a once-a-day check when a Claude Code session starts.
+
+### 8. Tell them what happens next
 
 The hooks come from this plugin and are already active — there is **no**
 `petctl install claude` step, and nothing was written to their

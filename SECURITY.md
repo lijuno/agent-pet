@@ -22,6 +22,37 @@ microphone or keyboard-monitoring permission, and needs no elevated privileges.
 It does listen: `127.0.0.1:9876` carries the event API that adapters and
 `petctl` use.
 
+## Updates do reach the network, from `petctl` and never from the daemon
+
+The app can update itself (ADR 0008), which is the sort of feature that usually
+ends the paragraph above. It does not, because the code that fetches, downloads
+and installs lives in `petctl` — a separate program `petd` cannot import. The
+daemon holds a version number it was *told* over the loopback API and shows it
+in a menu; it has no way to find one out.
+
+The same reasoning is why the menu-bar item opens a release page through
+`NSWorkspace` rather than the Wails runtime's `BrowserOpenURL`, which would run
+`/usr/bin/open` as a subprocess.
+
+What `petctl` does reach:
+
+- `raw.githubusercontent.com`, for a small JSON manifest, when you run
+  `petctl update --check`. Nothing is sent but the request.
+- `github.com` and its asset storage, to download a release you chose to
+  install.
+
+No check runs on its own unless `update.check` is set in the config file. It is
+off in a fresh install, and turning it on is the only way this program contacts
+anything.
+
+Before an update replaces the app, the download must match the manifest's
+SHA-256, pass `codesign --verify --strict` and `spctl`, and carry **the same
+Apple team identifier and bundle identifier as the app being replaced** —
+Apple's notarization says somebody legitimate signed it; the team check is what
+says it was us, and the bundle check is what says it is this app rather than
+`Agent Pet (dev)`, which is a separate application with its own port and data
+directory.
+
 ## The listener has no authentication, on purpose
 
 Any process running as your user can post events, force a state, switch
@@ -35,8 +66,11 @@ express: the pet can be made to lie about what your agent is doing, put itself
 somewhere inconvenient on screen, or be told to quit. `/diagnostics` returns the
 config path and data directory, which contain your account name.
 
-It cannot read your files, run a command, or reach the network, because no
-endpoint takes a path, a command or a URL as input.
+It cannot read your files, run a command, or reach the network. No endpoint
+takes a path or a command as input, and the one that takes a URL — `/update`,
+where `petctl` reports what a check found — accepts nothing but an HTTPS
+`github.com` URL inside this project's repository, and only ever hands it to
+the browser when somebody clicks the menu item. Nothing there is fetched.
 
 A local attacker with that much access has better targets than the pet. The
 boundary being defended here is the machine, not the process: the concern is a

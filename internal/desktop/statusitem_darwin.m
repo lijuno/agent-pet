@@ -21,6 +21,7 @@ static NSStatusItem *petItem = nil;
 static PetStatusTarget *petTarget = nil;
 static NSMenuItem *petStateItem = nil;
 static NSMenuItem *petChangeItem = nil;
+static NSMenuItem *petUpdateItem = nil;
 
 static NSMenuItem *addItem(NSMenu *menu, NSString *title, int tag) {
   NSMenuItem *it = [[NSMenuItem alloc] initWithTitle:title
@@ -90,6 +91,11 @@ void petStatusInstall(const void *png, int len, int onTop, int muted, int shown)
     [top setState:onTop ? NSControlStateValueOn : NSControlStateValueOff];
     NSMenuItem *mute = addItem(menu, @"Mute", PET_MUTE);
     [mute setState:muted ? NSControlStateValueOn : NSControlStateValueOff];
+
+    // Hidden until a check finds something. An always-present item reporting
+    // nothing is worse than no item.
+    petUpdateItem = addItem(menu, @"Update Available", PET_UPDATE);
+    [petUpdateItem setHidden:YES];
     [menu addItem:[NSMenuItem separatorItem]];
 
     addItem(menu, @"Quit Pet", PET_QUIT);
@@ -130,6 +136,27 @@ void petStatusAddPet(const char *title, int tag, int checked) {
     [it setTag:tag];
     [it setState:checked ? NSControlStateValueOn : NSControlStateValueOff];
     [petChangeItem.submenu addItem:it];
+  });
+}
+
+void petStatusSetUpdate(const char *title, int visible) {
+  NSString *t = [NSString stringWithUTF8String:title];
+  onMain(^{
+    [petUpdateItem setTitle:t];
+    [petUpdateItem setHidden:visible ? NO : YES];
+  });
+}
+
+void petOpenURL(const char *url) {
+  NSString *s = [NSString stringWithUTF8String:url];
+  onMain(^{
+    NSURL *u = [NSURL URLWithString:s];
+    // Checked again here, at the last point before Launch Services sees it: a
+    // scheme other than https is how a URL becomes something other than a page.
+    if (u == nil || ![[u scheme] isEqualToString:@"https"]) {
+      return;
+    }
+    [[NSWorkspace sharedWorkspace] openURL:u];
   });
 }
 
@@ -214,8 +241,12 @@ int petStatusMenuDump(char *buf, int cap) {
       if (it.isSeparatorItem) {
         continue;
       }
-      [out appendFormat:@"%ld:%@%@|", (long)it.tag, it.title,
-                        it.state == NSControlStateValueOn ? @"[on]" : @""];
+      // Hidden is reported as well as ticked. The update item is hidden
+      // until there is an update, and a test cannot see a menu — so "present
+      // but not shown" has to be sayable.
+      [out appendFormat:@"%ld:%@%@%@|", (long)it.tag, it.title,
+                        it.state == NSControlStateValueOn ? @"[on]" : @"",
+                        it.isHidden ? @"[hidden]" : @""];
       for (NSMenuItem *sub in it.submenu.itemArray) {
         [out appendFormat:@"%ld:>%@%@|", (long)sub.tag, sub.title,
                           sub.state == NSControlStateValueOn ? @"[on]" : @""];

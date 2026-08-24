@@ -5,6 +5,8 @@ package desktop
 import (
 	"context"
 	"errors"
+
+	"github.com/lijuno/agent-pet/internal/update"
 )
 
 // The status-bar item is macOS-only. See statusitem_darwin.go.
@@ -23,6 +25,8 @@ func (a *App) displayInset() (int, int) { return 0, menuBarInset }
 func (a *App) activate()                {}
 func (a *App) syncShownCheck(bool)      {}
 func (a *App) refreshPetMenu()          {}
+func setUpdateItem(update.Status)       {}
+func openURL(string)                    {}
 func (a *App) StatusMenu() string       { return "" }
 
 func (a *App) ClickStatusItem(string) error {

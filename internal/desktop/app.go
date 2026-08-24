@@ -14,8 +14,10 @@ import (
 	"github.com/lijuno/agent-pet/internal/config"
 	"github.com/lijuno/agent-pet/internal/engine"
 	"github.com/lijuno/agent-pet/internal/events"
+	"github.com/lijuno/agent-pet/internal/flavor"
 	"github.com/lijuno/agent-pet/internal/petassets"
 	"github.com/lijuno/agent-pet/internal/state"
+	"github.com/lijuno/agent-pet/internal/update"
 )
 
 // App is the Wails-facing adapter. It is deliberately thin: it forwards engine
@@ -50,6 +52,12 @@ type App struct {
 	// hidden mirrors the window's visibility, so the Show Pet checkbox can
 	// report it. Wails has no "is the window visible" call to ask.
 	hidden bool
+
+	// upd is the last update check result, as reported by petctl over the
+	// event API. The app never works this out for itself: it holds no HTTP
+	// client and opens no connections (ADR 0008).
+	updMu sync.Mutex
+	upd   update.Status
 }
 
 func NewApp(eng *engine.Engine, log *slog.Logger, cfgPath, addr string) *App {
@@ -569,6 +577,39 @@ func (a *App) SetAlwaysOnTop(b bool) {
 }
 
 func (a *App) SetMuted(b bool) { a.muted = b }
+
+// SetUpdate records what a check found and retitles the menu-bar item. Called
+// by the server when petctl posts a result; there is no other way for the app
+// to learn one.
+func (a *App) SetUpdate(st update.Status) {
+	a.updMu.Lock()
+	a.upd = st
+	a.updMu.Unlock()
+	setUpdateItem(st)
+}
+
+// GetUpdate is what the frontend shows in the status panel.
+func (a *App) GetUpdate() update.Status {
+	a.updMu.Lock()
+	defer a.updMu.Unlock()
+	return a.upd
+}
+
+// UpdateChannel is the channel this build follows. It is a fact about the
+// build, not a setting: the other channel is a different application.
+func (a *App) UpdateChannel() update.Channel { return flavor.Current().Channel }
+
+// openReleaseNotes opens the page for the version on offer. The pet installs
+// nothing itself: it has no updater in it, and `petctl update` is what does the
+// work.
+func (a *App) openReleaseNotes() {
+	a.updMu.Lock()
+	url := a.upd.NotesURL
+	a.updMu.Unlock()
+	if url != "" {
+		openURL(url)
+	}
+}
 
 // SetDropShadow turns the shadow behind the sprite on or off and remembers the
 // choice. Unlike the size, nothing about the window changes: the shadow is

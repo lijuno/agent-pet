@@ -21,6 +21,7 @@ import (
 	"github.com/lijuno/agent-pet/internal/engine"
 	"github.com/lijuno/agent-pet/internal/events"
 	"github.com/lijuno/agent-pet/internal/state"
+	"github.com/lijuno/agent-pet/internal/update"
 )
 
 // MaxBody caps request bodies. Large enough for any legitimate hook payload,
@@ -53,6 +54,11 @@ type Server struct {
 	StatusMenu func() string
 	// SetShown hides or shows the pet, the same toggle the menu bar offers.
 	SetShown func(bool)
+	// OnUpdate is called when a check reports a result, so the menu bar can
+	// say so. Nil in a headless run.
+	OnUpdate func(update.Status)
+	// upd holds what the last check found. See update.go.
+	upd updateState
 	// startedAt supports the uptime field in /healthz and `petctl doctor`.
 	startedAt time.Time
 }
@@ -81,6 +87,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/pet", s.handleSetPet)
 	s.mux.HandleFunc("/diagnostics", s.handleDiagnostics)
 	s.mux.HandleFunc("/window", s.handleWindow)
+	s.mux.HandleFunc("/update", s.handleUpdate)
 }
 
 // Listen binds the address. It refuses non-loopback addresses unless the config
@@ -511,6 +518,8 @@ type Diagnostics struct {
 	// Desktop is window geometry and menu-bar status: things with no other way
 	// of being checked, since nothing in a test can look at a screen.
 	Desktop map[string]string `json:"desktop,omitempty"`
+	// Update is what the last update check found, if one has run.
+	Update update.Status `json:"update"`
 }
 
 func (s *Server) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
@@ -535,6 +544,7 @@ func (s *Server) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 	if s.Desktop != nil {
 		d.Desktop = s.Desktop()
 	}
+	d.Update = s.updateStatus()
 	for _, p := range s.eng.Library().List() {
 		d.Pets = append(d.Pets, p.ID)
 	}

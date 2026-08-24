@@ -160,10 +160,26 @@ step "Repackaging with the ticket"
 rm -f "$OUT"
 ditto -c -k --keepParent "$APP" "$OUT"
 
-step "What Gatekeeper says"
-spctl -a -t exec -vv "$APP"
-xcrun stapler validate "$APP"
+# Verified from inside the zip, not from the bundle that was stapled.
+#
+# The zip is what ships: it is what a person downloads and what `petctl update`
+# installs unattended. Checking $APP proves the directory on this disk is good
+# and says nothing about whether the archive beside it holds the same thing —
+# and the archive is rebuilt after stapling, so it is not the file any earlier
+# step looked at.
+step "What Gatekeeper says about the zip"
+VERIFY=$(mktemp -d)
+trap 'rm -rf "$VERIFY"' EXIT
+ditto -x -k "$OUT" "$VERIFY"
+SHIPPED=$(find "$VERIFY" -maxdepth 1 -name '*.app')
+[ -d "$SHIPPED" ] || die "the zip does not contain an app bundle"
+codesign --verify --strict --verbose=2 "$SHIPPED"
+spctl -a -t exec -vv "$SHIPPED"
+xcrun stapler validate "$SHIPPED"
 
 echo
 echo "  $OUT  ($(du -h "$OUT" | cut -f1))"
-echo "  Ready to attach to a GitHub release."
+echo "  sha256 $(shasum -a 256 "$OUT" | cut -d' ' -f1)"
+echo
+echo "  Signed, notarized and stapled. \`make release\` publishes it;"
+echo "  nobody is offered it until the manifest commit is pushed."

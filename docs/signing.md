@@ -147,12 +147,26 @@ not itself a secret; the credentials never leave the keychain.
 
 ## Cutting a release
 
-Tag first — `VERSION` comes from `git describe`, and an untagged tree builds as
-`0.1.0` whatever the release is called:
+Tag first. The tag is the version: it reaches the binary through `-ldflags` and
+`Info.plist` through `scripts/brand.sh`, and an untagged tree builds as whatever
+`wails.json` says.
 
 ```bash
-git tag v0.1.0 && make version-sync
+git tag v0.1.0            # the release app
+git tag v0.1.0-dev.1      # the dev app, from the same commit
 ```
+
+```bash
+make release
+```
+
+That runs the build, this script, the upload, and the manifest write as one
+command — and refuses before signing anything if the tag and the built bundle do
+not name the same version and the same app. `make release CHANNEL=dev` publishes
+the dev app, taking the prerelease tag on the same commit.
+
+The two steps underneath it are still there when you want to sign without
+publishing:
 
 ```bash
 make build
@@ -162,9 +176,14 @@ make build
 make notarize
 ```
 
-That leaves `build/bin/agent-pet-<version>-universal.zip`, stapled and ready to
-attach to a GitHub release. Submission to Apple usually takes a few minutes.
-`NOTARY_PROFILE=other-name` overrides `.notary-profile` for one run.
+Either way you get `build/bin/agent-pet-<version>-universal.zip`, stapled.
+Submission to Apple usually takes a few minutes. `NOTARY_PROFILE=other-name`
+overrides `.notary-profile` for one run.
+
+**Signing it is not offering it.** `make release` leaves
+`updates/<channel>.json` modified and uncommitted; committing that file is what
+points every installed pet at the new version. See
+[ADR 0008](adr/0008-over-the-air-updates.md).
 
 Neither Xcode nor a paid toolchain is needed beyond this: `notarytool` and
 `stapler` ship with the Command Line Tools.
@@ -204,6 +223,13 @@ like a signing fault.
 **Repackages after stapling.** Stapling attaches the notarization ticket to the
 bundle so it launches offline. The zip made before stapling holds a copy
 without the ticket, so it is rebuilt afterwards.
+
+**Verifies the zip, not the bundle it stapled.** The last checks unpack the
+finished archive into a temporary directory and run `codesign`, `spctl` and
+`stapler validate` on what comes out. The archive is rebuilt after stapling, so
+it is not the file any earlier step looked at — and since `petctl update`
+installs it unattended, "the directory on this disk is fine" is not the question
+worth answering.
 
 **Checks for the profile before it signs anything.** A missing profile found
 after the bundle is signed and zipped costs a minute to learn something it
@@ -249,7 +275,8 @@ into `/Applications`, and stops rather than working around a failure.
 | `The data couldn't be read…` in Xcode | Enrolment still pending, or the licence agreement is unaccepted |
 | Notarization rejected | Ask Apple; the log names the binary and the reason |
 | App launches unsigned, fails signed | Hardened runtime needs an entitlement |
-| Update appears to do nothing | An old `petd` still holds the port; the new one exits quietly |
+| Update appears to do nothing | An old `petd` still holds the port; the new one exits quietly. `petctl update` polls the port for this reason rather than trusting the quit |
+| `petctl update --check` says nothing is published | True until `updates/<channel>.json` is committed — signing a release does not offer it |
 
 ```bash
 xcrun notarytool log <submission-id> --keychain-profile agent-pet

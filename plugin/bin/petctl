@@ -37,9 +37,20 @@ try "$HOME/Applications/agent-pet.app/Contents/MacOS/petctl"
 try "/Applications/Agent Pet.app/Contents/MacOS/petctl"
 try "$HOME/Applications/Agent Pet.app/Contents/MacOS/petctl"
 
+# Agent Pet (dev) is a second, separate application that can be installed
+# alongside the release one, and someone may have only that. It comes last so
+# that with both installed the stable app is the one commands act on.
+#
+# Which one is found barely matters for hooks: petctl delivers an event to every
+# pet that is listening, not just its own. It decides what `petctl doctor` and
+# `petctl update` talk about. AGENT_PET_APP overrides it.
+try "/Applications/agent-pet-dev.app/Contents/MacOS/petctl"
+try "$HOME/Applications/agent-pet-dev.app/Contents/MacOS/petctl"
+
 # Working on the pet itself: prefer a local build over whatever is installed.
 if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
 	try "$CLAUDE_PROJECT_DIR/build/bin/agent-pet.app/Contents/MacOS/petctl"
+	try "$CLAUDE_PROJECT_DIR/build/bin/agent-pet-dev.app/Contents/MacOS/petctl"
 	try "$CLAUDE_PROJECT_DIR/bin/petctl"
 fi
 

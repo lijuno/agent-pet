@@ -19,6 +19,7 @@ enum {
   PET_CHANGE = 4,
   PET_ONTOP = 5,
   PET_MUTE = 6,
+  PET_UPDATE = 7,
   PET_QUIT = 8,
   // Items in the Change Pet submenu are PET_PICK_BASE + the pet's index in the
   // list the Go side last sent.
@@ -43,6 +44,19 @@ void petStatusSetCheck(int tag, int on);
 // from there rather than guessed at here.
 void petStatusClearPets(void);
 void petStatusAddPet(const char *title, int tag, int checked);
+
+// petStatusSetUpdate retitles the update item and shows or hides it. Hidden is
+// the normal state: an item saying "no update available" would be a permanent
+// piece of furniture reporting nothing.
+void petStatusSetUpdate(const char *title, int visible);
+
+// petOpenURL opens a URL in the user's browser through NSWorkspace.
+//
+// Deliberately not the Wails runtime's BrowserOpenURL, which runs /usr/bin/open
+// as a subprocess: petd spawns no processes and SECURITY.md says so. NSWorkspace
+// asks Launch Services directly. Non-https URLs are refused here as well as by
+// the caller — this is the last point before a URL reaches the system.
+void petOpenURL(const char *url);
 
 // petStatusProbe reports what actually happened, because nothing else can:
 // there is no way to look at the menu bar from a test. Bit 0: the item object

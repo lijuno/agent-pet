@@ -69,7 +69,7 @@ echo
 echo "Every menu item survives being clicked"
 # The suite used to click only Show Pet. Three of the others emitted an event
 # from the main thread and killed the process, and nothing here noticed.
-for item in show show status stats change ontop ontop mute mute pet:momo; do
+for item in show show status stats change ontop ontop mute mute pet:momo update; do
 	if ! curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
 		bad "clicking $item" "petd is gone — an earlier item killed it"
 		break
@@ -123,6 +123,63 @@ else
 	sleep 0.8
 	want "and follows a change made elsewhere" "$(field status_menu)" ">SanMao (三毛)[on]"
 fi
+
+echo
+echo "Updates"
+# Stateful, like the rest of this file. A previous run leaves an update showing,
+# so the "nothing found yet" state has to be restored rather than assumed —
+# asserting on what the last run left behind passes in sequence and fails alone.
+curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json' \
+	-d '{"available":false}' >/dev/null
+sleep 0.4
+
+# The channel is a build fact, not a setting: the other channel is the other
+# application (ADR 0008). So there is no picker, and its absence is worth
+# asserting — a stray one would mean the switching code came back.
+menu=$(field status_menu)
+case "$menu" in
+*"Update Channel"*) bad "the menu offers no channel picker" "still there: $menu" ;;
+*) ok "the menu offers no channel picker" ;;
+esac
+
+# Nothing has been checked, so there is nothing to say and the item is hidden.
+# An item permanently announcing "no update available" is furniture.
+want "the update item is hidden until there is one" "$menu" "Update Available[hidden]"
+
+# The app cannot find an update by itself — it holds no HTTP client. This is
+# petctl's half of the conversation, which is the only way one arrives.
+curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json' \
+	-d '{"latest":"9.9.9","available":true}' >/dev/null
+sleep 0.6
+menu=$(field status_menu)
+want "a reported update names the version" "$menu" "Update to 9.9.9…"
+case "$menu" in
+*"Update to 9.9.9…[hidden]"*) bad "and the item becomes visible" "still hidden: $menu" ;;
+*) ok "and the item becomes visible" ;;
+esac
+
+# Clicking it opens the release page. There is no notes URL in what was posted
+# above, deliberately: this checks the click path without opening a browser
+# window in the middle of a test run.
+post '{"status_item":"update"}'
+sleep 0.6
+if curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
+	ok "clicking it leaves the pet running"
+else
+	bad "clicking it leaves the pet running" "the process died"
+fi
+
+# A result for the other channel is refused rather than stored: this build can
+# never install it, so there is no moment at which showing it would be true.
+mine=$(curl -sS --max-time 5 "$BASE/update" |
+	python3 -c "import sys,json;print(json.load(sys.stdin)['channel'])")
+other=dev
+[ "$mine" = dev ] && other=release
+code=$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' -X POST "$BASE/update" \
+	-H 'content-type: application/json' \
+	-d "{\"channel\":\"$other\",\"latest\":\"8.8.8\",\"available\":true}")
+want "a $other result is refused by the $mine build" "$code" "400"
+want "and the menu still shows the real one" "$(field status_menu)" "Update to 9.9.9…"
 
 echo
 echo "Show Pet is a toggle"

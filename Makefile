@@ -1,6 +1,22 @@
-.PHONY: help deps dev build require-wails test-desktop petctl pets test test-ui vet fmt clean run-headless demo notarize plugin-hooks plugin-validate embed-petctl version-sync states-gif
+.PHONY: help deps dev build require-wails test-desktop petctl pets icons test test-ui vet fmt clean run-headless demo notarize release plugin-hooks plugin-validate embed-petctl version-sync states-gif
 BIN := bin
-APP := build/bin/agent-pet.app
+
+# CHANNEL picks which of the two applications to build. They install side by
+# side and each follows its own update channel, so "switching channel" means
+# running the other app (ADR 0008). Everything that differs between them lives
+# in internal/flavor; nothing here repeats those values, it only passes the
+# stamp along and asks the built binary what it became.
+CHANNEL ?= release
+ifeq ($(CHANNEL),release)
+APP_SLUG := agent-pet
+FLAVOR_LDFLAGS :=
+else ifeq ($(CHANNEL),dev)
+APP_SLUG := agent-pet-dev
+FLAVOR_LDFLAGS := -X github.com/lijuno/agent-pet/internal/flavor.Name=dev
+else
+$(error CHANNEL must be release or dev, not "$(CHANNEL)")
+endif
+APP := build/bin/$(APP_SLUG).app
 
 # The tag is the single source of truth for the version. wails.json carries a
 # copy because Info.plist is templated from it; `make version-sync` rewrites it
@@ -8,7 +24,7 @@ APP := build/bin/agent-pet.app
 # release cannot ship claiming a version nobody tagged.
 GIT_VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
 VERSION ?= $(if $(GIT_VERSION),$(GIT_VERSION),0.1.0)
-LDFLAGS := -X main.version=$(VERSION)
+LDFLAGS := -X main.version=$(VERSION) $(FLAVOR_LDFLAGS)
 
 # `go install` puts wails in $(go env GOPATH)/bin, and nothing puts that
 # directory on PATH — on macOS it is not there by default. The README tells you
@@ -30,7 +46,7 @@ WAILS := $(shell command -v wails 2>/dev/null || echo $(GO_BIN)/wails)
 help:
 	@echo "make deps           resolve Go modules (run this first)"
 	@echo "make dev            run the pet with hot reload"
-	@echo "make build          build the .app bundle"
+	@echo "make build          build the .app bundle (CHANNEL=dev for the dev app)"
 	@echo "make petctl         build the CLI into $(BIN)/"
 	@echo "make test           run the Go test suite"
 	@echo "make test-ui        open the UI tests in a browser"
@@ -42,6 +58,8 @@ help:
 	@echo "make version-sync    write $(VERSION) into wails.json before a release"
 	@echo "make states-gif     rebuild the README state figure from the sprites"
 	@echo "make notarize       sign, notarize and staple the built bundle"
+	@echo "make release        build, notarize, publish, and write the update manifest"
+	@echo "make icons          regenerate the dev app's badged icons (needs Pillow)"
 deps:
 	go mod tidy
 dev: require-wails
@@ -50,7 +68,8 @@ dev: require-wails
 # silently excludes them looks identical to one that does not.
 build: require-wails
 	$(WAILS) build -clean -platform darwin/universal -ldflags "$(LDFLAGS)"
-	@$(MAKE) --no-print-directory embed-petctl
+	@./scripts/brand.sh $(CHANNEL)
+	@$(MAKE) --no-print-directory embed-petctl CHANNEL=$(CHANNEL)
 # BROKEN: fyne.io/systray declares an Objective-C class named AppDelegate and
 # so does Wails' own desktop frontend, so a production build fails to link with
 # a duplicate symbol. `go build -tags tray` links only because it leaves the
@@ -83,6 +102,14 @@ fmt:
 	gofmt -w .
 pets:
 	python3 tools/genpets/genpets.py
+
+# The dev app's menu-bar and Finder icons, derived from the release ones. Both
+# are committed, so building the dev app needs no Pillow — only regenerating
+# them does. Two apps in the menu bar with the same icon would be two apps you
+# cannot tell apart.
+icons:
+	@python3 scripts/gen-trayicon-dev.py
+	@python3 scripts/gen-appicon-dev.py
 clean:
 	rm -rf $(BIN) build/bin
 demo: petctl
@@ -146,3 +173,10 @@ require-wails:
 # would have to be a copy of the private key in the repository secrets.
 notarize:
 	@./scripts/notarize.sh $(if $(NOTARY_PROFILE),--profile $(NOTARY_PROFILE),)
+
+# Builds, notarizes, uploads the asset, and writes updates/$(CHANNEL).json —
+# without committing it. Publishing an asset and offering it over the air are
+# two separate acts: the second is the commit, which you make by hand after
+# reading the diff. CHANNEL=dev publishes prereleases. See ADR 0008.
+release:
+	@./scripts/release.sh $(if $(CHANNEL),--channel $(CHANNEL),)

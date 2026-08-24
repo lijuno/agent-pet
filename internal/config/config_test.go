@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/lijuno/agent-pet/internal/flavor"
 )
 
 func TestLoadCreatesDefaultsWhenMissing(t *testing.T) {
@@ -159,5 +161,68 @@ func TestShadowSurvivesAConfigThatPredatesIt(t *testing.T) {
 	}
 	if cfg, err = Load(back); err != nil || cfg.Pet.DropShadow {
 		t.Fatalf("the shadow should still be off after a round trip: %+v %v", cfg.Pet, err)
+	}
+}
+
+// The default has to be "checks nothing": an app that has never contacted a
+// server does not start doing so because it was upgraded.
+func TestUpdateChecksAreOffByDefault(t *testing.T) {
+	cfg, err := Load(filepath.Join(t.TempDir(), "config.yaml"))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Update.Check {
+		t.Error("update.check defaults to on")
+	}
+	if cfg.Update.Interval.D() != 24*time.Hour {
+		t.Errorf("update.interval = %s, want 24h", cfg.Update.Interval.D())
+	}
+}
+
+func TestEmptyManifestURLFallsBackToTheDefault(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	os.WriteFile(path, []byte("update:\n  manifest_url: \"\"\n  interval: 0s\n"), 0o644)
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Update.ManifestURL != DefaultManifestURL {
+		t.Errorf("manifest_url = %q, want the default", cfg.Update.ManifestURL)
+	}
+	if cfg.Update.Interval <= 0 {
+		t.Error("a zero interval would check on every session start")
+	}
+}
+
+// Two programs need this path: petctl writes it after a check, and the desktop
+// shell deletes it when the channel changes. Neither may spell it itself.
+func TestUpdateStampLivesInTheDataDir(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("AGENT_PET_DATA", dir)
+	if got, want := UpdateStamp(), filepath.Join(dir, "update-check"); got != want {
+		t.Errorf("UpdateStamp() = %q, want %q", got, want)
+	}
+}
+
+// The dev app and the release app must never edit each other's settings, and
+// the only thing keeping them apart is the flavor in the path.
+func TestPathsAreNamedAfterTheFlavour(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "/tmp/cfg")
+	t.Setenv("XDG_DATA_HOME", "/tmp/data")
+	t.Setenv("AGENT_PET_CONFIG", "")
+	t.Setenv("AGENT_PET_DATA", "")
+
+	slug := flavor.Current().Slug
+	if got, want := Path(), filepath.Join("/tmp/cfg", slug, "config.yaml"); got != want {
+		t.Errorf("Path() = %q, want %q", got, want)
+	}
+	if got, want := DataDir(), filepath.Join("/tmp/data", slug); got != want {
+		t.Errorf("DataDir() = %q, want %q", got, want)
+	}
+	// The port too: two pets that share one are one pet, and the second exits
+	// at startup looking like a build that did nothing.
+	if Default().Server.Addr != flavor.Current().Addr {
+		t.Errorf("default addr %q is not the flavour's %q", Default().Server.Addr, flavor.Current().Addr)
 	}
 }

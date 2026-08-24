@@ -24,11 +24,28 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/lijuno/agent-pet/internal/flavor"
 	"github.com/lijuno/agent-pet/internal/state"
+	"github.com/lijuno/agent-pet/internal/update"
 )
 
 //go:embed trayicon.png
 var trayIcon []byte
+
+// The dev app's icon differs in shape, not colour: this is a template image and
+// macOS discards the colour to recolour it for the menu bar. Two identical
+// icons would be the only thing distinguishing two menu-bar-only apps, which is
+// to say nothing would. See scripts/gen-trayicon-dev.py.
+//
+//go:embed trayicon-dev.png
+var trayIconDev []byte
+
+func trayIconBytes() []byte {
+	if flavor.Current().IsDev() {
+		return trayIconDev
+	}
+	return trayIcon
+}
 
 // statusApp is how the C callback finds its way back. There is exactly one
 // status item and one App for the life of the process, and the alternative —
@@ -65,9 +82,14 @@ func (a *App) startTray(ctx context.Context) {
 		if !a.hidden {
 			shown = 1
 		}
-		C.petStatusInstall(unsafe.Pointer(&trayIcon[0]), C.int(len(trayIcon)),
+		icon := trayIconBytes()
+		C.petStatusInstall(unsafe.Pointer(&icon[0]), C.int(len(icon)),
 			C.int(onTop), C.int(muted), C.int(shown))
 
+		// The menu is built with a placeholder first line. Set it now rather
+		// than waiting for the first event, so the dev app says which app it
+		// is from the moment it is installed.
+		setStatusTitle(menuStateLine(a.eng.Last().Snapshot.State))
 		a.refreshPetMenu()
 
 		// Keep the disabled first line in step, so the pet's state is readable
@@ -83,7 +105,7 @@ func (a *App) startTray(ctx context.Context) {
 					if !ok {
 						return
 					}
-					setStatusTitle(trayLabel(up.Snapshot.State))
+					setStatusTitle(menuStateLine(up.Snapshot.State))
 				}
 			}
 		}()
@@ -134,7 +156,10 @@ func (a *App) activate() { C.petActivate() }
 // "tag:title[on]|...". A test can assert on it; nothing else can see a menu
 // bar, and accessibility access is refused to anything that tries.
 func (a *App) StatusMenu() string {
-	buf := make([]C.char, 1024)
+	// Big enough for the whole menu with every submenu expanded: the pet list
+	// grows with whatever the user has installed, and a truncated dump would
+	// fail a test for a reason that has nothing to do with the menu.
+	buf := make([]C.char, 4096)
 	n := C.petStatusMenuDump(&buf[0], C.int(len(buf)))
 	return C.GoStringN(&buf[0], n)
 }
@@ -145,7 +170,7 @@ func (a *App) ClickStatusItem(name string) error {
 	tags := map[string]C.int{
 		"show": C.PET_SHOW, "status": C.PET_STATUS, "stats": C.PET_STATS,
 		"change": C.PET_CHANGE, "ontop": C.PET_ONTOP, "mute": C.PET_MUTE,
-		"quit": C.PET_QUIT,
+		"quit": C.PET_QUIT, "update": C.PET_UPDATE,
 	}
 	tag, ok := tags[name]
 	if !ok {
@@ -243,6 +268,32 @@ func (a *App) refreshPetMenu() {
 // syncShownCheck keeps the Show Pet tick in step with the window.
 func (a *App) syncShownCheck(on bool) { setStatusCheck(C.PET_SHOW, on) }
 
+// setUpdateItem retitles the update item, or hides it when there is nothing to
+// say. The version has already been through update.Status.Validate, so it
+// cannot put anything but a version number into a menu title.
+func setUpdateItem(st update.Status) {
+	title := "Update Available"
+	visible := C.int(0)
+	if st.Available && st.Latest != "" {
+		title = "Update to " + st.Latest + "…"
+		visible = 1
+	}
+	c := C.CString(title)
+	defer C.free(unsafe.Pointer(c))
+	C.petStatusSetUpdate(c, visible)
+}
+
+// openURL hands a URL to Launch Services. Validated once more here: this is
+// called from a menu action, and what reaches it came in over the event API.
+func openURL(raw string) {
+	if err := update.ValidateNotesURL(raw); err != nil {
+		return
+	}
+	c := C.CString(raw)
+	defer C.free(unsafe.Pointer(c))
+	C.petOpenURL(c)
+}
+
 func setStatusCheck(tag C.int, on bool) {
 	v := C.int(0)
 	if on {
@@ -308,9 +359,27 @@ func (a *App) handleStatusClick(tag C.int) {
 		next := !a.muted
 		a.SetMuted(next)
 		setStatusCheck(C.PET_MUTE, next)
+	case C.PET_UPDATE:
+		// The pet cannot install anything — it holds no updater and opens no
+		// connections. It shows the release, and `petctl update` does the work.
+		a.openReleaseNotes()
 	case C.PET_QUIT:
 		a.Quit()
 	}
+}
+
+// menuStateLine is the disabled first line of the menu-bar menu.
+//
+// For the release app it is just the state. The dev app appends what it is and
+// what version it is, because the two apps run at once and their menus are
+// otherwise identical — and clicking the icon is how somebody works out which
+// of the two they are looking at.
+func menuStateLine(s state.State) string {
+	f := flavor.Current()
+	if !f.IsDev() {
+		return trayLabel(s)
+	}
+	return trayLabel(s) + " · " + f.Label + " " + Version
 }
 
 func trayLabel(s state.State) string {

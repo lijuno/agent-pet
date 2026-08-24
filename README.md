@@ -74,17 +74,39 @@ bin/petctl watch
 ## Cutting a release
 
 ```bash
-git tag v0.2.0 && make version-sync   # VERSION comes from `git describe`
-make build                            # produces build/bin/agent-pet.app
-make notarize                         # signs it, submits it, staples the ticket
+git tag v0.2.0     # the tag is the version; it reaches Info.plist via brand.sh
+make release       # builds, notarizes, uploads, writes the manifest
 ```
 
-That leaves `build/bin/agent-pet-<version>-universal.zip`, stapled and ready to
-attach to a GitHub release. Apple usually answers within a few minutes.
+`make release CHANNEL=dev` cuts the dev app instead, from a prerelease tag. The
+two are built, signed and published separately; a release is one app or the
+other, never both.
 
-Skip the tag and the build is `0.1.0` whatever you meant to call it — `VERSION`
-falls back when `git describe` finds nothing, and `wails.json` is where the
-version reaches `Info.plist`.
+That builds the bundle, signs and staples it, attaches
+`agent-pet-<version>-universal.zip` to the GitHub release — and then stops,
+leaving `updates/release.json` modified and **uncommitted**. Apple usually
+answers within a few minutes.
+
+Nobody is offered the new version until you commit that file:
+
+```bash
+git diff updates/release.json
+git commit -am "Offer 0.2.0 on the release channel" && git push
+```
+
+Publishing an asset and offering it over the air are deliberately two acts. You
+can build a release, install it yourself, live with it for a week, and only then
+decide — and the decision has a diff, a commit message, and `git revert` as the
+undo. See [`updates/README.md`](updates/README.md) and
+[ADR 0008](docs/adr/0008-over-the-air-updates.md).
+
+The individual steps are still there when you want them: `make build`,
+`make notarize`.
+
+Skip the tag and `make release` refuses: it takes the version from the tag on
+HEAD, choosing the plain one for the release app and the prerelease for the dev
+app, so both can be cut from the same commit. An untagged `make build` falls
+back to `wails.json`, which is the only thing that file is still for.
 
 `make build` alone needs nothing beyond the Requirements above. `make notarize`
 needs Apple credentials, and those do not travel with a clone — on a machine
@@ -135,6 +157,60 @@ xattr -d com.apple.quarantine /Applications/agent-pet.app
 Do that only if you trust where the bundle came from, and never on a release —
 a signed one needs no such thing, and an agent asked to install this app will
 run that command without hesitating if the README implies it is routine.
+
+## Updating
+
+```bash
+petctl update --check     # is there a newer one?
+petctl update             # install it
+```
+
+`petctl update` quits the pet, downloads the release, and refuses to install it
+unless the hash matches the manifest, `codesign` and `spctl` both pass, and the
+download carries **the same Apple team identifier and bundle identifier as the
+app it is replacing**. Notarization says somebody legitimate signed it; those
+last two say it was us, and that it is this app rather than the other one. Then
+it swaps the bundle — old one moved aside, not deleted, until the new one has
+landed — waits for the event port to actually come free, and starts the new
+version. A build you made yourself is never replaced.
+
+When a check finds something, an item naming the version appears in the menu-bar
+menu and opens the release notes. It does not install: the app holds no updater
+and opens no connections of its own. `petctl` does the work, which is why
+[SECURITY.md](SECURITY.md) can still say the daemon never dials out.
+
+Nothing checks on its own unless you ask it to. `update.check: true` in the
+config file runs one at most once a day when a Claude Code session starts.
+
+### Two apps, not two channels
+
+There is a second application:
+
+| | Bundle | Listens on | Updates from |
+|---|---|---|---|
+| **Agent Pet** | `agent-pet.app` | `127.0.0.1:9876` | `updates/release.json` |
+| **Agent Pet (dev)** | `agent-pet-dev.app` | `127.0.0.1:9877` | `updates/dev.json` |
+
+They install side by side, the way VS Code ships Stable and Insiders. There is
+no channel setting and nothing to switch: to follow prereleases, install the dev
+app; to stop, quit it. Each has its own config file, data directory and menu-bar
+icon, and neither can update itself into the other.
+
+The point of that is what happens when a prerelease is broken — which is what
+prereleases are for. Your working pet is a different application and is still
+running. You can watch both react to the same session at once: `petctl` delivers
+every event to every pet that is listening, so no configuration is needed to
+compare them.
+
+`petctl doctor` says which of them you have and which are running. The dev app
+carries a badge on both its icons and names itself in its menu, because both are
+menu-bar-only apps and would otherwise be indistinguishable.
+
+Build it with:
+
+```bash
+make build CHANNEL=dev
+```
 
 ## Connecting Claude Code
 
@@ -230,7 +306,14 @@ thresholds:
 
 server:
   addr: 127.0.0.1:9876
+
+update:
+  check: false          # nothing contacts the network until this is true
+  interval: 24h
 ```
+
+There is no channel setting: which channel a build follows is decided when it is
+built. The dev app is a separate install — see [Updating](#updating).
 
 Anything you leave out keeps its default. A malformed file logs a warning and
 falls back to defaults rather than refusing to start.
@@ -254,6 +337,7 @@ curl -sS -X POST http://127.0.0.1:9876/event \
 | `GET /diagnostics` | Everything `petctl doctor` prints |
 | `POST /window` | Move the window or open a panel — see below |
 | `GET /pets`, `POST /pet` | List and switch characters |
+| `GET /update`, `POST /update` | What the last update check found. `petctl` posts here; the pet never looks for itself |
 
 `POST /window` parks the window, opens its overlays and performs menu-bar items,
 doing nothing you cannot do with a mouse. It exists because a test has no mouse:
@@ -302,8 +386,9 @@ PNG strip per state plus a `manifest.json`; see [`docs/pets.md`](docs/pets.md).
 
 - No prompts, no source code, no command arguments are recorded. Default logs
   contain event categories only; `logging.verbose: true` adds tool names.
-- No network client of any kind. The process listens on loopback and calls
-  nothing out.
+- The pet itself has no network client of any kind: it listens on loopback and
+  calls nothing out. Updates are fetched by `petctl`, a separate program, and
+  only when you run it — automatic checks are off until you turn them on.
 - Character packs are built from local images. Nothing is uploaded, and there is
   no image-generation service to opt into.
 - No accessibility, screen-recording, camera, microphone or keyboard-monitoring
@@ -326,7 +411,14 @@ internal/server/       the loopback event API
 internal/petassets/    pet pack loading
 internal/bubble/       template speech
 internal/config/       config.yaml
-cmd/petctl/            the CLI (no shared code with the engine)
+internal/flavor/       what makes Agent Pet and Agent Pet (dev) two apps: the
+                       bundle id, port, paths and icons that must never be shared
+internal/update/       the update manifest and version comparison — no network,
+                       no subprocess, so petd stays free of both (ADR 0008)
+cmd/petctl/            the CLI (no shared code with the engine), and the whole
+                       of the updater: the fetch, the checks, the bundle swap
+updates/               the channel manifests — committing one is what publishes
+                       a release to everybody
 adapters/claude/       the Claude Code hook adapter
 adapters/              Codex and git adapters — Milestone 3 and later
 tools/genpets/         the sprite generator

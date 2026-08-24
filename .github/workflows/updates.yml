@@ -1,0 +1,44 @@
+name: update manifest
+
+# What a publishing runner used to give for free.
+#
+# Releases are cut by hand on the maintainer's machine, because that is where
+# the signing certificate lives (docs/signing.md). The cost of that decision is
+# that nothing structurally guarantees the manifest describes the asset next to
+# it: a person can upload the wrong zip, re-run the release script twice, or
+# hand-edit a version string, and every installed pet would act on the result.
+#
+# So this checks the published file against the published artifact. It needs no
+# secrets, which is the whole reason it can exist on a runner at all.
+
+on:
+  push:
+    paths: ["updates/*.json"]
+  pull_request:
+    paths: ["updates/*.json"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: the manifest describes the asset
+    # Ubuntu on purpose: this is curl and sha256, and nothing here needs a Mac.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: check each manifest against its asset
+        run: |
+          shopt -s nullglob
+          files=(updates/*.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no manifests yet — nothing to check"
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            echo "::group::$f"
+            python3 .github/verify-manifest.py "$f"
+            echo "::endgroup::"
+          done

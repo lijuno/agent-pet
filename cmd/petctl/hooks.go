@@ -7,10 +7,15 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/lijuno/agent-pet/adapters/claude"
+	"github.com/lijuno/agent-pet/internal/config"
+	"github.com/lijuno/agent-pet/internal/events"
 )
 
 // maxHookInput bounds what a hook will read from stdin. Hook payloads are a few
@@ -30,7 +35,7 @@ const hookTimeout = 750 * time.Millisecond
 // load-bearing: a non-zero exit would show the user an error about a cartoon
 // cat in the middle of their work, and stdout beginning with `{` is parsed by
 // Claude Code as a decision object, which is emphatically not ours to send.
-func cmdHook(c *client, args []string) error {
+func cmdHook(targets []*client, args []string) error {
 	if len(args) == 0 || args[0] != "claude" {
 		return nil
 	}
@@ -46,19 +51,100 @@ func cmdHook(c *client, args []string) error {
 	if err != nil {
 		return nil
 	}
-	req, err := http.NewRequest(http.MethodPost, c.base+"/event", bytes.NewReader(body))
-	if err != nil {
-		return nil
+
+	// Every installed pet, at once rather than one after another. Both apps may
+	// be running and both are watching this agent; doing it in sequence would
+	// spend one timeout per app, and the whole budget here is 750ms of somebody
+	// else's tool call.
+	var wg sync.WaitGroup
+	for _, t := range targets {
+		wg.Add(1)
+		go func(base string) {
+			defer wg.Done()
+			req, err := http.NewRequest(http.MethodPost, base+"/event", bytes.NewReader(body))
+			if err != nil {
+				return
+			}
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := (&http.Client{Timeout: hookTimeout}).Do(req)
+			if err != nil {
+				// Not running. A completely normal state of affairs, and the
+				// usual one for whichever app the user did not install.
+				return
+			}
+			defer resp.Body.Close()
+			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
+		}(t.base)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := (&http.Client{Timeout: hookTimeout}).Do(req)
-	if err != nil {
-		// petd is not running. That is a completely normal state of affairs.
-		return nil
+	wg.Wait()
+
+	if ev.Event == string(events.SessionStarted) {
+		maybeCheckForUpdates()
 	}
-	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
 	return nil
+}
+
+// dueForCheck decides whether enough time has passed. A zero last means the
+// check has never run.
+//
+// A stamp in the future counts as due. Clocks move — a timezone change, a
+// restored backup, a machine that woke up wrong — and the alternative is a
+// check that quietly never runs again until the calendar catches up.
+func dueForCheck(interval time.Duration, last, now time.Time) bool {
+	if last.IsZero() || now.Before(last) {
+		return true
+	}
+	return now.Sub(last) >= interval
+}
+
+// maybeCheckForUpdates starts a check in the background when a session begins.
+//
+// Three things make this safe to hang off somebody else's tool call. It is off
+// unless the user turned it on: an app that has never contacted a server does
+// not start doing so because it was upgraded. It runs at most once an interval.
+// And it is started and abandoned — never waited for — because the hook has a
+// budget measured in milliseconds and a network call does not fit in it.
+func maybeCheckForUpdates() {
+	cfg, _ := config.Load(config.Path())
+	if !cfg.Update.Check {
+		return
+	}
+	stamp := config.UpdateStamp()
+	var last time.Time
+	if st, err := os.Stat(stamp); err == nil {
+		last = st.ModTime()
+	}
+	if !dueForCheck(cfg.Update.Interval.D(), last, time.Now()) {
+		return
+	}
+	// Stamped before the check runs, not after. A check that fails should not
+	// mean the next session tries again immediately, and neither should one
+	// that never finishes.
+	if err := os.MkdirAll(filepath.Dir(stamp), 0o755); err != nil {
+		return
+	}
+	if err := os.WriteFile(stamp, nil, 0o644); err != nil {
+		return
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	cmd := exec.Command(exe, "update", "--quiet")
+	// Nothing inherited. Anything this writes would land in the middle of the
+	// agent's output, and stdout beginning with `{` is read by Claude Code as
+	// a decision object.
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
+	// Its own process group, so it outlives the hook rather than being killed
+	// with it.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		return
+	}
+	// Deliberately not waited for. The child is reparented to init when this
+	// process exits, which is in a few milliseconds.
+	go func() { _ = cmd.Wait() }()
 }
 
 // settingsPath resolves which settings.json to edit.

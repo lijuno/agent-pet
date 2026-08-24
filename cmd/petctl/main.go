@@ -12,25 +12,42 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/lijuno/agent-pet/adapters/claude"
+	"github.com/lijuno/agent-pet/internal/config"
+	"github.com/lijuno/agent-pet/internal/flavor"
+	"github.com/lijuno/agent-pet/internal/update"
 )
 
 var version = "dev"
 
-const defaultAddr = "127.0.0.1:9876"
-
 func main() {
+	// If this process is the copy that `petctl update` made of itself to get
+	// out of the bundle it is replacing, tidy that copy away now. See
+	// reexecOutside.
+	cleanupDetached()
+
+	if err := flavor.Check(); err != nil {
+		fmt.Fprintln(os.Stderr, "petctl:", err)
+		os.Exit(1)
+	}
+
 	args := os.Args[1:]
 	addr := os.Getenv("AGENT_PET_ADDR")
+	// Whether the target was named matters as much as what it is: an unnamed
+	// target means "whichever pets are installed", and a named one means
+	// exactly that one. See eventTargets.
+	pinned := addr != ""
 	if addr == "" {
-		addr = defaultAddr
+		addr = flavor.Current().Addr
 	}
 	// A global --addr may appear anywhere.
-	args, addr = extractAddr(args, addr)
+	args, addr, flagged := extractAddr(args, addr)
+	pinned = pinned || flagged
 
 	if len(args) == 0 {
 		usage()
@@ -41,7 +58,7 @@ func main() {
 	var err error
 	switch args[0] {
 	case "event":
-		err = cmdEvent(c, args[1:])
+		err = cmdEvent(eventTargets(c, pinned), args[1:])
 	case "test":
 		err = cmdTest(c, args[1:])
 	case "status":
@@ -54,10 +71,12 @@ func main() {
 		err = cmdPet(c, args[1:])
 	case "watch":
 		err = cmdWatch(c)
+	case "update":
+		err = cmdUpdate(c, args[1:])
 	case "install", "uninstall":
 		err = cmdInstall(args)
 	case "hook":
-		err = cmdHook(c, args[1:])
+		err = cmdHook(eventTargets(c, pinned), args[1:])
 	case "version", "--version", "-v":
 		fmt.Println("petctl", version)
 	case "help", "--help", "-h":
@@ -71,20 +90,46 @@ func main() {
 	}
 }
 
-func extractAddr(args []string, addr string) ([]string, string) {
+func extractAddr(args []string, addr string) ([]string, string, bool) {
 	out := args[:0:0]
+	found := false
 	for i := 0; i < len(args); i++ {
 		switch {
 		case args[i] == "--addr" && i+1 < len(args):
 			addr = args[i+1]
+			found = true
 			i++
 		case strings.HasPrefix(args[i], "--addr="):
 			addr = strings.TrimPrefix(args[i], "--addr=")
+			found = true
 		default:
 			out = append(out, args[i])
 		}
 	}
-	return out, addr
+	return out, addr, found
+}
+
+// eventTargets is every pet an event should reach.
+//
+// Both apps can be installed and running at once — that is the whole point of
+// shipping them separately (ADR 0008) — and both are watching the same agent,
+// so both should react. Comparing a dev build against the release one while
+// working is the reason somebody installs the dev build at all, and it needs no
+// configuration to happen.
+//
+// The one that is not running costs nothing: a refused connection on loopback
+// returns immediately, and every caller here already treats failure as normal.
+//
+// A named target overrides all of it. Asking for one pet gets one pet.
+func eventTargets(c *client, pinned bool) []*client {
+	if pinned {
+		return []*client{c}
+	}
+	out := make([]*client, 0, len(flavor.All()))
+	for _, f := range flavor.All() {
+		out = append(out, &client{base: "http://" + f.Addr})
+	}
+	return out
 }
 
 func usage() {
@@ -98,12 +143,26 @@ Usage:
   petctl pets
   petctl pet <id>
   petctl watch
+  petctl update [--check] [--json]
   petctl install claude [--project|--global]
   petctl uninstall claude [--project|--global]
   petctl version
 
 Options:
-  --addr HOST:PORT   petd address (default 127.0.0.1:9876, $AGENT_PET_ADDR)
+  --addr HOST:PORT   one petd to talk to ($AGENT_PET_ADDR). Without it, events
+                     go to every installed pet: Agent Pet listens on 9876 and
+                     Agent Pet (dev) on 9877, and both watch the same agent.
+
+Updating:
+  update            install a newer version of this app, if there is one
+  update --check    only say whether one exists
+  --channel dev     look at what the other app is on. It cannot install it:
+                    Agent Pet and Agent Pet (dev) are two applications, and
+                    they update from their own channels. See "petctl doctor".
+
+  Updates are verified against Apple's notarization, must be signed by the same
+  team as the app they replace, and must carry the same bundle identifier. A
+  build from source is never replaced.
 
 States:
   idle thinking working attention confused worried happy celebrate sleeping heart
@@ -124,6 +183,7 @@ Examples:
   petctl event codex task_completed --session abc123
   petctl event claude tool_started --meta tool=bash
   petctl test celebrate --for 10s
+  petctl update --check
 `)
 }
 
@@ -172,7 +232,7 @@ func (c *client) do(method, path string, body any, out any) error {
 
 // ---- commands ----
 
-func cmdEvent(c *client, args []string) error {
+func cmdEvent(targets []*client, args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("usage: petctl event <source> <event> [--session ID] [--meta k=v ...]")
 	}
@@ -204,18 +264,36 @@ func cmdEvent(c *client, args []string) error {
 	if len(meta) > 0 {
 		body["metadata"] = meta
 	}
-	var out struct {
-		Known bool   `json:"known"`
-		State string `json:"state"`
+	// Delivered to every pet that is listening, not just the first. Both apps
+	// watch the same agent, so an event belongs to both of them; the ones that
+	// are not running refuse the connection immediately and cost nothing.
+	delivered := 0
+	var firstErr error
+	for _, t := range targets {
+		var out struct {
+			Known bool   `json:"known"`
+			State string `json:"state"`
+		}
+		if err := t.do(http.MethodPost, "/event", body, &out); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		delivered++
+		who := ""
+		if len(targets) > 1 {
+			who = "  (" + t.base + ")"
+		}
+		if !out.Known {
+			fmt.Printf("accepted (unknown event type %q — recorded as activity, no state change) → %s%s\n", args[1], out.State, who)
+			continue
+		}
+		fmt.Printf("%s %s → %s%s\n", args[0], args[1], out.State, who)
 	}
-	if err := c.do(http.MethodPost, "/event", body, &out); err != nil {
-		return err
+	if delivered == 0 {
+		return firstErr
 	}
-	if !out.Known {
-		fmt.Printf("accepted (unknown event type %q — recorded as activity, no state change) → %s\n", args[1], out.State)
-		return nil
-	}
-	fmt.Printf("%s %s → %s\n", args[0], args[1], out.State)
 	return nil
 }
 
@@ -350,6 +428,7 @@ type diagnostics struct {
 	State             string            `json:"state"`
 	Integrations      map[string]string `json:"integrations"`
 	Desktop           map[string]string `json:"desktop"`
+	Update            update.Status     `json:"update"`
 }
 
 func cmdDoctor(c *client) error {
@@ -359,6 +438,10 @@ func cmdDoctor(c *client) error {
 	var d diagnostics
 	if err := c.do(http.MethodGet, "/diagnostics", nil, &d); err != nil {
 		fmt.Printf("  %s petd not reachable at %s\n", cross, strings.TrimPrefix(c.base, "http://"))
+		// The apps section first, before giving up: "not reachable" and "you
+		// are asking the wrong one of the two" look identical otherwise, and
+		// the second is easy to arrive at once both are installed.
+		reportApps()
 		fmt.Println()
 		fmt.Println("  Start it with:  petd")
 		return fmt.Errorf("petd unreachable")
@@ -371,6 +454,7 @@ func cmdDoctor(c *client) error {
 		fmt.Printf("  %s data directory: %s\n", cross, d.DataWrite)
 	}
 	fmt.Printf("  %s config: %s\n", tick, d.ConfigPath)
+	reportApps()
 	fmt.Println()
 
 	fmt.Println("  Pet")
@@ -424,6 +508,7 @@ func cmdDoctor(c *client) error {
 	}
 
 	reportAdapters()
+	reportUpdates(d.Update)
 
 	fmt.Println()
 	fmt.Printf("  Current state: %s   sessions: %d   events this run: %d\n", d.State, d.Sessions, d.EventsSeen)
@@ -466,6 +551,107 @@ func reportAdapters() {
 			fmt.Printf("    %s %-8s only %d of %d hooks installed — run `petctl install claude` again\n",
 				warn, scope.label, n, len(claude.Hooks))
 		}
+	}
+}
+
+// reportApps lists both applications: which are installed, which are running.
+//
+// This exists because they are menu-bar-only. An app with no Dock icon and no
+// entry in the app switcher is one you can forget you installed, and two of
+// them show two identical icons in the menu bar. Something has to be able to
+// answer "what have I actually got".
+func reportApps() {
+	fmt.Println()
+	fmt.Println("  Apps")
+	for _, f := range flavor.All() {
+		here := ""
+		if f.ID == flavor.Current().ID {
+			here = "  ← this petctl"
+		}
+		path, installed := findApp(f)
+
+		var running, version string
+		var h struct {
+			Version string `json:"version"`
+		}
+		if err := (&client{base: "http://" + f.Addr}).do(http.MethodGet, "/healthz", nil, &h); err == nil {
+			running, version = "running on "+f.Addr, h.Version
+		}
+
+		switch {
+		case running != "":
+			fmt.Printf("    %s %-18s %-12s %s%s\n", tick, f.AppName, version, running, here)
+			if installed {
+				fmt.Printf("      %-18s %s\n", "", path)
+			}
+		case installed:
+			fmt.Printf("    · %-18s %-12s installed, not running%s\n", f.AppName, "", here)
+			fmt.Printf("      %-18s %s\n", "", path)
+		default:
+			fmt.Printf("    · %-18s %-12s not installed%s\n", f.AppName, "", here)
+		}
+	}
+}
+
+// findApp looks where an app is actually kept. Deliberately the same two
+// locations, in the same order, as the plugin's petctl shim searches.
+func findApp(f flavor.Flavor) (string, bool) {
+	var candidates []string
+	if p := os.Getenv("AGENT_PET_APP"); p != "" && strings.HasSuffix(p, f.AppFile()) {
+		candidates = append(candidates, p)
+	}
+	candidates = append(candidates, filepath.Join("/Applications", f.AppFile()))
+	if home, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates, filepath.Join(home, "Applications", f.AppFile()))
+	}
+	for _, p := range candidates {
+		if st, err := os.Stat(filepath.Join(p, "Contents", "MacOS", "petctl")); err == nil && !st.IsDir() {
+			return p, true
+		}
+	}
+	return "", false
+}
+
+// reportUpdates says what the pet knows about newer versions, and — just as
+// important — what it does not. petd never checks for itself, so an empty
+// answer here means no check has run, not that there is nothing to find.
+func reportUpdates(st update.Status) {
+	cfg, _ := config.Load(config.Path())
+	fmt.Println()
+	fmt.Println("  Updates")
+
+	f := flavor.Current()
+	fmt.Printf("    · %-16s %s — this is %s, and the other channel is the other app\n",
+		"channel", f.Channel, f.AppName)
+
+	if cfg.Update.Check {
+		fmt.Printf("    %s %-16s every %s, from the Claude Code session hook\n",
+			tick, "automatic", cfg.Update.Interval.D())
+	} else {
+		fmt.Printf("    · %-16s off — nothing here contacts the network until you run\n", "automatic")
+		fmt.Printf("      %-16s `petctl update --check`, or set update.check in %s\n", "", config.Path())
+	}
+
+	switch {
+	case version == update.DevBuild:
+		fmt.Printf("    · %-16s a dev build is never replaced over the air\n", "this build")
+	case st.Error != "":
+		fmt.Printf("    %s %-16s %s\n", cross, "last check", st.Error)
+	case st.Available:
+		fmt.Printf("    %s %-16s %s is available (you have %s)\n", warn, "update", st.Latest, st.Current)
+		if st.NotesURL != "" {
+			fmt.Printf("      %-16s %s\n", "", st.NotesURL)
+		}
+		fmt.Printf("      %-16s install it with `petctl update`\n", "")
+	case st.Latest != "" && update.Compare(st.Current, st.Latest) > 0:
+		fmt.Printf("    · %-16s you have %s; this channel is on %s\n", "ahead", st.Current, st.Latest)
+	case st.Latest != "":
+		fmt.Printf("    %s %-16s %s is the newest on this channel\n", tick, "up to date", st.Latest)
+	default:
+		fmt.Printf("    · %-16s no check has run yet\n", "latest")
+	}
+	if !st.CheckedAt.IsZero() {
+		fmt.Printf("    · %-16s %s ago\n", "last checked", time.Since(st.CheckedAt).Round(time.Second))
 	}
 }
 
