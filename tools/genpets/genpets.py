@@ -68,10 +68,13 @@ class Palette:
     # The edge of the garment. `line` is the character's own outline and is
     # warm and dark; drawn round a white dress it reads as piping in leather.
     cloth_line: tuple = None
+    # The underside of the jaw where it meets the body. A shadow, not an edge.
+    jaw: tuple = None
     lip: tuple = None
     ribbon: tuple = None
     ribbon_dark: tuple = None
     gold: tuple = None
+    gold_light: tuple = None
     gold_dark: tuple = None
     # think is the colour of the thinking dots. They used to be drawn in
     # `line`, the character's own outline, which made the one state that says
@@ -152,11 +155,13 @@ PEACH = Species(
         hair_light=(88, 68, 72, 255),
         cloth=(250, 250, 250, 255),
         cloth_line=(196, 200, 212, 255),   # a cool grey; her outline is warm
+        jaw=(228, 186, 164, 255),          # one step under the skin, no more
         lip=(206, 116, 116, 255),
         ribbon=(255, 172, 142, 255),   # peach, for the girl called Peach
         ribbon_dark=(226, 124, 104, 255),
-        gold=(244, 202, 108, 255),
-        gold_dark=(198, 152, 66, 255),
+        gold=(222, 168, 58, 255),
+        gold_light=(255, 228, 140, 255),
+        gold_dark=(160, 114, 36, 255),
         nose=None,
         think=(255, 194, 108, 255),    # warm, against all that dark hair
     ),
@@ -596,8 +601,6 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
 
     # The neck opening, and what hangs in it.
     d.polygon([(CX - 4, sh - 1), (CX, sh + 3), (CX + 4, sh - 1)], fill=skin)
-    if pal.gold:
-        necklace(d, CX, sh - 1, pal)
 
 
 def hair_back(d, s, top, bw, bh, cy, pal):
@@ -683,19 +686,30 @@ def hairline(img, s, top, bw, bh, cy, pal):
     img.alpha_composite(overlay)
 
 
-def necklace(d, cx, sh, pal):
-    """A fine gold chain in the open neck, with a pendant in the notch.
+def necklace(d, cx, y, pal):
+    """A fine gold chain with a drop, in the open neck.
 
-    Shaped to sit *inside* the neck opening rather than along its edge: a chain
-    that follows the collar reads as piping on the garment instead of as
-    jewellery on her.
+    `y` is the first row clear of the jaw. Everything above that is behind her
+    chin and cannot be seen, which leaves three rows of skin and then the dress
+    — so the chain is short and the drop does the work, hanging onto the white
+    where the contrast is best.
+
+    The gold is deeper than gold looks like it should be. Straight yellow is
+    almost exactly as light as her skin — 204 against 215 — so a chain in it
+    disappears into her neck however many pixels it is given. What makes
+    jewellery read at this size is the step down in value, not the hue.
     """
-    g, gd = pal.gold, pal.gold_dark or pal.gold
-    for k in range(3):
-        px(d, cx - 3 + k, sh + k, g)
-        px(d, cx + 3 - k, sh + k, g)
-    px(d, cx, sh + 3, gd)
-    px(d, cx, sh + 4, g)
+    g = pal.gold
+    gl = pal.gold_light or g
+    gd = pal.gold_dark or g
+    for k in range(2):
+        px(d, cx - 2 + k, y + k, g)
+        px(d, cx + 2 - k, y + k, g)
+    # A lit top, a wide middle, a shaded foot. Two pixels of drop is one more
+    # link of chain; three with a highlight is a pendant.
+    px(d, cx, y + 2, gl)
+    d.line([(cx - 1, y + 3), (cx + 1, y + 3)], fill=g)
+    px(d, cx, y + 4, gd)
 
 
 BOB = {
@@ -780,7 +794,21 @@ def draw_pet(s, state, i, n):
 
     # --- body
     d.ellipse([CX - bw // 2, top, CX + bw // 2, top + bh], fill=pal.body, outline=pal.line)
+    if s.torso != "none":
+        # Soften the jaw. The head's outline is there to part the silhouette
+        # from the background, but along the bottom the head meets her own
+        # shoulders — nothing to part — and `line` drawn there is a hard brown
+        # bar directly under the mouth. The arc stops short of the sides, which
+        # do overhang the body and still need the real outline.
+        d.arc([CX - bw // 2, top, CX + bw // 2, top + bh], 55, 125,
+              fill=pal.jaw or pal.body_dark)
     markings(img, s, top, bw, bh, cy, pal)
+    if s.torso != "none" and pal.gold:
+        # After the head, not with the body. Drawn in torso() it goes down
+        # before the head does, and the chin paints over two of every three
+        # pixels of it — which is why it read as a faint seam rather than as a
+        # necklace, whatever colour it was given.
+        necklace(d, CX, top + bh + 1, pal)
     hairline(img, s, top, bw, bh, cy, pal)
     if s.accessory == "bow":
         # On the tucked side: the other one is under the fall of the hair, and
