@@ -65,6 +65,9 @@ class Palette:
     hair: tuple = None
     hair_light: tuple = None
     cloth: tuple = None
+    # The edge of the garment. `line` is the character's own outline and is
+    # warm and dark; drawn round a white dress it reads as piping in leather.
+    cloth_line: tuple = None
     lip: tuple = None
     ribbon: tuple = None
     ribbon_dark: tuple = None
@@ -92,6 +95,15 @@ class Species:
     hair: str = "none"      # none | long | side
     lashes: bool = False
     accessory: str = "none"  # none | bow
+    # A separate body under the head, rather than one ellipse that is both.
+    torso: str = "none"      # none | chibi
+    # Where the head sits, and where the face sits inside it. A merged
+    # head-and-body puts the eyes near the middle of the one ellipse and lets
+    # the chin run into the chest; once the head is only a head, the face has
+    # to move down inside it or she is all forehead and jaw.
+    head_dy: int = 0
+    eye_dy: int = 0
+    mouth_dy: int = 0
     extras: dict = field(default_factory=dict)
 
 
@@ -122,7 +134,7 @@ MOMO = Species(
 PEACH = Species(
     pid="peach",
     name="Peach (桃桃)",
-    description="A girl with long dark hair swept over one shoulder, a peach bow and a gold necklace.",
+    description="A girl in a white dress, with long dark hair, a peach bow and a gold necklace.",
     palette=Palette(
         # Skin, hair and eyes are sampled from the reference photo and then
         # pushed apart: at 40px, tones a camera can tell apart collapse into
@@ -139,6 +151,7 @@ PEACH = Species(
         hair=(38, 30, 34, 255),
         hair_light=(88, 68, 72, 255),
         cloth=(250, 250, 250, 255),
+        cloth_line=(196, 200, 212, 255),   # a cool grey; her outline is warm
         lip=(206, 116, 116, 255),
         ribbon=(255, 172, 142, 255),   # peach, for the girl called Peach
         ribbon_dark=(226, 124, 104, 255),
@@ -147,8 +160,9 @@ PEACH = Species(
         nose=None,
         think=(255, 194, 108, 255),    # warm, against all that dark hair
     ),
-    ears="none", face="human", tail=False, body_w=24, body_h=22,
+    ears="none", face="human", tail=False, body_w=21, body_h=19,
     hair="side", lashes=True, accessory="bow",
+    torso="chibi", head_dy=-6, eye_dy=3, mouth_dy=3,
 )
 
 
@@ -518,6 +532,74 @@ def bow(d, x, y, pal):
     rect(d, x - 1, y - 1, x + 1, y + 1, dark)
 
 
+def torso(img, s, state, i, top, bw, bh, cy, pal):
+    """A small body under a big head.
+
+    The proportions are not a style choice. At 40px the head has to stay big
+    enough to carry an expression, because the expression is the entire signal
+    this program sends — so what is left for a body is eight rows. That is
+    enough for shoulders, two arms and a pair of feet, and the body's job is to
+    hang the clothes and the necklace on and to give the hair somewhere to fall
+    past. It does not act; the face does.
+
+    The dress flares. A straight one is six rows of white rectangle and reads
+    as an apron; the flare is what makes a silhouette out of it, and it is
+    almost the only thing at this size that says the body is a body.
+
+    Drawn before the head, so the chin overlaps the shoulders rather than the
+    shoulders cutting a line across the jaw. It hangs off the head rather than
+    standing on the ground, which is what makes the whole character leave the
+    floor on `celebrate` instead of stretching a neck.
+    """
+    if s.torso != "chibi":
+        return
+    d = ImageDraw.Draw(img)
+    sh = top + bh                  # the shoulder line, right under the chin
+    hip = GROUND - 3
+    skin, dark, line = pal.body, pal.body_dark, pal.line
+
+    # Legs, behind the hem. Two pixels each: at three they touch and become a
+    # block, and the gap between them is what reads as legs at all.
+    for sx in (-1, 1):
+        rect(d, CX + sx * 2, hip, CX + sx * 2 + sx, GROUND - 1, skin)
+        rect(d, CX + sx * 2 - 1, GROUND - 1, CX + sx * 2 + sx, GROUND, dark)
+
+    if state == "working":
+        # The keyboard sits in front of her, so it goes down before the hands.
+        rect(d, CX - 8, hip + 2, CX + 8, hip + 4, dark)
+        d.rectangle([CX - 8, hip + 2, CX + 8, hip + 4], outline=line)
+
+    # Arms, posed by state — the body has no other way to join in. They hang
+    # outside the dress, which is the only place there is room for them.
+    for sx in (-1, 1):
+        if state == "celebrate":
+            hx, hy = CX + sx * 9, sh - 2
+        elif state == "working":
+            hx, hy = CX + sx * 4, hip + 1
+        else:
+            hx, hy = CX + sx * 8, hip - 2
+        if state in ("celebrate", "working"):
+            hy += (i + (sx > 0)) % 2
+        d.line([(CX + sx * 4, sh + 1), (hx, hy)], fill=skin, width=3)
+        # A hand outlined in `line` is a dark blot at four pixels across. The
+        # shadow tone is enough to round it off.
+        d.ellipse([hx - 2, hy - 2, hx + 2, hy + 2], fill=skin, outline=dark)
+
+    # The dress: shoulders, a waist, then the flare. No outline across the top
+    # — the chin sits on it, and a drawn edge there reads as a choker.
+    dress = [(CX - 5, sh), (CX + 5, sh), (CX + 4, sh + 3), (CX + 6, hip),
+             (CX - 6, hip), (CX - 4, sh + 3)]
+    d.polygon(dress, fill=pal.cloth or skin)
+    edge = pal.cloth_line or line
+    d.line(dress[1:5], fill=edge)
+    d.line([dress[5], dress[4]], fill=edge)
+
+    # The neck opening, and what hangs in it.
+    d.polygon([(CX - 4, sh - 1), (CX, sh + 3), (CX + 4, sh - 1)], fill=skin)
+    if pal.gold:
+        necklace(d, CX, sh - 1, pal)
+
+
 def hair_back(d, s, top, bw, bh, cy, pal):
     """The mass of hair behind the head, and the only part of the character
     allowed outside the body silhouette.
@@ -601,64 +683,19 @@ def hairline(img, s, top, bw, bh, cy, pal):
     img.alpha_composite(overlay)
 
 
-def necklace(d, s, top, bw, bh, cy, pal):
+def necklace(d, cx, sh, pal):
     """A fine gold chain in the open neck, with a pendant in the notch.
 
-    Drawn after the top, and shaped to sit *inside* the neck opening rather
-    than along its edge: a chain that follows the collar reads as piping on the
-    garment instead of as jewellery on her. The two limbs pass a pixel outside
-    the mouth at its widest, which is the whole vertical budget there is
-    between a chin and a collarbone.
+    Shaped to sit *inside* the neck opening rather than along its edge: a chain
+    that follows the collar reads as piping on the garment instead of as
+    jewellery on her.
     """
-    if not pal.gold:
-        return
-    hem = top + bh - 4
     g, gd = pal.gold, pal.gold_dark or pal.gold
-    for k in range(4):
-        px(d, CX - 4 + k, hem - 3 + k, g)
-        px(d, CX + 4 - k, hem - 3 + k, g)
-    # The pendant hangs in the open neck, just clear of the collar.
-    px(d, CX, hem, gd)
-    px(d, CX, hem + 1, g)
-
-
-def outfit(img, s, top, bw, bh, cy, pal):
-    """The white top, clipped to the body the same way.
-
-    Without it the skin runs to the bottom of the ellipse and she reads as a
-    floating head. But the body is a head and a torso merged into one shape, so
-    every row the top takes is a row the face loses: at the cat's bib height it
-    was a quarter of her visible pixels and looked like a shirt pulled up over
-    her jaw. It sits four rows off the bottom now, not six.
-
-    The shoulders are the high points and the neck the low one, which is what
-    makes it a scoop neck. A collar drawn straight across is a stripe.
-    """
-    if not pal.cloth:
-        return
-    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    o = ImageDraw.Draw(overlay)
-    x0, x1 = CX - bw // 2, CX + bw // 2
-    hem = top + bh - 4
-
-    # Shoulders five rows above the notch. Cut straight across at the notch's
-    # height — which is where it sat when the neckline was raised to make room
-    # for the chain — the top becomes a band at the bottom of the frame and she
-    # reads as bare to the collarbone. The garment needs somewhere to hang from.
-    neck = [(x0 - 3, hem - 5), (CX - 7, hem - 3), (CX - 3, hem), (CX, hem + 2),
-            (CX + 3, hem), (CX + 7, hem - 3), (x1 + 3, hem - 5),
-            (x1 + 3, top + bh + 3), (x0 - 3, top + bh + 3)]
-    # No trim. It edged the neckline first, a pixel from the chain, and the two
-    # parallel lines read as piping with the gold lost inside it; moved to the
-    # shoulders it became two dashes floating clear of a garment that is barely
-    # there at that height. One accent at the neck is the whole idea, and the
-    # accent is the necklace.
-    o.polygon(neck, fill=pal.cloth)
-
-    mask = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mask).ellipse([x0 + 1, top + 1, x1 - 1, top + bh - 1], fill=255)
-    overlay.putalpha(ImageChops.multiply(overlay.getchannel("A"), mask))
-    img.alpha_composite(overlay)
+    for k in range(3):
+        px(d, cx - 3 + k, sh + k, g)
+        px(d, cx + 3 - k, sh + k, g)
+    px(d, cx, sh + 3, gd)
+    px(d, cx, sh + 4, g)
 
 
 BOB = {
@@ -685,7 +722,7 @@ def draw_pet(s, state, i, n):
     pal = s.palette
 
     bob = BOB.get(state, [0])[i % len(BOB.get(state, [0]))]
-    cy = 23 + bob
+    cy = 23 + bob + s.head_dy
     bw, bh = s.body_w, s.body_h
 
     # Squash and stretch. A body that only translates looks like a sticker;
@@ -695,14 +732,20 @@ def draw_pet(s, state, i, n):
     elif bob > 0:
         bw, bh = bw + 1, bh - 1
 
-    # ground shadow — shrinks as the pet rises, which is what sells the hop
-    shadow_w = bw - 2 + bob
+    # ground shadow — shrinks as the pet rises, which is what sells the hop.
+    # A character with a body casts it from the feet, not from the head, or a
+    # big head throws a shadow wider than anything touching the floor.
+    shadow_w = (12 if s.torso == "chibi" else bw - 2) + bob
     d.ellipse([CX - shadow_w // 2, GROUND, CX + shadow_w // 2, GROUND + 3],
               fill=(0, 0, 0, 60))
 
     top = cy - bh // 2
 
-    # --- hair, behind the body: it is the silhouette, so it goes down first
+    # --- the body, then the hair over it: she wears her hair forward, so it
+    #     falls across the shoulder rather than behind it
+    torso(img, s, state, i, top, bw, bh, cy, pal)
+
+    # --- hair, behind the head: it is the silhouette, so it goes down first
     hair_back(d, s, top, bw, bh, cy, pal)
 
     # --- tail, behind the body, bottom-left so it never hits the prop column
@@ -738,9 +781,7 @@ def draw_pet(s, state, i, n):
     # --- body
     d.ellipse([CX - bw // 2, top, CX + bw // 2, top + bh], fill=pal.body, outline=pal.line)
     markings(img, s, top, bw, bh, cy, pal)
-    outfit(img, s, top, bw, bh, cy, pal)
     hairline(img, s, top, bw, bh, cy, pal)
-    necklace(d, s, top, bw, bh, cy, pal)
     if s.accessory == "bow":
         # On the tucked side: the other one is under the fall of the hair, and
         # a bow you cannot see is three pixels of nothing.
@@ -750,7 +791,9 @@ def draw_pet(s, state, i, n):
     paw = pal.white if s.markings == "tortie" else pal.body
 
     # --- limbs that must sit on top of the body
-    if state == "celebrate":
+    if s.torso == "chibi":
+        pass
+    elif state == "celebrate":
         # A head that fills the top of the body has no room above it for an
         # arm: raised to the cat's height the hands sit level with her temples
         # and read as a second pair of ears. So they start at the shoulder.
@@ -772,14 +815,17 @@ def draw_pet(s, state, i, n):
                       fill=paw, outline=pal.line)
 
     face_cx = CX
-    ey = cy - 4
+    # Props are placed against the frame, not against the character: the
+    # top-right corner is reserved for them, and a head that rides higher would
+    # otherwise push the Z's of `sleeping` off the top edge entirely.
+    pcy = cy - s.head_dy
+    ey = cy - 4 + s.eye_dy
     my = cy + 4
 
     if s.face == "human":
         # A face, not a muzzle: nothing is drawn between the eyes and the
-        # mouth, and the mouth sits higher so it lands on the chin rather than
-        # on the collar.
-        my = cy + 2
+        # mouth.
+        my = cy + 2 + s.mouth_dy
     elif s.face == "screen":
         # A robot reads better with a lit panel than with fur-and-muzzle.
         d.rounded_rectangle([CX - 8, cy - 8, CX + 8, cy + 4], radius=2,
@@ -814,25 +860,25 @@ def draw_pet(s, state, i, n):
     elif state == "thinking":
         eyes(d, face_cx, ey, "closed" if blink else "dot", pal, look=(-1, -1), lashes=s.lashes)
         mouth(d, face_cx, my, "flat", pal, mstyle)
-        dots(d, PROP_X + 1, cy - 10, pal.think or pal.accent, pal.line, i)
+        dots(d, PROP_X + 1, pcy - 10, pal.think or pal.accent, pal.line, i)
     elif state == "working":
         eyes(d, face_cx, ey, "squint", pal, lashes=s.lashes)
         mouth(d, face_cx, my, "flat", pal, mstyle)
         for k in range(2):
             if (i + k) % 2 == 0:
-                sparkle(d, PROP_X + 3 + k * 5, cy - 9 + k * 4, pal.accent, 1)
+                sparkle(d, PROP_X + 3 + k * 5, pcy - 9 + k * 4, pal.accent, 1)
     elif state == "attention":
         eyes(d, face_cx, ey, "wide", pal, lashes=s.lashes)
         mouth(d, face_cx, my, "o", pal, mstyle)
-        bang(d, PROP_X + 4, cy - 16 + i % 2, (236, 78, 78, 255))
+        bang(d, PROP_X + 4, pcy - 16 + i % 2, (236, 78, 78, 255))
     elif state == "confused":
         eyes(d, face_cx, ey, "confused", pal)
         mouth(d, face_cx, my, "wobble", pal, mstyle)
-        question(d, PROP_X + 4, cy - 14 - (i % 2), pal.line)
+        question(d, PROP_X + 4, pcy - 14 - (i % 2), pal.line)
     elif state == "worried":
         eyes(d, face_cx, ey, "worried", pal)
         mouth(d, face_cx, my, "wobble", pal, mstyle)
-        sweat(d, PROP_X + 2, cy - 9 + (i % 2) * 2, (118, 190, 236, 255))
+        sweat(d, PROP_X + 2, pcy - 9 + (i % 2) * 2, (118, 190, 236, 255))
     elif state == "happy":
         eyes(d, face_cx, ey, "happy", pal)
         mouth(d, face_cx, my, "wide_smile", pal, mstyle)
@@ -842,18 +888,18 @@ def draw_pet(s, state, i, n):
         mouth(d, face_cx, my, "wide_smile", pal, mstyle)
         for k, (sx, sy) in enumerate([(13, -14), (-13, -12), (16, -6), (-15, -3)]):
             if (i + k) % 3 != 2:
-                sparkle(d, CX + sx, cy + sy, pal.accent, 1 + (i + k) % 2)
+                sparkle(d, CX + sx, pcy + sy, pal.accent, 1 + (i + k) % 2)
     elif state == "sleeping":
         eyes(d, face_cx, ey + 1, "closed", pal)
         mouth(d, face_cx, my, "flat", pal, mstyle)
-        zzz(d, PROP_X + 2, cy - 12, pal.line, i)
+        zzz(d, PROP_X + 2, pcy - 12, pal.line, i)
     elif state == "heart":
         eyes(d, face_cx, ey, "happy", pal)
         mouth(d, face_cx, my, "smile", pal, mstyle)
         blush(d, s, CX, ey, pal)
-        heart(d, PROP_X + 4, cy - 13 - (i % 2), (236, 84, 116, 255))
+        heart(d, PROP_X + 4, pcy - 13 - (i % 2), (236, 84, 116, 255))
         if i % 2 == 0:
-            heart(d, PROP_X - 1, cy - 7, (236, 132, 152, 210), big=False)
+            heart(d, PROP_X - 1, pcy - 7, (236, 132, 152, 210), big=False)
 
     return img
 def build(s: Species):

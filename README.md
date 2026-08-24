@@ -519,7 +519,7 @@ Two built-in packs ship in the binary:
 | id | | |
 |---|---|---|
 | `momo` | SanMao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
-| `peach` | Peach (桃桃), a girl with long dark hair | swept over one shoulder, peach bow, gold necklace |
+| `peach` | Peach (桃桃), a girl in a white dress | long dark hair over one shoulder, peach bow, gold necklace |
 
 Pick one from the menu-bar item's **Change Pet** submenu, or with
 `petctl pet peach`. `tools/genpets` carries a third species, `byte`, as a
