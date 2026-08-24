@@ -57,36 +57,49 @@ If it says this is a dev build, the user built it themselves — say so and stop
 
 If `petctl doctor` reports the app is not installed, continue below.
 
-### 2. Find the latest release
+### 2. Ask the manifest what to install
 
-Prefer `gh` when the user has it, and fall back to the public API:
-
-```bash
-gh release view --repo lijuno/agent-pet --json tagName,assets
-```
+The same file `petctl update` reads, so an install and an update always agree
+about what the current version is:
 
 ```bash
-curl -fsSL https://api.github.com/repos/lijuno/agent-pet/releases/latest
+curl -fsSL https://raw.githubusercontent.com/lijuno/agent-pet/master/updates/release.json
 ```
 
-Pick the universal `.zip` asset. **If there is no release yet, stop** and tell
-the user the app has not been published, pointing them at `README.md` for
-building from source. Do not improvise another download.
+It gives you `version`, `url`, `sha256`, `size` and `min_macos`. Use those four —
+do **not** go looking for an asset by name, and do not use the GitHub releases
+API instead; the manifest is the thing the project publishes deliberately, and a
+release can exist for days before it is offered to anyone.
+
+**If it 404s, stop** and tell the user nothing has been published yet, pointing
+them at `README.md` for building from source. Do not improvise another download.
+
+Check `min_macos` against `sw_vers -productVersion` before downloading anything.
+An app that will not launch on their machine is not worth 19 MB of their
+bandwidth.
 
 ### 3. Download to a temporary directory
 
 Never unpack straight into `/Applications`:
 
 ```bash
-tmp=$(mktemp -d) && curl -fsSL -o "$tmp/pet.zip" <ASSET_URL> && ditto -x -k "$tmp/pet.zip" "$tmp"
+tmp=$(mktemp -d) && curl -fsSL -o "$tmp/pet.zip" <URL_FROM_MANIFEST> && ditto -x -k "$tmp/pet.zip" "$tmp"
 ```
 
 Use `ditto`, not `unzip` — `unzip` does not preserve the symlinks and metadata
 inside a bundle.
 
-### 4. Verify the signature — before it goes anywhere
+### 4. Verify it — before it goes anywhere
 
-This is the step the whole procedure exists for. Run both:
+This is the step the whole procedure exists for. Run all three.
+
+```bash
+shasum -a 256 "$tmp/pet.zip"
+```
+
+Compare against `sha256` from the manifest. This one is worth doing first
+because it is the cheapest and its failure is the least alarming: a mismatch is
+usually a truncated download.
 
 ```bash
 codesign --verify --strict --deep --verbose=2 "$tmp/agent-pet.app"
@@ -97,9 +110,10 @@ spctl -a -t exec -vv "$tmp/agent-pet.app"
 ```
 
 The first says the bundle is intact and unmodified since signing. The second
-says Gatekeeper accepts it — expect `source=Notarized Developer ID`.
+says Gatekeeper accepts it — expect `source=Notarized Developer ID` and
+`origin=Developer ID Application: Lijun Li (YH77U4A52H)`.
 
-**Both must pass.** If either fails, delete `$tmp` and go to *When
+**All three must pass.** If any fails, delete `$tmp` and go to *When
 verification fails*. Do not install it anyway, and do not ask the user whether
 they would like you to install it anyway.
 
@@ -131,7 +145,8 @@ Ask whether they saw it. If they did not, go to `/agent-pet:troubleshoot`.
 ### 7. Mention the dev app, do not install it
 
 There is a second application, `Agent Pet (dev)`, that installs alongside this
-one and follows prereleases. It is not an alternative to what you just
+one and follows prereleases. Its manifest is `updates/dev.json`, and installing
+it is the same procedure with that file — but do not, unless they ask. It is not an alternative to what you just
 installed and it is not a setting — it is a separate app with its own icon,
 its own port and its own settings, and both can run at once.
 
@@ -155,8 +170,13 @@ need `/reload-plugins`, or a new session, before the pet starts reacting.
 
 Report it plainly and stop. Say which command failed and quote its output.
 
-A signature failure means the download was corrupted in transit, or the file
-is not what the author published. The first is common and harmless; the second
-is not, and neither you nor the user can tell them apart from the output. One
-clean retry of the download is reasonable. If it fails again, leave it
-uninstalled and let the user decide.
+A checksum failure on its own is almost always a truncated or corrupted
+download — retry once, cleanly.
+
+A **signature** failure is different. It means the download was corrupted, or
+the file is not what the author published, and neither you nor the user can
+tell those apart from the output. One clean retry is reasonable. If it fails
+again, leave it uninstalled and let the user decide.
+
+Either way: say which command failed and quote its output. Do not summarise it
+as "the install did not work".

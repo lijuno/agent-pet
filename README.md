@@ -17,146 +17,166 @@ prompt appears, it turns and asks for you. Tests pass, it celebrates.
   ships — <code>make states-gif</code>.</sub>
 </p>
 
-**This repository contains Milestones 1 and 2** — the pet engine, the local
-event API, `petctl`, the desktop window, a pixel-art character,
-and the Claude Code adapter. The Codex adapter is Milestone 3;
-[`docs/adr/0006-milestone-1-boundaries.md`](docs/adr/0006-milestone-1-boundaries.md)
-records which seam each deferred piece attaches to.
-
 ```
    agent events  ──▶  local state machine  ──▶  expressive character
 ```
 
-## Requirements
+Nothing leaves your machine. The app has no network client at all — it listens
+on loopback and calls nothing out. See [Privacy](#privacy).
 
-- macOS (the architecture allows Windows and Linux; only macOS is exercised)
-- Xcode Command Line Tools — `xcode-select --install`. The menu-bar item is
-  Objective-C compiled through cgo, so a build needs clang; `codesign`,
-  `notarytool` and `stapler` come from here too. Full Xcode is never needed.
-- Go 1.23+
-- [Wails CLI](https://wails.io/docs/gettingstarted/installation) **v2.10.2 or
-  newer** — matching the version in `go.mod`. An older CLI fails to build on a
-  recent Go toolchain with `internal error: package "strings" without types`,
-  which does not look like a version problem:
+---
 
-  ```bash
-  go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.2
-  ```
+## Install
 
-  That installs into `$(go env GOPATH)/bin`, which is not on `PATH` by default
-  on macOS — so `wails` may be on disk and still not be a command you can run.
-  The Makefile looks there as well as on `PATH`, so `make build` works either
-  way; add it to your shell if you want to run `wails` yourself:
+You need macOS 12 or newer. The release is a universal build, so Apple Silicon
+and Intel both work. Nothing else — no Go, no Xcode, no toolchain.
 
-  ```bash
-  export PATH="$PATH:$(go env GOPATH)/bin"
-  ```
-- Python 3 with Pillow, only if you want to regenerate the sprite art
+### With the Claude Code plugin (recommended)
 
-## Quick start
+The plugin carries the hooks; the app is a separate signed download. In Claude
+Code:
 
-```bash
-go mod tidy          # resolves Wails and yaml; needed once
-wails dev            # runs the pet with hot reload
+```
+/plugin marketplace add lijuno/agent-pet
+/plugin install agent-pet@lijuno
+/agent-pet:install
 ```
 
-In another terminal:
+`/agent-pet:install` reads the published manifest, downloads what it names, and
+checks the SHA-256 and the signature — `codesign` and `spctl` both — **before**
+anything goes near `/Applications`. Then it makes the pet visibly do something,
+so you confirm it works with your eyes rather than trusting a summary.
 
-```bash
-go build -o bin/petctl ./cmd/petctl
+This path never touches your `settings.json` and never bakes an absolute path
+into it, so it cannot go stale when the app moves. There is also
+`/agent-pet:troubleshoot` for when the pet stops reacting.
 
-bin/petctl doctor
-bin/petctl test celebrate --for 8s
-bin/petctl event claude permission_requested
-bin/petctl watch
-```
+### By hand
 
-## Cutting a release
-
-```bash
-git tag v0.2.0     # the tag is the version; it reaches Info.plist via brand.sh
-make release       # builds, notarizes, uploads, writes the manifest
-```
-
-`make release CHANNEL=dev` cuts the dev app instead, from a prerelease tag. The
-two are built, signed and published separately; a release is one app or the
-other, never both.
-
-That builds the bundle, signs and staples it, attaches
-`agent-pet-<version>-universal.zip` to the GitHub release — and then stops,
-leaving `updates/release.json` modified and **uncommitted**. Apple usually
-answers within a few minutes.
-
-Nobody is offered the new version until you commit that file:
-
-```bash
-git diff updates/release.json
-git commit -am "Offer 0.2.0 on the release channel" && git push
-```
-
-Publishing an asset and offering it over the air are deliberately two acts. You
-can build a release, install it yourself, live with it for a week, and only then
-decide — and the decision has a diff, a commit message, and `git revert` as the
-undo. See [`updates/README.md`](updates/README.md) and
-[ADR 0008](docs/adr/0008-over-the-air-updates.md).
-
-The individual steps are still there when you want them: `make build`,
-`make notarize`.
-
-Skip the tag and `make release` refuses: it takes the version from the tag on
-HEAD, choosing the plain one for the release app and the prerelease for the dev
-app, so both can be cut from the same commit. An untagged `make build` falls
-back to `wails.json`, which is the only thing that file is still for.
-
-`make build` alone needs nothing beyond the Requirements above. `make notarize`
-needs Apple credentials, and those do not travel with a clone — on a machine
-that has never signed:
-
-1. **The certificate.** Import your `.p12` backup (double-click it, give the
-   export password). Do not create a second one: Apple caps how many Developer
-   ID certificates an account may hold, and a certificate whose private key is
-   on another Mac cannot sign anything. Confirm with
+1. Download `agent-pet-<version>-universal.zip` from
+   [Releases](https://github.com/lijuno/agent-pet/releases) and unzip it.
+2. Move `agent-pet.app` to `/Applications` and open it. Releases are signed and
+   notarized, so it opens normally.
+3. Put `petctl` on your `PATH` — it ships inside the bundle, so the CLI and the
+   daemon it talks to can never be different builds:
 
    ```bash
-   security find-identity -v -p codesigning
+   export PATH="$PATH:/Applications/agent-pet.app/Contents/MacOS"
    ```
 
-   You want one `Developer ID Application: Your Name (TEAMID)`.
-
-2. **The notary credentials**, from the App Store Connect API key. The `.p8`
-   downloads exactly once and can never be re-fetched, so it is in your
-   password manager or it is gone:
+4. Install the Claude Code hooks:
 
    ```bash
-   xcrun notarytool store-credentials agent-pet --key AuthKey_XXXXX.p8 --key-id YOUR_KEY_ID
+   petctl install claude       # this project;  --global for every project
    ```
 
-3. **The profile name**, so `make notarize` takes no arguments. The file is
-   git-ignored, because it names a keychain item that exists only here:
+Then start a **new** Claude Code session — hooks are read at startup, so the
+session you are in now will not pick them up.
 
-   ```bash
-   echo agent-pet > .notary-profile
-   ```
+> Use one path or the other. With both the plugin and `petctl install claude`,
+> every hook fires twice. `petctl doctor` reports the hooks it finds in
+> `settings.json`, so the duplicate is visible.
 
-Releases are cut by hand for the same reason step 1 is fiddly: signing on a
-runner would mean a copy of that private key in the repository's secrets.
-[`docs/signing.md`](docs/signing.md) covers the first-time Apple setup behind
-all three — enrolment, creating the certificate, and creating the API key —
-and what to do when a step fails.
+### First run
 
-A bundle you build yourself is neither signed nor notarized; a released one is.
-One you built yourself runs without complaint, because Gatekeeper only
-quarantines what arrives from elsewhere. One you downloaded is quarantined, and
-macOS refuses it with *"Agent Pet" is damaged and can't be opened*, which is not
-what has happened: the app is intact and unsigned. To run it anyway:
+Agent Pet is a menu-bar app: nothing appears in the Dock. Before an agent
+connects, the cat is grey and asleep — that is correct, not a fault. Colour and
+motion mean something is there to watch.
+
+`petctl doctor` says more than you expect: whether the app is running, which
+flavour it is, where its config lives, and whether the hooks are installed.
+
+## Using it
+
+| Action | Result |
+|---|---|
+| Drag | Move the pet. Its position is remembered. |
+| Double-click | Pet it. |
+| Right-click | Menu: status, statistics, change pet, size, always on top, mute, quit. |
+| Menu bar | The same commands under the `Pet` menu while the app is frontmost. |
+
+The pet also lives in the macOS menu bar. Its icon shows the current state and
+carries the same commands. **Show Pet** is a checkbox there: it puts the pet
+away and brings it back, and bringing it back also retrieves one that has been
+dragged off the edge of the screen. **Change Pet** is a submenu listing the
+characters, so switching happens in the menu bar rather than in a panel beside
+the pet. See [ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
+
+The character comes in three sizes — small, medium and large — from the
+right-click menu or the `pet.scale` setting.
+
+Two rules decide whether she is awake, and neither has a special case:
+
+- **No agent, no pet.** Claude Code exiting puts her to sleep at once, and so
+  does never having started.
+- **Idle and quiet for a minute** and she dozes off, waking on the next event.
+
+A pending request is `attention`, not idle, so it falls outside the second rule
+rather than being excused from it — nobody answers a prompt they were never
+shown.
+
+### Trying every state
+
+To see the whole character without waiting for an agent to do something:
 
 ```bash
-xattr -d com.apple.quarantine /Applications/agent-pet.app
+for s in idle thinking working attention confused worried happy celebrate sleeping heart; do
+  petctl test $s --for 2s; sleep 2
+done
 ```
 
-Do that only if you trust where the bundle came from, and never on a release —
-a signed one needs no such thing, and an agent asked to install this app will
-run that command without hesitating if the README implies it is routine.
+A state forced with `petctl test` keeps its colour, since the point of forcing
+one is to look at it. Or drive a realistic session by hand:
+
+```bash
+petctl event claude session_started --session demo
+petctl event claude thinking_started --session demo
+petctl event claude tool_started --session demo --meta tool=bash
+petctl event claude permission_requested --session demo
+petctl event claude tool_started --session demo --meta tool=edit
+petctl event claude task_completed --session demo
+petctl event claude tests_passed --session demo
+```
+
+`petctl watch` prints events as they arrive, which settles whether the hooks are
+firing at all.
+
+## Configuration
+
+`~/.config/agent-pet/config.yaml` is written on first run.
+
+```yaml
+pet:
+  active: momo          # momo, or your own pack
+  always_on_top: true
+  scale: 1.0
+  drop_shadow: true     # off if it reads as a halo on a light wallpaper
+
+behavior:
+  dialogue: true        # speech bubbles
+
+personality:
+  name: SanMao (三毛)
+  personality: gentle   # gentle cheerful calm mischievous sarcastic energetic
+
+thresholds:
+  idle_after: 30s       # a quiet agent stops looking busy
+  sleeping_after: 60s   # ... and shortly after that, dozes off
+
+server:
+  addr: 127.0.0.1:9876
+
+update:
+  check: false          # nothing contacts the network until this is true
+  interval: 24h
+```
+
+Anything you leave out keeps its default. A malformed file logs a warning and
+falls back to defaults rather than refusing to start.
+
+The file is rewritten from memory when the app quits, so edit it with the app
+closed or the edit is lost. There is no channel setting: which channel a build
+follows is decided when it is built — see [Updating](#updating).
 
 ## Updating
 
@@ -206,119 +226,232 @@ compare them.
 carries a badge on both its icons and names itself in its menu, because both are
 menu-bar-only apps and would otherwise be indistinguishable.
 
-Build it with:
+## When it stops reacting
+
+`/agent-pet:troubleshoot` walks this list if you have the plugin. By hand, in
+the order the causes actually occur:
+
+- **`petctl doctor` first.** It answers most of what follows in one line.
+- **Hooks are read when a session starts.** A session that was already open when
+  you installed them does not have them. `/reload-plugins`, or a new session.
+- **Is the pipe intact?** `petctl event claude permission_requested` pokes the
+  app directly, bypassing the hooks. If the pet reacts to that but not to real
+  work, the hooks are the problem, not the app.
+- **An update appeared to do nothing?** Almost always the old app was still
+  running. It holds the event port, and the new copy exits at startup rather
+  than reporting a conflict:
+
+  ```bash
+  pkill -f 'MacOS/petd'; sleep 1; open /Applications/agent-pet.app
+  ```
+
+- **Invisible, but reacting?** It may be off-screen or hidden; **Show Pet** in
+  the menu bar retrieves it. The window is deliberately transparent and
+  click-through in places, so "I cannot click it" is expected.
+
+Do not disable Gatekeeper, strip quarantine attributes, or re-sign the bundle to
+make something work. If macOS rejects a release, that is a finding worth
+reporting, not an obstacle to route around.
+
+## Privacy
+
+- No prompts, no source code, no command arguments are recorded. Default logs
+  contain event categories only; `logging.verbose: true` adds tool names.
+- The pet itself has no network client of any kind: it listens on loopback and
+  calls nothing out. Updates are fetched by `petctl`, a separate program, and
+  only when you run it — automatic checks are off until you turn them on.
+- Character packs are built from local images. Nothing is uploaded, and there is
+  no image-generation service to opt into.
+- No accessibility, screen-recording, camera, microphone or keyboard-monitoring
+  permission is requested, and no elevated privileges are needed.
+
+The event API is unauthenticated, so anything running as you — including
+whatever you ask your agent to run — can drive the pet. What that is and is not
+worth worrying about is set out in [SECURITY.md](SECURITY.md), along with how
+to report something privately.
+
+---
+
+## Building from source
+
+### Requirements
+
+- macOS (the architecture allows Windows and Linux; only macOS is exercised)
+- Xcode Command Line Tools — `xcode-select --install`. The menu-bar item is
+  Objective-C compiled through cgo, so a build needs clang; `codesign`,
+  `notarytool` and `stapler` come from here too. Full Xcode is never needed.
+- Go 1.23+
+- [Wails CLI](https://wails.io/docs/gettingstarted/installation) **v2.10.2 or
+  newer** — matching the version in `go.mod`. An older CLI fails to build on a
+  recent Go toolchain with `internal error: package "strings" without types`,
+  which does not look like a version problem:
+
+  ```bash
+  go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.2
+  ```
+
+  That installs into `$(go env GOPATH)/bin`, which is not on `PATH` by default
+  on macOS — so `wails` may be on disk and still not be a command you can run.
+  The Makefile looks there as well as on `PATH`, so `make build` works either
+  way; add it to your shell if you want to run `wails` yourself:
+
+  ```bash
+  export PATH="$PATH:$(go env GOPATH)/bin"
+  ```
+- Python 3 with Pillow, only if you want to regenerate the sprite art
+
+### Build and run
 
 ```bash
-make build CHANNEL=dev
+go mod tidy          # resolves Wails and yaml; needed once
+wails dev            # runs the pet with hot reload
 ```
 
-## Connecting Claude Code
+In another terminal:
 
 ```bash
-petctl install claude       # this project;  --global for every project
+go build -o bin/petctl ./cmd/petctl
+
+bin/petctl doctor
+bin/petctl test celebrate --for 8s
+bin/petctl event claude permission_requested
+bin/petctl watch
 ```
 
-Then start a **new** Claude Code session — hooks are read at startup, so the
-session you are in now will not pick them up. `petctl watch` shows the events
-arriving. `petctl doctor` says whether the hooks are installed, and
-`petctl uninstall claude` removes them again.
+`make build` produces the bundle; `make build CHANNEL=dev` produces the dev app
+instead. `make help` lists the rest.
 
-See [`adapters/README.md`](adapters/README.md) for the hook-to-event table and
-what the adapter deliberately does not try to detect.
-
-## Trying every state
-
-To see the whole character without waiting for an agent to do something:
+A bundle you build yourself is neither signed nor notarized, and it runs without
+complaint, because Gatekeeper only quarantines what arrives from elsewhere. One
+you *downloaded* is quarantined, and macOS refuses it with *"Agent Pet" is
+damaged and can't be opened*, which is not what has happened: the app is intact
+and unsigned. To run such a bundle anyway:
 
 ```bash
-for s in idle thinking working attention confused worried happy celebrate sleeping heart; do
-  petctl test $s --for 2s; sleep 2
-done
+xattr -d com.apple.quarantine /Applications/agent-pet.app
 ```
 
-Or drive a realistic session by hand:
+Do that only if you trust where the bundle came from, and never on a release —
+a signed one needs no such thing, and an agent asked to install this app will
+run that command without hesitating if the README implies it is routine.
+
+### Tests
 
 ```bash
-petctl event claude session_started --session demo
-petctl event claude thinking_started --session demo
-petctl event claude tool_started --session demo --meta tool=bash
-petctl event claude permission_requested --session demo
-petctl event claude tool_started --session demo --meta tool=edit
-petctl event claude task_completed --session demo
-petctl event claude tests_passed --session demo
+make test          # Go: engine, state machine, event API, adapter, placement
+make test-ui       # the window, in a browser
+make test-desktop  # the menu bar and corner placement, against a running app
 ```
 
-## Interacting with the pet
+CI runs the first of those on every push, against the Go version `go.mod`
+declares and against current stable, and builds the app bundle. It cannot run
+the other two: one needs a browser and the other needs the app running and
+drives its menu bar. A green tick is not evidence that a menu handler works.
 
-| Action | Result |
-|---|---|
-| Drag | Move the pet. Its position is remembered. |
-| Double-click | Pet it. |
-| Right-click | Menu: status, statistics, change pet, size, always on top, mute, quit. |
-| Menu bar | The same commands under the `Pet` menu while the app is frontmost. |
+The state machine is a pure function of (events, clock), so its tests drive a
+synthetic clock and never sleep. See
+[ADR 0004](docs/adr/0004-deterministic-state-machine.md).
 
-The pet also lives in the macOS menu bar. Its icon shows the current state and
-carries the same commands. **Show Pet** is a checkbox there: it puts the pet
-away and brings it back, and bringing it back also retrieves one that has been
-dragged off the edge of the screen. **Change Pet** is a submenu listing the
-characters, so switching happens in the menu bar rather than in a panel beside
-the pet. See [ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
+`make test-ui` serves the repository and opens
+[`ui/test/index.html`](ui/test/index.html), which loads the real
+`ui/dist/index.html` into a fresh iframe for each test and reports pass/fail on
+the page. There is no runner to install and no build step, because the UI is one
+static file and its tests should cost the same to run. They cover sprite
+rendering and timing, the panels and menu, click versus double-click, the
+layout invariant that an open panel never covers the pet, and — most
+importantly — that nothing an agent controls can become markup (§26).
 
-The character comes in three sizes — small, medium and large — from the
-right-click menu or the `pet.scale` setting.
+## Cutting a release
 
-Two rules decide whether she is awake, and neither has a special case:
-
-- **No agent, no pet.** Claude Code exiting puts her to sleep at once, and so
-  does never having started.
-- **Idle and quiet for a minute** and she dozes off, waking on the next event.
-
-A pending request is `attention`, not idle, so it falls outside the second rule
-rather than being excused from it — nobody answers a prompt they were never
-shown.
-
-When no agent is connected — Claude Code has exited, or has not started — the
-character greys out. Awake and in colour means something is there to watch;
-grey means the pet is running but nothing is. A state forced with
-`petctl test` keeps its colour, since the point of forcing one is to look at it.
-
-## Configuration
-
-`~/.config/agent-pet/config.yaml` is written on first run.
-
-```yaml
-pet:
-  active: momo          # momo, or your own pack
-  always_on_top: true
-  scale: 1.0
-  drop_shadow: true     # off if it reads as a halo on a light wallpaper
-
-behavior:
-  dialogue: true        # speech bubbles
-
-personality:
-  name: SanMao (三毛)
-  personality: gentle   # gentle cheerful calm mischievous sarcastic energetic
-
-thresholds:
-  idle_after: 30s       # a quiet agent stops looking busy
-  sleeping_after: 60s   # ... and shortly after that, dozes off
-
-server:
-  addr: 127.0.0.1:9876
-
-update:
-  check: false          # nothing contacts the network until this is true
-  interval: 24h
+```bash
+git tag v0.2.0     # the tag is the version; it reaches Info.plist via brand.sh
+make release       # builds, notarizes, uploads, writes the manifest
 ```
 
-There is no channel setting: which channel a build follows is decided when it is
-built. The dev app is a separate install — see [Updating](#updating).
+`make release CHANNEL=dev` cuts the dev app instead, from a prerelease tag. The
+two are built, signed and published separately; a release is one app or the
+other, never both.
 
-Anything you leave out keeps its default. A malformed file logs a warning and
-falls back to defaults rather than refusing to start.
+That builds the bundle, signs and staples it, attaches
+`agent-pet-<version>-universal.zip` to the GitHub release — and then stops,
+leaving `updates/release.json` modified and **uncommitted**. Apple usually
+answers within a few minutes.
 
-## The event API
+Nobody is offered the new version until you commit that file:
+
+```bash
+git diff updates/release.json
+git commit -am "Offer 0.2.0 on the release channel" && git push
+```
+
+Publishing an asset and offering it over the air are deliberately two acts. You
+can build a release, install it yourself, live with it for a week, and only then
+decide — and the decision has a diff, a commit message, and `git revert` as the
+undo. See [`updates/README.md`](updates/README.md) and
+[ADR 0008](docs/adr/0008-over-the-air-updates.md).
+
+The individual steps are still there when you want them: `make build`,
+`make notarize`.
+
+Skip the tag and `make release` refuses: it takes the version from the tag on
+HEAD, choosing the plain one for the release app and the prerelease for the dev
+app, so both can be cut from the same commit. An untagged `make build` falls
+back to `wails.json`, which is the only thing that file is still for.
+
+`make build` alone needs nothing beyond the requirements above. `make notarize`
+needs Apple credentials, and those do not travel with a clone — on a machine
+that has never signed:
+
+1. **The certificate.** Import your `.p12` backup (double-click it, give the
+   export password). Do not create a second one: Apple caps how many Developer
+   ID certificates an account may hold, and a certificate whose private key is
+   on another Mac cannot sign anything. Confirm with
+
+   ```bash
+   security find-identity -v -p codesigning
+   ```
+
+   You want one `Developer ID Application: Your Name (TEAMID)`.
+
+2. **The notary credentials**, from the App Store Connect API key. The `.p8`
+   downloads exactly once and can never be re-fetched, so it is in your
+   password manager or it is gone:
+
+   ```bash
+   xcrun notarytool store-credentials agent-pet --key AuthKey_XXXXX.p8 --key-id YOUR_KEY_ID
+   ```
+
+3. **The profile name**, so `make notarize` takes no arguments. The file is
+   git-ignored, because it names a keychain item that exists only here:
+
+   ```bash
+   echo agent-pet > .notary-profile
+   ```
+
+Releases are cut by hand for the same reason step 1 is fiddly: signing on a
+runner would mean a copy of that private key in the repository's secrets.
+[`docs/signing.md`](docs/signing.md) covers the first-time Apple setup behind
+all three — enrolment, creating the certificate, and creating the API key —
+and what to do when a step fails.
+
+---
+
+## How it works
+
+Hooks fire, `petctl hook claude` POSTs an event to a loopback port, a
+deterministic state machine reduces the stream to one visible state, and a
+transparent Wails window draws the character. Every decision that shaped that is
+written down in [`docs/adr/`](docs/adr/) — start with
+[ADR 0001](docs/adr/0001-single-process-petd.md) and
+[ADR 0007](docs/adr/0007-what-the-states-mean.md), which says what each of the
+ten states is allowed to mean.
+
+The pet never guesses. If Claude Code does not report something, the pet does
+not infer it — see the note on degrading honestly in
+[`adapters/README.md`](adapters/README.md), which also carries the
+hook-to-event table.
+
+### The event API
 
 Any local process can drive the pet:
 
@@ -358,7 +491,7 @@ set `server.allow_non_loopback`. See [`docs/events.md`](docs/events.md) for the
 full event vocabulary and [ADR 0002](docs/adr/0002-event-transport.md) for the
 hardening applied to untrusted input.
 
-## Characters
+### Characters
 
 One built-in pack ships in the binary:
 
@@ -382,24 +515,7 @@ Your own packs go in `~/.local/share/agent-pet/pets/<id>/` and are picked up
 at startup. A pack with the same id as a built-in replaces it. The format is one
 PNG strip per state plus a `manifest.json`; see [`docs/pets.md`](docs/pets.md).
 
-## Privacy
-
-- No prompts, no source code, no command arguments are recorded. Default logs
-  contain event categories only; `logging.verbose: true` adds tool names.
-- The pet itself has no network client of any kind: it listens on loopback and
-  calls nothing out. Updates are fetched by `petctl`, a separate program, and
-  only when you run it — automatic checks are off until you turn them on.
-- Character packs are built from local images. Nothing is uploaded, and there is
-  no image-generation service to opt into.
-- No accessibility, screen-recording, camera, microphone or keyboard-monitoring
-  permission is requested, and no elevated privileges are needed.
-
-The event API is unauthenticated, so anything running as you — including
-whatever you ask your agent to run — can drive the pet. What that is and is not
-worth worrying about is set out in [SECURITY.md](SECURITY.md), along with how
-to report something privately.
-
-## Layout
+### Layout
 
 ```
 main.go                the entry point: flags, config, logging, wiring
@@ -417,6 +533,8 @@ internal/update/       the update manifest and version comparison — no network
                        no subprocess, so petd stays free of both (ADR 0008)
 cmd/petctl/            the CLI (no shared code with the engine), and the whole
                        of the updater: the fetch, the checks, the bundle swap
+plugin/                the Claude Code plugin: the hooks, and the install and
+                       troubleshoot skills
 updates/               the channel manifests — committing one is what publishes
                        a release to everybody
 adapters/claude/       the Claude Code hook adapter
@@ -427,31 +545,17 @@ ui/test/               its tests — open in a browser, no build step
 docs/adr/              architectural decisions
 ```
 
-## Tests
+### Where it stands
 
-```bash
-make test          # Go: engine, state machine, event API, adapter, placement
-make test-ui       # the window, in a browser
-make test-desktop  # the menu bar and corner placement, against a running app
-```
+**Milestones 1 and 2 are in** — the pet engine, the local event API, `petctl`,
+the desktop window, a pixel-art character, the Claude Code adapter and plugin,
+and over-the-air updates. The Codex adapter is Milestone 3, and statistics are
+still in memory rather than a durable store;
+[ADR 0006](docs/adr/0006-milestone-1-boundaries.md) records which seam each
+deferred piece attaches to.
 
-CI runs the first of those on every push, against the Go version `go.mod`
-declares and against current stable, and builds the app bundle. It cannot run
-the other two: one needs a browser and the other needs the app running and
-drives its menu bar. A green tick is not evidence that a menu handler works.
-
-The state machine is a pure function of (events, clock), so its tests drive a
-synthetic clock and never sleep. See
-[ADR 0004](docs/adr/0004-deterministic-state-machine.md).
-
-`make test-ui` serves the repository and opens
-[`ui/test/index.html`](ui/test/index.html), which loads the real
-`ui/dist/index.html` into a fresh iframe for each test and reports pass/fail on
-the page. There is no runner to install and no build step, because the UI is one
-static file and its tests should cost the same to run. They cover sprite
-rendering and timing, the panels and menu, click versus double-click, the
-layout invariant that an open panel never covers the pet, and — most
-importantly — that nothing an agent controls can become markup (§26).
+If you want to work on it, [CLAUDE.md](CLAUDE.md) is the map — including a list
+of the things here that cost an hour each to discover.
 
 ## License
 
