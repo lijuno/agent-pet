@@ -208,8 +208,10 @@ menu and opens the release notes. It does not install: the app holds no updater
 and opens no connections of its own. `petctl` does the work, which is why
 [SECURITY.md](SECURITY.md) can still say the daemon never dials out.
 
-Nothing checks on its own unless you ask it to. `update.check: true` in the
-config file runs one at most once a day when a Claude Code session starts.
+A check runs on its own at most once a day, when a Claude Code session starts;
+`update.check: false` in the config file stops it. Upgrading never turns it on
+for you: the file is rewritten in full on every quit, so an installation that
+predates this default already has its own answer written down.
 
 ### Two apps, not two channels
 

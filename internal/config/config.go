@@ -102,10 +102,11 @@ type Thresholds struct {
 // checking and the installing.
 type Update struct {
 	// Check enables the automatic check that runs from the Claude Code
-	// SessionStart hook. Off by default, and deliberately: an app that has
-	// never contacted a server should not start doing so because it was
-	// upgraded. `petctl update --check` always works, because typing it is
-	// consent.
+	// SessionStart hook. On by default. It only ever reaches an installation
+	// that has no answer of its own: the file is written back in full on every
+	// quit, so anybody who turned checks off has that on disk and an upgrade
+	// cannot talk them round. `petctl update --check` works either way,
+	// because typing it is consent.
 	Check bool `yaml:"check"`
 	// ManifestURL is a template; {channel} is filled in from the build's own
 	// flavor. A fork points this at its own manifest.

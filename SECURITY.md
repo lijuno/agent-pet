@@ -36,14 +36,18 @@ The same reasoning is why the menu-bar item opens a release page through
 
 What `petctl` does reach:
 
-- `raw.githubusercontent.com`, for a small JSON manifest, when you run
-  `petctl update --check`. Nothing is sent but the request.
+- `raw.githubusercontent.com`, for a small JSON manifest — when you run
+  `petctl update --check`, and once a day from the Claude Code `SessionStart`
+  hook. Nothing is sent but the request.
 - `github.com` and its asset storage, to download a release you chose to
   install.
 
-No check runs on its own unless `update.check` is set in the config file. It is
-off in a fresh install, and turning it on is the only way this program contacts
-anything.
+The manifest check runs on its own, at most once a day. It is the only thing
+this program does unasked, and all it does is read a version number: nothing is
+downloaded and nothing is installed without you asking for it. `update.check:
+false` in the config file stops it, and an installation that predates this
+default keeps whatever it already had — the file is rewritten in full on every
+quit, so its answer is already on disk.
 
 Before an update replaces the app, the download must match the manifest's
 SHA-256, pass `codesign --verify --strict` and `spctl`, and carry **the same

@@ -139,10 +139,11 @@ Say it exists and leave it there. Someone who wants prereleases will ask; the
 release app is the right thing for everyone else, and installing both without
 being asked leaves an extra menu-bar-only app on their machine.
 
-Also mention that automatic update checks are **off** — the app contacts no
-server at all until they turn them on. `petctl update --check` is the manual
-version, and `update.check: true` in the config file that `petctl doctor` names
-turns on a once-a-day check when a Claude Code session starts.
+Also mention that automatic update checks are **on**: when a Claude Code session
+starts, `petctl` fetches a small JSON manifest from `raw.githubusercontent.com`,
+at most once a day. It only checks — nothing is downloaded or installed without
+them saying yes. `update.check: false` in the config file that `petctl doctor`
+names turns it off, and `petctl update --check` is the manual version.
 
 ### 8. Tell them what happens next
 

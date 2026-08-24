@@ -99,11 +99,11 @@ func dueForCheck(interval time.Duration, last, now time.Time) bool {
 
 // maybeCheckForUpdates starts a check in the background when a session begins.
 //
-// Three things make this safe to hang off somebody else's tool call. It is off
-// unless the user turned it on: an app that has never contacted a server does
-// not start doing so because it was upgraded. It runs at most once an interval.
-// And it is started and abandoned — never waited for — because the hook has a
-// budget measured in milliseconds and a network call does not fit in it.
+// Three things make this safe to hang off somebody else's tool call. It fetches
+// a manifest and nothing else — an update is never installed without the user
+// asking. It runs at most once an interval. And it is started and abandoned —
+// never waited for — because the hook has a budget measured in milliseconds and
+// a network call does not fit in it.
 func maybeCheckForUpdates() {
 	cfg, _ := config.Load(config.Path())
 	if !cfg.Update.Check {

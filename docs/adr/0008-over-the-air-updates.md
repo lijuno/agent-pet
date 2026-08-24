@@ -176,15 +176,22 @@ straight into it, so:
   installed**. Without that second half, an update that silently left the old
   daemon running would report success.
 
-### Automatic checks are off by default
+### Automatic checks are on by default
 
-An app that has never contacted a server should not start doing so because it
-was upgraded. `update.check` is `false` in a fresh config; `petctl update
---check` always works, because typing it is consent.
+`update.check` is `true` in a fresh config. It was `false` first, on the
+reasoning that an app which has never contacted a server should not start
+because it was upgraded — but a fix nobody hears about is not a fix, and the
+check reads a version number and nothing else. Nothing is downloaded or
+installed without the user asking, and `petctl update --check` works either way,
+because typing it is consent.
 
-When it is on, the check is started from the `SessionStart` hook — at most once
-a day, in a detached process, never waited for. The hook has a budget measured
-in milliseconds and a network call does not fit in it.
+The default only ever reaches an installation that has no answer of its own.
+`config.yaml` is written back in full on every quit, so somebody who turned
+checks off has that on disk and no upgrade may talk them round.
+
+The check is started from the `SessionStart` hook — at most once a day, in a
+detached process, never waited for. The hook has a budget measured in
+milliseconds and a network call does not fit in it.
 
 ## What was considered and not done
 
