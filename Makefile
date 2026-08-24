@@ -89,7 +89,8 @@ demo: petctl
 	@./scripts/demo.sh
 
 # plugin/hooks/hooks.json has to agree with claude.Hooks exactly. Generating it
-# is the only way they stay in step; plugin_test.go fails if they drift.
+# is the only way they stay in step; adapters/claude/plugin_hooks_test.go
+# fails if they drift.
 plugin-hooks:
 	@python3 scripts/gen-plugin-hooks.py
 

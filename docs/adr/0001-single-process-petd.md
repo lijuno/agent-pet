@@ -20,7 +20,7 @@ Ship **one binary, `petd`**, built with Wails. It contains:
 `petctl` is a second, tiny binary with no dependency on the engine. It only
 speaks HTTP to `petd`.
 
-The engine never imports Wails. The Wails layer (`main.go`, `app.go`) is a thin
+The engine never imports Wails. The Wails layer (`internal/desktop/`) is a thin
 adapter that subscribes to engine state changes and forwards them to the
 frontend. This keeps the boundary the spec cares about — the engine is
 replaceable and testable without a GUI.

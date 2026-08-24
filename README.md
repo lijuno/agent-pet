@@ -271,7 +271,8 @@ to report something privately.
 ## Layout
 
 ```
-main.go, app.go        Wails shell — the only files that import Wails
+main.go                the entry point: flags, config, logging, wiring
+internal/desktop/      the Wails shell — the only package that imports Wails
 internal/events/       the internal event vocabulary and its sanitiser
 internal/state/        the deterministic state machine
 internal/engine/       event intake, timers, subscribers

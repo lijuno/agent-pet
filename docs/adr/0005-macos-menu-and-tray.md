@@ -45,10 +45,11 @@ duplicate symbol '_OBJC_CLASS_$_AppDelegate'
 entirely, which is why the build tag looked healthy while producing no app.
 
 The status item is now written directly against AppKit in
-`statusitem_darwin.{h,m,go}`: an `NSStatusItem` hung off the `NSApplication`
-Wails already runs, with its action target under a name of our own. It creates
-no application, no delegate and no run loop, so there is nothing left for it to
-fight over — which is what made the shared run loop risky in the first place.
+`internal/desktop/statusitem_darwin.{h,m,go}`: an `NSStatusItem` hung off the
+`NSApplication` Wails already runs, with its action target under a name of our
+own. It creates no application, no delegate and no run loop, so there is nothing
+left for it to fight over — which is what made the shared run loop risky in the
+first place.
 `fyne.io/systray` is no longer a dependency, and the build tag is gone with it.
 
 The reasoning above still holds for the other two surfaces, and still explains

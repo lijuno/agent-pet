@@ -132,7 +132,7 @@ function stubBackend(w, impl) {
     },
     has() { return true; },
   });
-  w.go = { main: { App: app } };
+  w.go = { desktop: { App: app } };
   return calls;
 }
 

@@ -1,4 +1,4 @@
-package main
+package desktop
 
 import (
 	"context"
@@ -20,7 +20,11 @@ import (
 
 // App is the Wails-facing adapter. It is deliberately thin: it forwards engine
 // updates to the frontend and turns frontend calls back into engine calls.
-// Nothing in internal/ knows this file exists.
+// The dependency runs one way — nothing the engine, the state machine or the
+// server does knows this package exists.
+//
+// Wails binds every exported method here, and names the JavaScript namespace
+// after this package: the frontend reaches them as window.go.desktop.App.
 type App struct {
 	ctx context.Context
 	eng *engine.Engine
@@ -591,7 +595,7 @@ type Info struct {
 func (a *App) GetInfo() Info {
 	cfg := a.eng.Config()
 	out := Info{
-		Version:     version,
+		Version:     Version,
 		Addr:        a.addr,
 		ConfigPath:  a.cfgPath,
 		PetsDir:     config.PetsDir(),

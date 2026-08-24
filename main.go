@@ -9,19 +9,14 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
 
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/mac"
-
 	"github.com/lijuno/agent-pet/internal/config"
+	"github.com/lijuno/agent-pet/internal/desktop"
 	"github.com/lijuno/agent-pet/internal/engine"
 	"github.com/lijuno/agent-pet/internal/petassets"
 	"github.com/lijuno/agent-pet/internal/server"
@@ -78,10 +73,11 @@ func main() {
 
 	eng := engine.New(cfg, lib, log)
 	server.Version = version
+	desktop.Version = version
 	srv := server.New(eng, log)
 	// Wails runs this binary to generate bindings; that pass must not take the
 	// port, or building while the pet is running fails.
-	if !generatingBindings {
+	if !desktop.GeneratingBindings {
 		if err := srv.Listen(cfg.Server); err != nil {
 			fmt.Fprintln(os.Stderr, "petd:", err)
 			fmt.Fprintln(os.Stderr, "  (another petd may already be running — try `petctl status`)")
@@ -104,7 +100,7 @@ func main() {
 		return
 	}
 
-	app := NewApp(eng, log, cfgPath, srv.Addr())
+	app := desktop.NewApp(eng, log, cfgPath, srv.Addr())
 	// Let `petctl doctor` see the window and the menu bar. The server has no
 	// idea either exists; this is the only wire between them.
 	srv.Desktop = app.DesktopDiagnostics
@@ -113,52 +109,11 @@ func main() {
 	srv.StatusItem = app.ClickStatusItem
 	srv.StatusMenu = app.StatusMenu
 	srv.SetShown = app.SetShown
-	// Only as big as the character. The window grows when a panel opens and
-	// shrinks again when it closes — see App.OpenOverlay for why it must not
-	// simply stay large.
-	winW, winH := WindowSize(cfg.Pet.Scale)
-	err := wails.Run(&options.App{
-		Title:  "Agent Pet",
-		Width:  winW,
-		Height: winH,
 
-		Frameless:     true,
-		DisableResize: true,
-		AlwaysOnTop:   cfg.Pet.AlwaysOnTop,
-		StartHidden:   cfg.Window.StartHidden,
-
-		// A fully transparent window: the webview paints nothing but the pet,
-		// and the window itself has no background to paint.
-		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 0},
-		Mac: &mac.Options{
-			WebviewIsTransparent: true,
-			// Leave WindowIsTranslucent false: it adds an NSVisualEffectView
-			// blur behind the webview, which would put a frosted square around
-			// the pet instead of leaving the desktop visible.
-			WindowIsTranslucent: false,
-			DisableZoom:         true,
-			About: &mac.AboutInfo{
-				Title:   "Agent Pet",
-				Message: "An ambient companion for Claude Code and Codex.\nVersion " + version,
-			},
-		},
-
-		AssetServer: &assetserver.Options{
-			Assets: assets,
-			// Pets the user added on disk are not in the binary, so they are
-			// served here. Everything else 404s.
-			Handler: userPetHandler(config.PetsDir()),
-		},
-		Menu:       app.appMenu(),
-		OnStartup:  app.startup,
-		OnShutdown: app.shutdown,
-		Bind:       []any{app},
-
-		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId: "com.agentpet.petd",
-		},
-	})
-	if err != nil {
+	if err := desktop.Run(app, desktop.Options{
+		Assets:  assets,
+		PetsDir: config.PetsDir(),
+	}); err != nil {
 		log.Error("window", "err", err)
 		fmt.Fprintln(os.Stderr, "petd:", err)
 		os.Exit(1)
@@ -177,43 +132,6 @@ func runHeadless(ctx context.Context, cancel context.CancelFunc, srv *server.Ser
 	cancel()
 	_ = srv.Close()
 	log.Info("petd stopped")
-}
-
-// userPetHandler serves pet packs from the user's data directory.
-//
-// The path is validated rather than trusted: only /userpets/<id>/<file> is
-// reachable, both segments must be simple names, and the result must still be
-// inside the pets directory after cleaning (§26 — external input is untrusted).
-func userPetHandler(petsDir string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-		rest, ok := strings.CutPrefix(r.URL.Path, "/userpets/")
-		if !ok {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-		id, file, ok := strings.Cut(rest, "/")
-		if !ok || !safeSegment(id) || !safeSegment(file) {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-		full := filepath.Join(petsDir, id, file)
-		if !strings.HasPrefix(filepath.Clean(full), filepath.Clean(petsDir)+string(os.PathSeparator)) {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-		http.ServeFile(w, r, full)
-	})
-}
-
-func safeSegment(s string) bool {
-	if s == "" || s == "." || s == ".." || len(s) > 64 {
-		return false
-	}
-	return !strings.ContainsAny(s, `/\`) && !strings.Contains(s, "..")
 }
 
 // newLogger writes concise lines to both stderr and a log file. §32: event

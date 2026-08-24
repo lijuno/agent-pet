@@ -1,8 +1,9 @@
-package main
+package claude_test
 
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -30,7 +31,7 @@ type pluginHooks struct {
 
 func loadPluginHooks(t *testing.T) pluginHooks {
 	t.Helper()
-	b, err := os.ReadFile("plugin/hooks/hooks.json")
+	b, err := os.ReadFile(filepath.Join("..", "..", "plugin", "hooks", "hooks.json"))
 	if err != nil {
 		t.Fatalf("reading the plugin hooks: %v", err)
 	}

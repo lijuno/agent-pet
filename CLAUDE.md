@@ -50,8 +50,9 @@ accessibility access, which is refused here.
 ## Layout
 
 ```
-main.go, app.go        the Wails shell — the only files importing Wails
-statusitem_darwin.*    the menu-bar item, written against AppKit in cgo
+main.go                the entry point: flags, config, logging, wiring
+internal/desktop/      the Wails shell — the only package importing Wails
+                       (statusitem_darwin.* is the menu-bar item, in cgo)
 internal/state/        the state machine: pure, no clock, no goroutines
 internal/engine/       event intake, timers, subscribers
 internal/server/       the loopback event API
@@ -93,8 +94,14 @@ Each of these cost an hour or more to find.
   visibility they expect first, because asserting on what the last run left
   behind passes in sequence and fails alone.
 - **cgo compiles Objective-C without ARC.** `-fobjc-arc` in
-  `statusitem_darwin.go` is load-bearing: without it the status item is
-  autoreleased out from under its static and the next message crashes the app.
+  `internal/desktop/statusitem_darwin.go` is load-bearing: without it the status
+  item is autoreleased out from under its static and the next message crashes
+  the app.
+- **Wails names the frontend's backend namespace after the Go package.** `App`
+  lives in `internal/desktop`, so the UI calls `window.go.desktop.App`. Move
+  that package and every backend call silently returns null — `backend()` in
+  `ui/dist/index.html` degrades instead of throwing. `make test-desktop` is what
+  catches it; the UI suite stubs the namespace and cannot.
 - **Never call the Wails runtime from a native menu callback.** Those run on
   the main thread, and emitting an event ends in `evaluateJavaScript`, which
   segfaults from there. `goStatusClick` hands off to a goroutine for this

@@ -1,6 +1,6 @@
 //go:build darwin
 
-package main
+package desktop
 
 /*
 // -fobjc-arc is load-bearing. cgo compiles Objective-C without ARC by default,
@@ -27,7 +27,7 @@ import (
 	"github.com/lijuno/agent-pet/internal/state"
 )
 
-//go:embed build/trayicon.png
+//go:embed trayicon.png
 var trayIcon []byte
 
 // statusApp is how the C callback finds its way back. There is exactly one

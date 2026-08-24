@@ -235,8 +235,10 @@ let muted = false;
 
 /* --- backend plumbing ---------------------------------------------------- */
 
+// Wails names this after the Go package that App lives in: internal/desktop.
+// Rename that package and this line has to move with it.
 function backend() {
-  return (window.go && window.go.main && window.go.main.App) || null;
+  return (window.go && window.go.desktop && window.go.desktop.App) || null;
 }
 
 async function call(name, ...args) {
