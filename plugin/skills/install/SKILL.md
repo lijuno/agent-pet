@@ -1,5 +1,5 @@
 ---
-description: Install or update the Agent Pet macOS app that this plugin drives. Use when the user asks to install, set up, or update the pet app.
+description: Install the Agent Pet macOS app that this plugin drives, for the first time. Use when the user asks to install or set up the pet app. To update one that is already installed, use the update skill instead.
 disable-model-invocation: true
 ---
 
@@ -34,26 +34,11 @@ petctl doctor
 
 `petctl` is on your `PATH` while this plugin is enabled.
 
-**If it reports a running app, the rest of this skill is not what you want.**
-The app updates itself, and doing it by hand risks getting it wrong in ways the
-built-in path already handles — quitting the old daemon before replacing the
-bundle it is running from, and checking that what arrived is signed by the same
-developer as what is being replaced.
-
-```bash
-petctl update --check --json
-```
-
-That prints `{"available": true, "latest": "..."}` when there is something
-newer. Tell the user the version, and install it only if they say yes:
-
-```bash
-petctl update
-```
-
-It quits the pet, verifies the download, swaps the bundle and starts it again,
-and it refuses rather than guesses at every step. Then go to *Prove it works*.
-If it says this is a dev build, the user built it themselves — say so and stop.
+**If it reports a running or installed app, this is not the skill you want.**
+Use `/agent-pet:update` instead — the app updates itself, and doing it by hand
+risks getting wrong the parts that command already handles: quitting the old
+daemon before replacing the bundle it is running from, and checking that what
+arrived is signed by the same developer and is the same application.
 
 If `petctl doctor` reports the app is not installed, continue below.
 

@@ -180,6 +180,15 @@ follows is decided when it is built — see [Updating](#updating).
 
 ## Updating
 
+Ask Claude Code:
+
+```
+/agent-pet:update
+```
+
+It checks, tells you what it found, waits for you to say yes, and then runs the
+command below — which is the same thing you can run yourself:
+
 ```bash
 petctl update --check     # is there a newer one?
 petctl update             # install it

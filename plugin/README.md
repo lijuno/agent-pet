@@ -8,6 +8,16 @@ The front door. Installing this plugin is how a user gets the pet.
 /agent-pet:install
 ```
 
+Later, when there is a newer version:
+
+```
+/agent-pet:update
+```
+
+Both are user-invoked only. Neither will run because an agent decided the
+moment was right: installing and updating both replace an application and the
+second one quits the pet while somebody is working.
+
 ## What is in here, and why
 
 | Path | Purpose |
@@ -15,6 +25,7 @@ The front door. Installing this plugin is how a user gets the pet.
 | `hooks/hooks.json` | The ten Claude Code hooks, each running `petctl hook claude` |
 | `bin/petctl` | A shim resolving `petctl` inside the installed app bundle |
 | `skills/install/` | `/agent-pet:install` — downloads, **verifies**, installs the app |
+| `skills/update/` | `/agent-pet:update` — moves an installed app to the newest published version |
 | `skills/troubleshoot/` | `/agent-pet:troubleshoot` — diagnoses a pet that is not reacting |
 
 The plugin is small and travels over git. The app is a signed download from

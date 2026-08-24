@@ -2,7 +2,7 @@
   "name": "agent-pet",
   "displayName": "Agent Pet",
   "description": "A desktop pet that reacts to what Claude Code is doing. Ships the hooks; the app itself is a separate signed download.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "lijuno",
     "url": "https://github.com/lijuno"
@@ -10,5 +10,10 @@
   "homepage": "https://github.com/lijuno/agent-pet",
   "repository": "https://github.com/lijuno/agent-pet",
   "license": "MIT",
-  "keywords": ["desktop-pet", "ambient", "status", "macos"]
+  "keywords": [
+    "desktop-pet",
+    "ambient",
+    "status",
+    "macos"
+  ]
 }
