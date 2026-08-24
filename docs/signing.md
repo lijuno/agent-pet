@@ -123,25 +123,52 @@ xcrun notarytool history --keychain-profile agent-pet
 An empty history that returns cleanly is a pass.
 
 Storing credentials keeps secrets off the command line, where `ps` would show
-them to any process on the machine, and out of shell history and CI logs.
+them to any process on the machine, and out of shell history.
+
+### 4. Name the profile for this checkout
+
+```bash
+echo agent-pet > .notary-profile
+```
+
+That is the whole of it — `make notarize` takes the name from there and needs
+no arguments after this. The file is git-ignored, and has to be: it names a
+keychain item that exists only on the machine that ran `store-credentials`, so
+a committed copy would point everyone else at a profile they do not have. It is
+not itself a secret; the credentials never leave the keychain.
 
 ---
 
 ## Cutting a release
+
+Tag first — `VERSION` comes from `git describe`, and an untagged tree builds as
+`0.1.0` whatever the release is called:
+
+```bash
+git tag v0.1.0 && make version-sync
+```
 
 ```bash
 make build
 ```
 
 ```bash
-make notarize NOTARY_PROFILE=agent-pet
+make notarize
 ```
 
 That leaves `build/bin/agent-pet-<version>-universal.zip`, stapled and ready to
 attach to a GitHub release. Submission to Apple usually takes a few minutes.
+`NOTARY_PROFILE=other-name` overrides `.notary-profile` for one run.
 
 Neither Xcode nor a paid toolchain is needed beyond this: `notarytool` and
 `stapler` ship with the Command Line Tools.
+
+**This happens on your machine, not on a runner.** There is no signing job in
+CI and that is deliberate: a runner can only sign if the certificate's private
+key is copied into repository secrets, and that key is the one thing that
+cannot be re-issued freely — Apple caps how many Developer ID certificates an
+account may hold. Releases here are cut by hand, from the one machine that
+holds it.
 
 ---
 
@@ -171,6 +198,10 @@ like a signing fault.
 **Repackages after stapling.** Stapling attaches the notarization ticket to the
 bundle so it launches offline. The zip made before stapling holds a copy
 without the ticket, so it is rebuilt afterwards.
+
+**Checks for the profile before it signs anything.** A missing profile found
+after the bundle is signed and zipped costs a minute to learn something it
+could have said at once.
 
 **Discovers the bundle rather than naming it.** The app has been renamed once
 (`digital-pet` → `agent-pet`). A hardcoded path survives a rename looking
@@ -205,6 +236,7 @@ into `/Applications`, and stops rather than working around a failure.
 
 | Symptom | Cause |
 |---|---|
+| `no notarytool profile` | `.notary-profile` is missing — step 4 above |
 | `no 'Developer ID Application' certificate` | Not created yet, or the wrong type was created |
 | Identity listed but `codesign` fails | Intermediate missing from the chain — [apple.com/certificateauthority](https://www.apple.com/certificateauthority/) |
 | Certificate present, no private key under it | The CSR was generated on a different machine |
@@ -219,21 +251,3 @@ xcrun notarytool log <submission-id> --keychain-profile agent-pet
 
 Get the submission id from `xcrun notarytool history --keychain-profile agent-pet`.
 
----
-
-## In CI
-
-`scripts/notarize.sh` takes credentials from the environment when `--profile`
-is absent, so the local and CI paths run the same code:
-
-| Secret | From |
-|---|---|
-| `MACOS_CERT_P12` | `base64 -i cert.p12` |
-| `MACOS_CERT_PASSWORD` | the export password |
-| `NOTARY_ISSUER_ID` | App Store Connect (team keys only) |
-| `NOTARY_KEY_ID` | App Store Connect |
-| `NOTARY_KEY_P8` | the `.p8`, base64 |
-
-The runner imports the `.p12` into a temporary keychain it deletes afterwards.
-The API key is written to a temporary file rather than passed as an argument,
-so it stays out of the process list and the build log.

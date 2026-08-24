@@ -4,8 +4,8 @@ APP := build/bin/agent-pet.app
 
 # The tag is the single source of truth for the version. wails.json carries a
 # copy because Info.plist is templated from it; `make version-sync` rewrites it
-# from here, and the release workflow runs that before building so a release
-# cannot ship claiming a version nobody tagged.
+# from here, and cutting a release means running it before `make build` so a
+# release cannot ship claiming a version nobody tagged.
 GIT_VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
 VERSION ?= $(if $(GIT_VERSION),$(GIT_VERSION),0.1.0)
 LDFLAGS := -X main.version=$(VERSION)
@@ -115,7 +115,8 @@ embed-petctl:
 
 # Rewrites wails.json's productVersion from VERSION. Info.plist is templated
 # from that field, so this is what makes CFBundleShortVersionString match the
-# tag. Intended for the release workflow; it edits a tracked file.
+# tag. Run it before `make build` when cutting a release; it edits a tracked
+# file.
 version-sync:
 	@python3 -c "import json,sys; p='wails.json'; d=json.load(open(p)); d['info']['productVersion']='$(VERSION)'; json.dump(d,open(p,'w'),indent=2); open(p,'a').write('\n'); print('wails.json productVersion ->','$(VERSION)')"
 
@@ -138,7 +139,10 @@ require-wails:
 
 # Signs, notarizes and staples whatever `make build` produced. Needs a
 # Developer ID Application certificate and a notarytool keychain profile; the
-# script says how to get both if either is missing. NOTARY_PROFILE names the
-# profile.
+# script says how to get both if either is missing. The profile name comes from
+# .notary-profile, which is machine-local and git-ignored; NOTARY_PROFILE
+# overrides it for one run. Releases are cut by hand on the machine holding the
+# certificate — there is no signing job in CI, deliberately, because there
+# would have to be a copy of the private key in the repository secrets.
 notarize:
 	@./scripts/notarize.sh $(if $(NOTARY_PROFILE),--profile $(NOTARY_PROFILE),)

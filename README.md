@@ -72,15 +72,21 @@ A release build:
 
 ```bash
 make build           # produces build/bin/agent-pet.app
+make notarize        # signs it, sends it to Apple, staples the ticket
 ```
 
-A bundle you build yourself is neither signed nor notarized. Released ones
-are: see [`docs/signing.md`](docs/signing.md) for how that is done, and for the
-one-time Apple setup behind it. One you built yourself runs without complaint,
-because Gatekeeper only quarantines what arrives from elsewhere. One you
-downloaded is quarantined, and macOS refuses it with *"Agent Pet" is damaged
-and can't be opened*, which is not what has happened: the app is intact and
-unsigned. To run it anyway:
+The second needs a Developer ID certificate and a stored notarytool profile, so
+it runs only on the machine holding them. Releases here are cut by hand for
+that reason: signing on a runner would mean putting a copy of the private key
+in the repository's secrets, and Apple caps how many of those certificates an
+account may have. [`docs/signing.md`](docs/signing.md) is the one-time Apple
+setup behind it.
+
+A bundle you build yourself is neither signed nor notarized; a released one is.
+One you built yourself runs without complaint, because Gatekeeper only
+quarantines what arrives from elsewhere. One you downloaded is quarantined, and
+macOS refuses it with *"Agent Pet" is damaged and can't be opened*, which is not
+what has happened: the app is intact and unsigned. To run it anyway:
 
 ```bash
 xattr -d com.apple.quarantine /Applications/agent-pet.app

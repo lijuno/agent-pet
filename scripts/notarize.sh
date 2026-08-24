@@ -2,17 +2,23 @@
 # Sign, notarize and staple the app bundle, and leave a zip ready to release.
 #
 #   make build
-#   ./scripts/notarize.sh --profile agent-pet
+#   make notarize
 #
 # --profile names a keychain profile holding App Store Connect API credentials,
 # created once with:
 #
 #   xcrun notarytool store-credentials agent-pet \
-#     --key AuthKey_XXXX.p8 --key-id KEYID --issuer ISSUERID
+#     --key AuthKey_XXXX.p8 --key-id KEYID
 #
-# No credential is ever read by this script, written to the repository, or
-# passed on a command line where `ps` would show it. In CI, set
-# NOTARY_ISSUER_ID / NOTARY_KEY_ID / NOTARY_KEY_P8 instead of --profile.
+# Without --profile the name is read from .notary-profile, which git ignores:
+# the profile names a keychain item that exists only on the machine that stored
+# it, so committing the name would point everyone else at nothing.
+#
+# Releases are cut here, by hand, on the machine holding the certificate. There
+# is deliberately no signing job on a runner — the private key would have to
+# become a repository secret to have one. No credential is ever read by this
+# script, written to the repository, or passed on a command line where `ps`
+# would show it.
 set -euo pipefail
 
 APP=""
@@ -48,6 +54,26 @@ if [ -z "$APP" ]; then
 	esac
 fi
 [ -d "$APP" ] || die "no bundle at $APP — run make build first"
+
+# ---- credentials ----------------------------------------------------------
+
+# Resolved before anything is signed. Discovering a missing profile after the
+# bundle is signed and zipped costs a minute to learn something knowable now.
+PROFILE_FILE=.notary-profile
+if [ -z "$PROFILE" ] && [ -f "$PROFILE_FILE" ]; then
+	PROFILE=$(tr -d '[:space:]' < "$PROFILE_FILE")
+fi
+
+if [ "$SKIP_NOTARIZE" = 0 ] && [ -z "$PROFILE" ]; then
+	die "no notarytool profile.
+  Store the credentials once:
+    xcrun notarytool store-credentials NAME --key AuthKey_XXXX.p8 --key-id KEYID
+  Then name that profile, either for good:
+    echo NAME > $PROFILE_FILE
+  or per run:
+    make notarize NOTARY_PROFILE=NAME
+  docs/signing.md has the Apple side. --skip-notarize signs without any of it."
+fi
 
 # ---- identity -------------------------------------------------------------
 
@@ -114,29 +140,12 @@ fi
 
 # ---- notarize -------------------------------------------------------------
 
-creds=()
-if [ -n "$PROFILE" ]; then
-	creds=(--keychain-profile "$PROFILE")
-elif [ -n "${NOTARY_ISSUER_ID:-}" ] && [ -n "${NOTARY_KEY_ID:-}" ] && [ -n "${NOTARY_KEY_P8:-}" ]; then
-	# CI. The key reaches notarytool as a file the runner deletes, never as an
-	# argument, so it stays out of the process list and the build log.
-	keyfile=$(mktemp -t notarykey)
-	printf '%s' "$NOTARY_KEY_P8" | base64 --decode > "$keyfile" 2>/dev/null ||
-		printf '%s' "$NOTARY_KEY_P8" > "$keyfile"
-	trap 'rm -f "$keyfile"' EXIT
-	creds=(--issuer "$NOTARY_ISSUER_ID" --key-id "$NOTARY_KEY_ID" --key "$keyfile")
-else
-	die "no notarization credentials.
-  Locally:  --profile NAME, after xcrun notarytool store-credentials NAME ...
-  In CI:    NOTARY_ISSUER_ID, NOTARY_KEY_ID and NOTARY_KEY_P8"
-fi
-
-step "Submitting to Apple (this takes a few minutes)"
-if ! xcrun notarytool submit "$OUT" ${creds[@]+"${creds[@]}"} --wait --timeout 30m; then
+step "Submitting to Apple as profile '$PROFILE' (this takes a few minutes)"
+if ! xcrun notarytool submit "$OUT" --keychain-profile "$PROFILE" --wait --timeout 30m; then
 	echo
 	echo "Rejected. Ask Apple why — the log names the offending binary:" >&2
-	echo "  xcrun notarytool history ${PROFILE:+--keychain-profile $PROFILE}" >&2
-	echo "  xcrun notarytool log <submission-id> ${PROFILE:+--keychain-profile $PROFILE}" >&2
+	echo "  xcrun notarytool history --keychain-profile $PROFILE" >&2
+	echo "  xcrun notarytool log <submission-id> --keychain-profile $PROFILE" >&2
 	exit 1
 fi
 

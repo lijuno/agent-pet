@@ -21,3 +21,9 @@ go.work.sum
 
 .DS_Store
 *.log
+
+# The notarytool keychain profile name, read by scripts/notarize.sh. It points
+# at a keychain item that exists only on the machine that ran
+# `notarytool store-credentials`, so committing it would name a profile nobody
+# else has. Not a secret — the credentials themselves stay in the keychain.
+/.notary-profile
