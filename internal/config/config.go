@@ -188,7 +188,7 @@ func Default() Config {
 		},
 		Logging: Logging{Level: "info", Verbose: false},
 		Update: Update{
-			Check:       false,
+			Check:       true,
 			ManifestURL: DefaultManifestURL,
 			Interval:    Duration(24 * time.Hour),
 		},

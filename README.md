@@ -167,7 +167,7 @@ server:
   addr: 127.0.0.1:9876
 
 update:
-  check: false          # nothing contacts the network until this is true
+  check: true           # automatic update checks are on; set to false to disable
   interval: 24h
 ```
 
