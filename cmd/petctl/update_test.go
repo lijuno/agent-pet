@@ -295,3 +295,37 @@ func TestNothingPublishedSaysSo(t *testing.T) {
 		t.Errorf("unexpected message:\n%s", out)
 	}
 }
+
+// After an update the menu bar used to say "No update check yet", because petd
+// holds only what it has been told and a daemon that has just started has been
+// told nothing. It is true of the process and useless to somebody who watched
+// the update finish. petctl knows the answer at that moment and now says so.
+//
+// The three fields below are exactly what internal/desktop reads as "Up to
+// date": equal versions, nothing available, and a check time that is not zero.
+func TestInstalledStatusReadsAsUpToDate(t *testing.T) {
+	m := update.Manifest{
+		Channel: "dev", Version: "0.2.0-dev.3",
+		NotesURL: "https://github.com/lijuno/agent-pet/releases/tag/v0.2.0-dev.3",
+	}
+	st := installedStatus(m, "0.2.0-dev.3")
+
+	if st.Current != st.Latest {
+		t.Errorf("current %q and latest %q should match after an update", st.Current, st.Latest)
+	}
+	if st.Available {
+		t.Error("an update is not available immediately after taking it")
+	}
+	if st.CheckedAt.IsZero() {
+		t.Error("a zero check time is what makes the menu say nobody has ever looked")
+	}
+	if st.Channel != update.Channel("dev") {
+		t.Errorf("channel = %q, want the manifest's", st.Channel)
+	}
+	if st.NotesURL != m.NotesURL {
+		t.Error("the notes URL should survive, so the item stays pressable")
+	}
+	if err := st.Validate(); err != nil {
+		t.Errorf("the status petd is about to be told does not validate: %v", err)
+	}
+}

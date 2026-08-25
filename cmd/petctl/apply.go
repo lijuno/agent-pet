@@ -101,8 +101,36 @@ func apply(c *client, m update.Manifest, o updateOpts) error {
 	if err != nil {
 		return err
 	}
+	// Tell the new daemon what it is running before anybody looks at the menu.
+	//
+	// petd holds a result it was told and nothing else — it opens no
+	// connections of its own (ADR 0008) — and a daemon that has just started
+	// has been told nothing, so its menu says "No update check yet". Which is
+	// true of that process and useless to the person who watched an update
+	// finish thirty seconds ago. We know the answer here: the manifest we just
+	// installed is the newest the channel has, and the version answering the
+	// port is that one.
+	report(c, installedStatus(m, got))
 	fmt.Printf("Updated to %s.\n", got)
 	return nil
+}
+
+// installedStatus is what to tell the daemon after an update has landed.
+//
+// Current and Latest are equal, Available is false and CheckedAt is now: those
+// three together are what the menu bar reads as "Up to date". Getting any of
+// them wrong leaves the menu saying something else — CheckedAt in particular,
+// because a zero time there means "nobody has ever checked", which is what the
+// menu said after an update until this existed.
+func installedStatus(m update.Manifest, installed string) update.Status {
+	return update.Status{
+		Channel:   update.Channel(m.Channel),
+		Current:   installed,
+		Latest:    m.Version,
+		Available: false,
+		NotesURL:  m.NotesURL,
+		CheckedAt: time.Now(),
+	}
 }
 
 // targetBundle is the .app this petctl belongs to. It is found from the running
