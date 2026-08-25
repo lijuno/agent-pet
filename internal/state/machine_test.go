@@ -193,10 +193,60 @@ func TestSilentAgentFallsBackToIdle(t *testing.T) {
 	c := newClock()
 	o := DefaultOptions()
 	m := New(o)
-	step(m, c, ev(events.ToolStarted, "a"))
+	step(m, c, ev(events.Working, "a"))
 
 	if got := advance(m, c, o.IdleAfter+time.Second); got != Idle {
 		t.Fatalf("an agent that stopped reporting should not stay working, got %s", got)
+	}
+}
+
+// A tool the agent started and has not finished is the one silence that means
+// the opposite of idle. A `go test ./...` or a subagent runs for minutes with
+// no hook in between, and the pet used to doze off in the middle of it.
+func TestUnfinishedToolKeepsTheAgentWorking(t *testing.T) {
+	c := newClock()
+	o := DefaultOptions()
+	m := New(o)
+	step(m, c, ev(events.ToolStarted, "a"))
+
+	if got := advance(m, c, o.IdleAfter+time.Second); got != Working {
+		t.Fatalf("a tool that has not finished is still working, got %s", got)
+	}
+	if got := advance(m, c, o.SleepingAfter); got != Working {
+		t.Fatalf("a long tool must not put the pet to sleep, got %s", got)
+	}
+	if got := advance(m, c, o.ToolPatience-o.IdleAfter-o.SleepingAfter-2*time.Second); got != Working {
+		t.Fatalf("still within the tool's patience, got %s", got)
+	}
+	if got := step(m, c, ev(events.ToolFinished, "a")); got != Thinking {
+		t.Fatalf("the finished tool hands back to thinking, got %s", got)
+	}
+}
+
+// The patience above is bounded: an agent killed mid-tool never sends the
+// PostToolUse, and the pet must not work all afternoon on one PreToolUse.
+func TestUnfinishedToolPatienceIsBounded(t *testing.T) {
+	c := newClock()
+	o := DefaultOptions()
+	m := New(o)
+	step(m, c, ev(events.ToolStarted, "a"))
+
+	if got := advance(m, c, o.ToolPatience+time.Second); got != Sleeping {
+		t.Fatalf("a tool that never finished should stop counting, got %s", got)
+	}
+}
+
+// Zero is what a caller that builds Options field by field gets, and it must
+// not silently mean "no patience at all" — that is the bug this fixes.
+func TestZeroToolPatienceFallsBackToTheDefault(t *testing.T) {
+	c := newClock()
+	o := DefaultOptions()
+	o.ToolPatience = 0
+	m := New(o)
+	step(m, c, ev(events.ToolStarted, "a"))
+
+	if got := advance(m, c, o.SleepingAfter+time.Second); got != Working {
+		t.Fatalf("zero patience should mean the default, not none, got %s", got)
 	}
 }
 

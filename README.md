@@ -164,6 +164,7 @@ personality:
 thresholds:
   idle_after: 30s       # a quiet agent stops looking busy
   sleeping_after: 60s   # ... and shortly after that, dozes off
+  tool_patience: 30m    # but a tool still running keeps her at work this long
 
 server:
   addr: 127.0.0.1:9876

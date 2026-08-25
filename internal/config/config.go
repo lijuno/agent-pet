@@ -85,6 +85,7 @@ type Personality struct {
 // Thresholds mirrors §20 and §21. Values are Go durations ("30s", "5m", "2h").
 type Thresholds struct {
 	IdleAfter        Duration `yaml:"idle_after"`
+	ToolPatience     Duration `yaml:"tool_patience"`
 	SleepingAfter    Duration `yaml:"sleeping_after"`
 	AttentionTimeout Duration `yaml:"attention_timeout"`
 	SessionStale     Duration `yaml:"session_stale"`
@@ -178,6 +179,7 @@ func Default() Config {
 		},
 		Thresholds: Thresholds{
 			IdleAfter:        Duration(30 * time.Second),
+			ToolPatience:     Duration(30 * time.Minute),
 			SleepingAfter:    Duration(60 * time.Second),
 			AttentionTimeout: Duration(10 * time.Minute),
 			SessionStale:     Duration(2 * time.Hour),
@@ -294,6 +296,7 @@ func (c Config) sanitised() Config {
 		}
 	}
 	fix(&c.Thresholds.IdleAfter, d.IdleAfter)
+	fix(&c.Thresholds.ToolPatience, d.ToolPatience)
 	fix(&c.Thresholds.SleepingAfter, d.SleepingAfter)
 	fix(&c.Thresholds.AttentionTimeout, d.AttentionTimeout)
 	fix(&c.Thresholds.SessionStale, d.SessionStale)

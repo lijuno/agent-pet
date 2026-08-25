@@ -13,6 +13,16 @@ type Options struct {
 	// IdleAfter: a session that reported work but has gone quiet drops back to
 	// idle. Covers agents that never send an explicit idle event.
 	IdleAfter time.Duration
+	// ToolPatience: the same, for a session whose last word was that a tool had
+	// started. An unfinished tool is a longer silence than a session that
+	// simply stopped talking — a build, a test suite, a subagent — and
+	// IdleAfter is far too short for it, which is what put the pet to sleep
+	// halfway through a long command. Nothing is inferred here: the agent said
+	// a tool was running and has not said otherwise. Bounded all the same,
+	// because a kill -9 mid-tool never says otherwise either, and the pet
+	// should not work for the rest of the afternoon on one PreToolUse.
+	// Zero means DefaultToolPatience.
+	ToolPatience time.Duration
 	// SleepingAfter: no events from anyone for this long and the pet sleeps.
 	// Short on purpose. A cat dozes the moment nothing is happening, and an
 	// agent between turns is nothing happening — the pet is more restful and
@@ -52,9 +62,16 @@ type Options struct {
 // pet should stay responsive rather than accumulate.
 const DefaultMaxSessions = 64
 
+// DefaultToolPatience is how long an unfinished tool holds a silent session at
+// working. Long enough for the slow things an agent really does — a full test
+// run, a release build, a subagent — and short enough that a crashed agent is
+// forgotten well before SessionStale would forget its session.
+const DefaultToolPatience = 30 * time.Minute
+
 func DefaultOptions() Options {
 	return Options{
 		IdleAfter:        30 * time.Second,
+		ToolPatience:     DefaultToolPatience,
 		SleepingAfter:    60 * time.Second,
 		AttentionTimeout: 10 * time.Minute,
 		SessionStale:     2 * time.Hour,
@@ -96,14 +113,27 @@ func (s *Session) Effective(now time.Time, o Options) State {
 	if base == Attention && now.Sub(s.LastEventAt) > o.AttentionTimeout {
 		base = Idle
 	}
-	// An agent that stopped reporting is not working any more.
-	if (base == Working || base == Thinking) && now.Sub(s.LastEventAt) > o.IdleAfter {
+	// An agent that stopped reporting is not working any more — unless the last
+	// thing it reported was a tool starting, which it has yet to finish.
+	if (base == Working || base == Thinking) && now.Sub(s.LastEventAt) > o.quiet(s) {
 		base = Idle
 	}
 	if s.Ended {
 		return Idle
 	}
 	return base
+}
+
+// quiet is how long a session may say nothing before it stops counting as
+// working: longer while a tool it told us about is still running.
+func (o Options) quiet(s *Session) time.Duration {
+	if s.RunningTools <= 0 {
+		return o.IdleAfter
+	}
+	if o.ToolPatience > 0 {
+		return o.ToolPatience
+	}
+	return DefaultToolPatience
 }
 
 // Stats are in-memory counters for the status popup. Durable statistics arrive

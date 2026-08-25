@@ -62,6 +62,22 @@ func TestDurationsParseInTheDocumentedForm(t *testing.T) {
 	}
 }
 
+// A zero duration is not "no waiting", it is a threshold nobody meant to set:
+// zero tool_patience would put the pet to sleep in the middle of a long tool,
+// which is exactly the bug the threshold exists to prevent.
+func TestZeroThresholdIsCorrected(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	os.WriteFile(path, []byte("thresholds:\n  tool_patience: 0s\n"), 0o644)
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Thresholds.ToolPatience != Default().Thresholds.ToolPatience {
+		t.Fatalf("a zero threshold should be corrected, got %v", cfg.Thresholds.ToolPatience.D())
+	}
+}
+
 // A pet that refuses to start because of a typo would be a bad pet.
 func TestBrokenConfigFallsBackToDefaults(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")

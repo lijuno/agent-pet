@@ -91,6 +91,7 @@ func machineOptions(cfg config.Config) state.Options {
 	t := cfg.Thresholds
 	return state.Options{
 		IdleAfter:        t.IdleAfter.D(),
+		ToolPatience:     t.ToolPatience.D(),
 		SleepingAfter:    t.SleepingAfter.D(),
 		AttentionTimeout: t.AttentionTimeout.D(),
 		SessionStale:     t.SessionStale.D(),
