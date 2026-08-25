@@ -14,7 +14,7 @@ Every frame shares one palette. GIF stores a palette per frame but players
 apply the first one to the whole file, so quantising each frame on its own
 turns a tortoiseshell cat green from the second state onward.
 
-  python3 scripts/make-states-gif.py [--scale 6] [--out docs/media/states.gif]
+  python3 scripts/make-states-gif.py [--pet momo] [--scale 6] [--out PATH]
 """
 import argparse
 import json
@@ -27,7 +27,7 @@ except ImportError:
     sys.exit("needs Pillow: pip install Pillow")
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-PACK = ROOT / "ui/dist/pets/momo"
+PACKS = ROOT / "ui/dist/pets"
 
 # Session order, not manifest order: this reads as an arc — waking up, working,
 # needing you, going wrong, coming right, and settling — rather than a list.
@@ -59,10 +59,22 @@ def main():
     ap.add_argument("--scale", type=int, default=6,
                     help="integer only: the art is pixel art and a fractional "
                          "resize turns it to mush")
-    ap.add_argument("--out", default="docs/media/states.gif")
+    ap.add_argument("--pet", default="momo",
+                    help="which shipped pack to render")
+    # Named after the pet unless told otherwise, so rendering a second
+    # character cannot quietly overwrite the first one's figure.
+    ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
-    man = json.loads((PACK / "manifest.json").read_text())
+    pack = PACKS / args.pet
+    if not pack.is_dir():
+        have = ", ".join(sorted(p.name for p in PACKS.iterdir() if p.is_dir()))
+        sys.exit(f"no pack called {args.pet!r} in {PACKS} — have: {have}")
+    if args.out is None:
+        args.out = ("docs/media/states.gif" if args.pet == "momo"
+                    else f"docs/media/states-{args.pet}.gif")
+
+    man = json.loads((pack / "manifest.json").read_text())
     fw, fh = man["frame_width"], man["frame_height"]
     anims = man["animations"]
 
@@ -81,7 +93,7 @@ def main():
         if a is None:
             print(f"  skipping {name}: not in the manifest", file=sys.stderr)
             continue
-        strip = Image.open(PACK / a["file"]).convert("RGBA")
+        strip = Image.open(pack / a["file"]).convert("RGBA")
         n, fps = a["frames"], float(a["fps"])
         cycle = n / fps
         cycles = max(1, -(-MIN_HOLD // cycle))  # ceil

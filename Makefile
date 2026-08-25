@@ -56,7 +56,7 @@ help:
 	@echo "make plugin-hooks   regenerate the plugin hooks from the adapter"
 	@echo "make plugin-validate check the plugin and marketplace manifests"
 	@echo "make version-sync    write $(VERSION) into wails.json before a release"
-	@echo "make states-gif     rebuild the README state figure from the sprites"
+	@echo "make states-gif     rebuild the README state figures from the sprites"
 	@echo "make notarize       sign, notarize and staple the built bundle"
 	@echo "make release        build, notarize, publish, and write the update manifest"
 	@echo "make icons          regenerate the dev app's badged icons (needs Pillow)"
@@ -149,8 +149,11 @@ version-sync:
 
 # The README's state figure. Generated from the shipped sprites and manifest so
 # it cannot drift into advertising an animation the pet does not have.
+# One figure per shipped character. Both, because a README that shows one of
+# two characters is a README that will show one of three.
 states-gif:
-	@python3 scripts/make-states-gif.py
+	@python3 scripts/make-states-gif.py --pet momo
+	@python3 scripts/make-states-gif.py --pet peach
 
 # Fails with the command that fixes it, rather than "command not found" for a
 # binary that may well be installed.

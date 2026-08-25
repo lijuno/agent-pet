@@ -518,6 +518,20 @@ hardening applied to untrusted input.
 
 Two built-in packs ship in the binary:
 
+<p align="center">
+  <img src="docs/media/states.gif"
+       alt="SanMao, a tortoiseshell tabby, cycling through the ten states as pixel-art animations labelled with their names and frame rates."
+       width="240">
+  <img src="docs/media/states-peach.gif"
+       alt="Peach, a girl with long dark hair and a white dress, cycling through the same ten states: at the laptop for working, arms up for celebrate, asleep with Z's for sleeping."
+       width="240">
+</p>
+
+<p align="center">
+  <sub>Both characters, every state, rendered from the sprites they ship —
+  <code>make states-gif</code>.</sub>
+</p>
+
 | id | | |
 |---|---|---|
 | `momo` | SanMao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
