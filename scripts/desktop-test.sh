@@ -142,9 +142,11 @@ case "$menu" in
 *) ok "the menu offers no channel picker" ;;
 esac
 
-# Nothing has been checked, so there is nothing to say and the item is hidden.
-# An item permanently announcing "no update available" is furniture.
-want "the update item is hidden until there is one" "$menu" "Update Available[hidden]"
+# The item is always there and says what the last check found. It used to be
+# hidden until an update existed, which meant the menu could not answer "have I
+# got the latest?" — the question somebody opens it to ask. [off] is the dump's
+# way of saying present but not pressable: there is no release page behind it.
+want "the update item is always present" "$menu" "Nothing published yet[off]"
 
 # The app cannot find an update by itself — it holds no HTTP client. This is
 # petctl's half of the conversation, which is the only way one arrives.
@@ -153,10 +155,31 @@ curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json'
 sleep 0.6
 menu=$(field status_menu)
 want "a reported update names the version" "$menu" "Update to 9.9.9…"
-case "$menu" in
-*"Update to 9.9.9…[hidden]"*) bad "and the item becomes visible" "still hidden: $menu" ;;
-*) ok "and the item becomes visible" ;;
+# Pressable only when there is a page behind it, which a real result from
+# petctl always has — the manifest carries notes_url. Posted separately from
+# the click below, which deliberately has none so it opens no browser.
+curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json' \
+	-d '{"latest":"9.9.9","available":true,
+	     "notes_url":"https://github.com/lijuno/agent-pet/releases/tag/v9.9.9"}' >/dev/null
+sleep 0.5
+case "$(field status_menu)" in
+*"Update to 9.9.9…[off]"* | *"Update to 9.9.9…[hidden]"*)
+	bad "and the item becomes pressable" "not pressable" ;;
+*) ok "and the item becomes pressable" ;;
 esac
+
+# A check that found nothing says so, rather than going quiet. This is the
+# state the item exists for: "no update" is an answer, and before this it was
+# indistinguishable from "never looked".
+cur=$(curl -sS --max-time 5 "$BASE/update" |
+	python3 -c "import sys,json;print(json.load(sys.stdin)['current'])")
+curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json' \
+	-d "{\"latest\":\"$cur\",\"available\":false}" >/dev/null
+sleep 0.5
+want "a check that found nothing says so" "$(field status_menu)" "Up to date[off]"
+curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json' \
+	-d '{"latest":"9.9.9","available":true}' >/dev/null
+sleep 0.5
 
 # Clicking it opens the release page. There is no notes URL in what was posted
 # above, deliberately: this checks the click path without opening a browser

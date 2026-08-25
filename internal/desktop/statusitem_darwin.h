@@ -45,10 +45,10 @@ void petStatusSetCheck(int tag, int on);
 void petStatusClearPets(void);
 void petStatusAddPet(const char *title, int tag, int checked);
 
-// petStatusSetUpdate retitles the update item and shows or hides it. Hidden is
-// the normal state: an item saying "no update available" would be a permanent
-// piece of furniture reporting nothing.
-void petStatusSetUpdate(const char *title, int visible);
+// petStatusSetUpdate retitles the update item and sets whether it can be
+// pressed. The item is always visible: it reports the last check as well as an
+// available update. Disabled means there is no release page to open.
+void petStatusSetUpdate(const char *title, int enabled);
 
 // petOpenURL opens a URL in the user's browser through NSWorkspace.
 //

@@ -268,19 +268,21 @@ func (a *App) refreshPetMenu() {
 // syncShownCheck keeps the Show Pet tick in step with the window.
 func (a *App) syncShownCheck(on bool) { setStatusCheck(C.PET_SHOW, on) }
 
-// setUpdateItem retitles the update item, or hides it when there is nothing to
-// say. The version has already been through update.Status.Validate, so it
-// cannot put anything but a version number into a menu title.
+// setUpdateItem retitles the update item. The version has already been through
+// update.Status.Validate, so it cannot put anything but a version number into a
+// menu title.
+//
+// Enabled exactly when there is a page to open. openReleaseNotes does nothing
+// without a URL, and an item that silently does nothing when pressed is worse
+// than one that is visibly not for pressing.
 func setUpdateItem(st update.Status) {
-	title := "Update Available"
-	visible := C.int(0)
-	if st.Available && st.Latest != "" {
-		title = "Update to " + st.Latest + "…"
-		visible = 1
-	}
-	c := C.CString(title)
+	c := C.CString(updateItemTitle(st))
 	defer C.free(unsafe.Pointer(c))
-	C.petStatusSetUpdate(c, visible)
+	enabled := C.int(0)
+	if st.NotesURL != "" {
+		enabled = 1
+	}
+	C.petStatusSetUpdate(c, enabled)
 }
 
 // openURL hands a URL to Launch Services. Validated once more here: this is

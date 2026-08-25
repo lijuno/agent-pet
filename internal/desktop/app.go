@@ -599,6 +599,42 @@ func (a *App) GetUpdate() update.Status {
 // build, not a setting: the other channel is a different application.
 func (a *App) UpdateChannel() update.Channel { return flavor.Current().Channel }
 
+// updateItemTitle is what the menu bar's update item says. Kept out of the
+// cgo file so it can be tested without a menu bar to look at.
+//
+// The item is always shown. Hidden until an update existed, it meant the menu
+// could never answer "have I got the latest?" — which is the question somebody
+// opens it to ask, and the one they cannot answer any other way without a
+// terminal.
+//
+// It reports the last result; it does not check. The daemon opens no outbound
+// connections and spawns no processes (ADR 0008), so checking happens in
+// `petctl` — once a day from the Claude Code hook, or on demand from a shell.
+//
+// No relative time in the title. Nothing rebuilds this menu while it sits in
+// the menu bar, so "checked 2 minutes ago" would still say that four hours
+// later, and a label that goes quietly wrong is worse than no label.
+func updateItemTitle(st update.Status) string {
+	switch {
+	case st.Available && st.Latest != "":
+		return "Update to " + st.Latest + "…"
+	case st.Error != "":
+		// "no update" and "could not find out" are different answers and the
+		// pet does not guess between them — same rule as Status.Error itself.
+		return "Update check failed"
+	case st.CheckedAt.IsZero():
+		return "No update check yet"
+	case st.Latest == "":
+		return "Nothing published yet"
+	case st.Latest == st.Current:
+		return "Up to date"
+	default:
+		// The running build is newer than the channel offers. Normal on a
+		// prerelease, and neither an update nor "up to date".
+		return "Ahead of the channel"
+	}
+}
+
 // openReleaseNotes opens the page for the version on offer. The pet installs
 // nothing itself: it has no updater in it, and `petctl update` is what does the
 // work.

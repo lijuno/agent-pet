@@ -94,8 +94,11 @@ void petStatusInstall(const void *png, int len, int onTop, int muted, int shown)
 
     // Hidden until a check finds something. An always-present item reporting
     // nothing is worse than no item.
-    petUpdateItem = addItem(menu, @"Update Available", PET_UPDATE);
-    [petUpdateItem setHidden:YES];
+    // Always present. It reports the last check rather than appearing only
+    // when there is something to install, so the menu can answer "have I got
+    // the latest?" as well as "there is a new one".
+    petUpdateItem = addItem(menu, @"No update check yet", PET_UPDATE);
+    [petUpdateItem setEnabled:NO];
     [menu addItem:[NSMenuItem separatorItem]];
 
     addItem(menu, @"Quit Pet", PET_QUIT);
@@ -139,11 +142,11 @@ void petStatusAddPet(const char *title, int tag, int checked) {
   });
 }
 
-void petStatusSetUpdate(const char *title, int visible) {
+void petStatusSetUpdate(const char *title, int enabled) {
   NSString *t = [NSString stringWithUTF8String:title];
   onMain(^{
     [petUpdateItem setTitle:t];
-    [petUpdateItem setHidden:visible ? NO : YES];
+    [petUpdateItem setEnabled:enabled ? YES : NO];
   });
 }
 
@@ -241,12 +244,14 @@ int petStatusMenuDump(char *buf, int cap) {
       if (it.isSeparatorItem) {
         continue;
       }
-      // Hidden is reported as well as ticked. The update item is hidden
-      // until there is an update, and a test cannot see a menu — so "present
-      // but not shown" has to be sayable.
-      [out appendFormat:@"%ld:%@%@%@|", (long)it.tag, it.title,
+      // Ticked, hidden and disabled are all reported: a test cannot see a
+      // menu, so "present but not shown" and "present but not pressable" both
+      // have to be sayable. The update item is always present and is disabled
+      // whenever there is no page behind it.
+      [out appendFormat:@"%ld:%@%@%@%@|", (long)it.tag, it.title,
                         it.state == NSControlStateValueOn ? @"[on]" : @"",
-                        it.isHidden ? @"[hidden]" : @""];
+                        it.isHidden ? @"[hidden]" : @"",
+                        it.isEnabled ? @"" : @"[off]"];
       for (NSMenuItem *sub in it.submenu.itemArray) {
         [out appendFormat:@"%ld:>%@%@|", (long)sub.tag, sub.title,
                           sub.state == NSControlStateValueOn ? @"[on]" : @""];
