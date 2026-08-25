@@ -7,7 +7,7 @@ Claude Code starts, the pet wakes up. A tool runs, it gets to work. A permission
 prompt appears, it turns and asks for you. Tests pass, it celebrates.
 
 <p align="center">
-  <img src="docs/media/states.gif"
+  <img src="docs/media/states-sanmao.gif"
        alt="The pet cycling through its ten states: idle, thinking, working, attention, confused, worried, happy, celebrate, heart and sleeping. Each is a four- to six-frame pixel-art animation of a tortoiseshell cat, labelled with its name and frame rate."
        width="288">
 </p>
@@ -149,7 +149,7 @@ firing at all.
 
 ```yaml
 pet:
-  active: momo          # momo, peach, juanmao, or your own pack
+  active: sanmao        # sanmao, peach, juanmao, or your own pack
   always_on_top: true
   scale: 1.0
   drop_shadow: true     # off if it reads as a halo on a light wallpaper
@@ -561,7 +561,7 @@ hardening applied to untrusted input.
 Three built-in packs ship in the binary:
 
 <p align="center">
-  <img src="docs/media/states.gif"
+  <img src="docs/media/states-sanmao.gif"
        alt="Sanmao, a tortoiseshell tabby, cycling through the ten states as pixel-art animations labelled with their names and frame rates."
        width="240">
   <img src="docs/media/states-peach.gif"
@@ -579,7 +579,7 @@ Three built-in packs ship in the binary:
 
 | id | | |
 |---|---|---|
-| `momo` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
+| `sanmao` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
 | `peach` | Peach (桃桃), a girl in a white dress | long dark hair over one shoulder, peach bow, gold necklace |
 | `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, and a bicycle to work on |
 

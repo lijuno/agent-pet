@@ -8,7 +8,7 @@ import (
 )
 
 const fullManifest = `{
-  "id": "momo", "name": "Momo", "version": 1,
+  "id": "sanmao", "name": "Sanmao", "version": 1,
   "frame_width": 40, "frame_height": 40, "scale": 3, "pixelated": true,
   "animations": {
     "idle":      {"file": "idle.png", "frames": 4, "fps": 3, "loop": true},
@@ -42,10 +42,10 @@ func loadOne(t *testing.T, manifest string) Pet {
 
 func TestLoadObjectManifest(t *testing.T) {
 	p := loadOne(t, fullManifest)
-	if p.ID != "momo" || p.Name != "Momo" || !p.Builtin {
+	if p.ID != "sanmao" || p.Name != "Sanmao" || !p.Builtin {
 		t.Fatalf("unexpected pet: %+v", p.Manifest)
 	}
-	if p.BaseURL != "/pets/momo/" {
+	if p.BaseURL != "/pets/sanmao/" {
 		t.Fatalf("base url %q", p.BaseURL)
 	}
 	a := p.Animations[state.Working]
@@ -157,7 +157,7 @@ func TestAnyFallsBackToFirstAvailable(t *testing.T) {
 	_ = l.LoadBuiltin(fsys, "pets", "/pets")
 
 	p, ok := l.Any("does-not-exist")
-	if !ok || p.ID != "momo" {
+	if !ok || p.ID != "sanmao" {
 		t.Fatalf("a missing configured pet should fall back to an available one, got %v/%v", p.ID, ok)
 	}
 }
@@ -171,17 +171,19 @@ func TestMissingUserPetsDirIsNotAnError(t *testing.T) {
 
 // TestListOrdersByDisplayedName pins the order of the Change Pet submenu and
 // the panel beside it. Both show names; the ids they sort by are invisible, so
-// an order that follows the id looks random on screen. `momo` is displayed as
-// Sanmao, which is where this was noticed.
+// an order that follows the id looks random on screen. Sanmao is where that was
+// noticed — her id was `momo` — and the fixture here keeps a pack whose id and
+// name disagree even though no shipped pack does any more, because nothing
+// stops a user's own pack from disagreeing.
 func TestListOrdersByDisplayedName(t *testing.T) {
 	pack := func(id, name string) string {
 		return `{"id": "` + id + `", "name": "` + name + `",
 		         "animations": {"idle": "idle.png"}}`
 	}
 	fsys := fstest.MapFS{
-		"pets/a/manifest.json": {Data: []byte(pack("momo", "Sanmao (三毛)"))},
-		"pets/b/manifest.json": {Data: []byte(pack("juanmao", "Juanmao (卷毛)"))},
-		"pets/c/manifest.json": {Data: []byte(pack("peach", "Peach (桃桃)"))},
+		"pets/a/manifest.json": {Data: []byte(pack("zulu", "Alpha"))},
+		"pets/b/manifest.json": {Data: []byte(pack("mike", "Mike"))},
+		"pets/c/manifest.json": {Data: []byte(pack("alpha", "Zulu"))},
 	}
 	l := NewLibrary()
 	if err := l.LoadBuiltin(fsys, "pets", "/pets"); err != nil {
@@ -192,7 +194,9 @@ func TestListOrdersByDisplayedName(t *testing.T) {
 	for _, p := range l.List() {
 		got = append(got, p.ID)
 	}
-	want := []string{"juanmao", "peach", "momo"}
+	// Exactly the reverse of the id order, so a sort that slipped back to the
+	// id could not pass by coincidence.
+	want := []string{"zulu", "mike", "alpha"}
 	for i := range want {
 		if i >= len(got) || got[i] != want[i] {
 			t.Fatalf("order by name: got %v, want %v", got, want)

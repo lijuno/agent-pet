@@ -159,7 +159,7 @@ func (d *Duration) UnmarshalYAML(n *yaml.Node) error {
 func Default() Config {
 	return Config{
 		Pet: Pet{
-			Active:      "momo",
+			Active:      "sanmao",
 			AlwaysOnTop: true,
 			Scale:       1.0,
 			DropShadow:  true,
@@ -281,7 +281,17 @@ func (c Config) sanitised() Config {
 		c.Pet.Scale = 1.0
 	}
 	if c.Pet.Active == "" {
-		c.Pet.Active = "momo"
+		c.Pet.Active = "sanmao"
+	}
+	// `momo` was Sanmao's id until she was renamed, and every config.yaml
+	// written before that still names it. Left alone, the id matches no pack
+	// and Any() quietly hands the user whichever character sorts first —
+	// a cat owner opens the app and finds a stranger in the window.
+	//
+	// Rewritten on load, and the file is written back from memory on shutdown,
+	// so a config heals itself the first time the app runs.
+	if c.Pet.Active == "momo" {
+		c.Pet.Active = "sanmao"
 	}
 	if c.Server.Addr == "" {
 		c.Server.Addr = flavor.Current().Addr

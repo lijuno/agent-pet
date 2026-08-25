@@ -15,7 +15,7 @@ func TestLoadCreatesDefaultsWhenMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if cfg.Pet.Active != "momo" || cfg.Server.Addr != "127.0.0.1:9876" {
+	if cfg.Pet.Active != "sanmao" || cfg.Server.Addr != "127.0.0.1:9876" {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -87,7 +87,7 @@ func TestBrokenConfigFallsBackToDefaults(t *testing.T) {
 	if err == nil {
 		t.Fatal("the parse failure should be reported")
 	}
-	if cfg.Pet.Active != "momo" {
+	if cfg.Pet.Active != "sanmao" {
 		t.Fatalf("but the config must still be usable, got %+v", cfg.Pet)
 	}
 }
@@ -150,7 +150,7 @@ func TestShadowSurvivesAConfigThatPredatesIt(t *testing.T) {
 	dir := t.TempDir()
 
 	old := filepath.Join(dir, "old.yaml")
-	os.WriteFile(old, []byte("pet:\n  active: momo\n  scale: 1\n"), 0o644)
+	os.WriteFile(old, []byte("pet:\n  active: sanmao\n  scale: 1\n"), 0o644)
 	cfg, err := Load(old)
 	if err != nil {
 		t.Fatalf("load: %v", err)
@@ -257,5 +257,25 @@ func TestPathsAreNamedAfterTheFlavour(t *testing.T) {
 	// at startup looking like a build that did nothing.
 	if Default().Server.Addr != flavor.Current().Addr {
 		t.Errorf("default addr %q is not the flavour's %q", Default().Server.Addr, flavor.Current().Addr)
+	}
+}
+
+// TestRetiredPetIdIsCarriedForward covers the one rename that has happened to a
+// shipped pack. Sanmao's id was `momo` for the app's whole life until three
+// characters made an id nobody could match to a name too expensive to keep, so
+// every config.yaml written before the rename names a pack that is no longer
+// there. Left alone, Any() falls back to whichever character sorts first and a
+// cat owner opens the app to find a stranger in the window.
+func TestRetiredPetIdIsCarriedForward(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	os.WriteFile(path, []byte("pet:\n  active: momo\n"), 0o644)
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Pet.Active != "sanmao" {
+		t.Fatalf("a config naming the retired id should land on sanmao, got %q", cfg.Pet.Active)
 	}
 }

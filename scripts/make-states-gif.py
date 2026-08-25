@@ -14,7 +14,7 @@ Every frame shares one palette. GIF stores a palette per frame but players
 apply the first one to the whole file, so quantising each frame on its own
 turns a tortoiseshell cat green from the second state onward.
 
-  python3 scripts/make-states-gif.py [--pet momo] [--scale 6] [--out PATH]
+  python3 scripts/make-states-gif.py [--pet sanmao] [--scale 6] [--out PATH]
 """
 import argparse
 import json
@@ -59,7 +59,7 @@ def main():
     ap.add_argument("--scale", type=int, default=6,
                     help="integer only: the art is pixel art and a fractional "
                          "resize turns it to mush")
-    ap.add_argument("--pet", default="momo",
+    ap.add_argument("--pet", default="sanmao",
                     help="which shipped pack to render")
     # Named after the pet unless told otherwise, so rendering a second
     # character cannot quietly overwrite the first one's figure.
@@ -71,8 +71,7 @@ def main():
         have = ", ".join(sorted(p.name for p in PACKS.iterdir() if p.is_dir()))
         sys.exit(f"no pack called {args.pet!r} in {PACKS} — have: {have}")
     if args.out is None:
-        args.out = ("docs/media/states.gif" if args.pet == "momo"
-                    else f"docs/media/states-{args.pet}.gif")
+        args.out = f"docs/media/states-{args.pet}.gif"
 
     man = json.loads((pack / "manifest.json").read_text())
     fw, fh = man["frame_width"], man["frame_height"]

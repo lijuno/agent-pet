@@ -147,10 +147,14 @@ class Species:
     extras: dict = field(default_factory=dict)
 
 
-MOMO = Species(
-    # The id stays `momo`: it is what config.yaml files in the wild already
-    # name, and a display name is not worth breaking them over.
-    pid="momo",
+SANMAO = Species(
+    # The id was `momo` until long after she shipped, on the grounds that
+    # config.yaml files in the wild already named it and a display name was not
+    # worth breaking them over. Two more characters later, an id nobody can
+    # match to a name is worth more than that: it sorted the Change Pet menu
+    # into an order the reader could not verify, and `petctl pet momo` is a
+    # thing you have to be told. Config.Sanitised carries the old value across.
+    pid="sanmao",
     name="Sanmao (三毛)",
     description="A tortoiseshell tabby with a white bib and white paws.",
     palette=Palette(
@@ -273,7 +277,7 @@ BYTE = Species(
 # antenna instead of ears, a lit screen instead of a face — and the reason the
 # drawing code is parametric at all. Adding it to this list is the whole of
 # shipping it.
-SPECIES = [MOMO, PEACH, JUANMAO]
+SPECIES = [SANMAO, PEACH, JUANMAO]
 
 
 # --------------------------------------------------------------------------

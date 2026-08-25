@@ -191,10 +191,11 @@ func (l *Library) List() []Pet {
 	}
 	// By the name the user sees, not by the id. Every surface that shows this
 	// list — the Change Pet submenu, the panel in the window, `petctl pets` —
-	// shows names, and an id can differ from its name by more than case:
-	// `momo` is displayed as Sanmao. Sorted by id, the menu read Juanmao,
-	// Sanmao, Peach, which is alphabetical in a column nobody can see and
-	// therefore random in the one they can.
+	// shows names, and an id may differ from its name by more than case. One
+	// shipped pack did: `momo` displayed as Sanmao, and sorted by id the menu
+	// read Juanmao, Sanmao, Peach — alphabetical in a column nobody can see,
+	// and therefore random in the one they can. That pack has since been
+	// renamed, but nothing stops a user's own pack from doing the same.
 	//
 	// Id breaks the tie, so the order cannot depend on map iteration.
 	sort.Slice(out, func(i, j int) bool {

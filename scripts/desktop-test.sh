@@ -78,7 +78,7 @@ echo
 echo "Every menu item survives being clicked"
 # The suite used to click only Show Pet. Three of the others emitted an event
 # from the main thread and killed the process, and nothing here noticed.
-for item in show show status about change ontop ontop pet:momo update; do
+for item in show show status about change ontop ontop pet:sanmao update; do
 	if ! curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
 		bad "clicking $item" "petd is gone — an earlier item killed it"
 		break
@@ -108,7 +108,7 @@ echo "Change Pet is a submenu of the menu bar menu"
 # the last run — or a stray click — happened to leave active, so it passed in
 # sequence and failed on its own.
 curl -sS --max-time 5 -X POST "$BASE/pet" -H 'content-type: application/json' \
-	-d '{"id":"momo"}' >/dev/null
+	-d '{"id":"sanmao"}' >/dev/null
 sleep 0.6
 menu=$(field status_menu)
 want "it lists the cat" "$menu" ":>Sanmao"
@@ -134,7 +134,7 @@ else
 	esac
 	# The tick has to follow a change made anywhere, not only from this menu.
 	curl -sS --max-time 5 -X POST "$BASE/pet" -H 'content-type: application/json' \
-		-d '{"id":"momo"}' >/dev/null
+		-d '{"id":"sanmao"}' >/dev/null
 	sleep 0.8
 	want "and follows a change made elsewhere" "$(field status_menu)" ">Sanmao (三毛)[on]"
 fi

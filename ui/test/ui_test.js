@@ -36,7 +36,7 @@ function eq(got, want, msg) {
 function anim(over) {
   return Object.assign({
     resolved: "working",
-    url: "/pets/momo/working.png",
+    url: "/pets/sanmao/working.png",
     frames: 4,
     fps: 8,
     loop: true,
@@ -48,7 +48,7 @@ function anim(over) {
 
 function view(over) {
   return Object.assign({
-    pet: "momo",
+    pet: "sanmao",
     pet_name: "Momo",
     scale: 1,
     on_top: true,
@@ -197,7 +197,7 @@ test("apply sizes the sprite from the animation and scale", withPet(async (w, d)
   eq(s.style.height, "120px");
   // The strip is one row of frames, so the background is frames-wide.
   eq(s.style.backgroundSize, "480px 120px");
-  assert(s.style.backgroundImage.includes("/pets/momo/working.png"), "wrong sprite url");
+  assert(s.style.backgroundImage.includes("/pets/sanmao/working.png"), "wrong sprite url");
 }));
 
 test("scale multiplies the rendered size", withPet(async (w, d) => {
@@ -232,7 +232,7 @@ test("changing state swaps the sprite", withPet(async (w, d) => {
   const s = d.getElementById("sprite");
   w.apply(view());
   const before = s.style.backgroundImage;
-  w.apply(view({ animation: anim({ resolved: "celebrate", url: "/pets/momo/celebrate.png", frames: 6, fps: 10 }) }));
+  w.apply(view({ animation: anim({ resolved: "celebrate", url: "/pets/sanmao/celebrate.png", frames: 6, fps: 10 }) }));
   assert(s.style.backgroundImage !== before, "sprite did not change with the state");
   assert(s.style.backgroundImage.includes("celebrate.png"), "wrong sprite after change");
 }));
@@ -839,7 +839,7 @@ test("changing pet through the panel reaches the backend", withPet(async (w, d) 
   w.apply(view());
   const calls = stubBackend(w, {
     ListPets: () => [
-      { id: "momo", name: "Momo", builtin: true },
+      { id: "sanmao", name: "Sanmao", builtin: true },
       { id: "byte", name: "Byte", builtin: true },
     ],
   });
