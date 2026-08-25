@@ -97,7 +97,7 @@ func apply(c *client, m update.Manifest, o updateOpts) error {
 	if err := launch(target); err != nil {
 		return err
 	}
-	got, err := awaitVersion(c, m.Version)
+	got, err := awaitVersion(c, m.Version, target)
 	if err != nil {
 		return err
 	}
@@ -477,22 +477,41 @@ func launch(app string) error {
 }
 
 // awaitVersion waits for the new app to answer, and checks that what answered
-// is the version that was just installed. Without the second half this would
-// report success for an update that silently left the old daemon running.
-func awaitVersion(c *client, want string) (string, error) {
+// is the app that was just installed. Without that this would report success
+// for an update that silently left another daemon running.
+//
+// Both halves are needed. The version alone was not enough: two copies of the
+// same build answer identically, so a stray one — say a bundle left in
+// build/bin by a release — passes the version check while the app that was
+// actually just installed exits on the single-instance lock without a word.
+// That happened, and the update said it had worked. So the daemon is asked
+// which binary it is, and it has to be inside the bundle just written.
+func awaitVersion(c *client, want, bundle string) (string, error) {
 	deadline := time.Now().Add(launchWait)
-	last := ""
+	last, strayExe := "", ""
 	for time.Now().Before(deadline) {
 		var h struct {
 			Version string `json:"version"`
+			Exe     string `json:"exe"`
 		}
 		if err := c.do(http.MethodGet, "/healthz", nil, &h); err == nil {
 			last = h.Version
-			if h.Version == want {
+			// An older build answers without an exe. Nothing can be checked
+			// there, so the version stands on its own as it used to.
+			if h.Version == want && (h.Exe == "" || within(h.Exe, bundle)) {
 				return h.Version, nil
+			}
+			if h.Version == want && h.Exe != "" {
+				strayExe = h.Exe
 			}
 		}
 		time.Sleep(500 * time.Millisecond)
+	}
+	if strayExe != "" {
+		return "", fmt.Errorf("%s was installed, but the pet answering on the event port is a different copy:\n"+
+			"  %s\n"+
+			"  It holds the port, so the one just installed exited on the single-instance lock.\n"+
+			"  Quit that copy and open %s.", want, strayExe, bundle)
 	}
 	if last != "" {
 		return "", fmt.Errorf("the app was replaced but %s is answering on the event port, not %s\n"+

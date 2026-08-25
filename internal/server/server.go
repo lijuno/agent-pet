@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -222,13 +223,22 @@ type healthResponse struct {
 	Version string `json:"version"`
 	Uptime  string `json:"uptime"`
 	PID     int    `json:"pid"`
+	// Exe is which binary is answering. An updater that has just swapped a
+	// bundle needs to know it is talking to the app it installed and not to
+	// another copy that already held the port — and the version alone cannot
+	// tell it, because two copies of the same version answer identically.
+	Exe string `json:"exe,omitempty"`
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	// PID was declared and never set, so it answered 0 to everyone who asked.
+	exe, _ := os.Executable()
 	writeJSON(w, http.StatusOK, healthResponse{
 		OK:      true,
 		Version: Version,
 		Uptime:  time.Since(s.startedAt).Round(time.Second).String(),
+		PID:     os.Getpid(),
+		Exe:     exe,
 	})
 }
 
