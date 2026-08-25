@@ -180,6 +180,18 @@ Either way you get `build/bin/agent-pet-<version>-universal.zip`, stapled.
 Submission to Apple usually takes a few minutes. `NOTARY_PROFILE=other-name`
 overrides `.notary-profile` for one run.
 
+The release body is the changelog: the subjects of the commits since the
+previous tag on that channel, which the pet's own update item opens by way of
+`notes_url`. Read it before cutting anything — it works on an untagged tree, so
+it also answers "what would ship if I tagged this now?":
+
+```bash
+./scripts/release.sh --print-notes --channel dev
+```
+
+A release that already exists keeps the notes it has, so an asset can be
+replaced without discarding anything edited on GitHub by hand.
+
 **Signing it is not offering it.** `make release` leaves
 `updates/<channel>.json` modified and uncommitted; committing that file is what
 points every installed pet at the new version. See
