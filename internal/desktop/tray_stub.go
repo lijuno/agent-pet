@@ -26,6 +26,9 @@ func (a *App) activate()                {}
 func (a *App) syncShownCheck(bool)      {}
 func (a *App) refreshPetMenu()          {}
 func setUpdateItem(update.Status)       {}
+func showAbout(string, string)          {}
+func closeAbout()                       {}
+func aboutReport() string               { return "closed" }
 func openURL(string)                    {}
 func (a *App) StatusMenu() string       { return "" }
 

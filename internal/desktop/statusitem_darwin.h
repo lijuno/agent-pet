@@ -21,6 +21,7 @@ enum {
   PET_MUTE = 6,
   PET_UPDATE = 7,
   PET_QUIT = 8,
+  PET_ABOUT = 9,
   // Items in the Change Pet submenu are PET_PICK_BASE + the pet's index in the
   // list the Go side last sent.
   PET_PICK_BASE = 100,
@@ -101,5 +102,20 @@ int petStatusMenuDump(char *buf, int cap);
 // petStatusClickItem performs a menu item exactly as a click on it would,
 // target and all, so a test exercises the same path as the user.
 void petStatusClickItem(int tag);
+
+// petAboutShow opens the About window, centred on screen, creating it the first
+// time. It is a real NSWindow with a title bar and a close button rather than
+// an overlay in the pet: Wails v2 has exactly one window and it is the
+// frameless transparent pet, so a second one has to be built here.
+void petAboutShow(const char *title, const char *body);
+
+// petAboutClose hides it again. For tests, and for Quit.
+void petAboutClose(void);
+
+// petAboutReport describes the window — whether it is on screen, its size and
+// where it sits relative to the centre of the display it is on. A test cannot
+// see a native window any other way: reading one needs accessibility access,
+// which this project does not have.
+int petAboutReport(char *buf, int cap);
 
 #endif

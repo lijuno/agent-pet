@@ -61,7 +61,7 @@ want "the status item is installed" "$(field menu_bar)" "installed"
 # Dock icon nobody notices in review.
 want "the app keeps out of the Dock" "$(field dock)" "menu bar only"
 menu=$(field status_menu)
-for item in "Show Pet" "Pet Status" "Statistics" "Change Pet" "Always on Top" "Mute" "Quit"; do
+for item in "Show Pet" "Pet Status" "Statistics" "Change Pet" "Always on Top" "Mute" "About" "Quit"; do
 	want "the menu offers $item" "$menu" "$item"
 done
 
@@ -69,7 +69,7 @@ echo
 echo "Every menu item survives being clicked"
 # The suite used to click only Show Pet. Three of the others emitted an event
 # from the main thread and killed the process, and nothing here noticed.
-for item in show show status stats change ontop ontop mute mute pet:momo update; do
+for item in show show status stats about change ontop ontop mute mute pet:momo update; do
 	if ! curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
 		bad "clicking $item" "petd is gone — an earlier item killed it"
 		break
@@ -84,6 +84,11 @@ for item in show show status stats change ontop ontop mute mute pet:momo update;
 	post '{"panel":"close"}'
 	sleep 0.2
 done
+# About is a real window and the loop above opened it. Nothing else closes it,
+# and leaving one on screen after a test run is the same wart as leaving a fake
+# update in the menu bar.
+post '{"panel":"about-close"}'
+
 # Leave the toggles as they were found.
 post '{"shown":true}'
 sleep 0.4
@@ -211,6 +216,23 @@ want "and the menu still shows the real one" "$(field status_menu)" "Update to 9
 # exists when it does not is a different kind of wrong.
 curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json' \
 	-d '{"available":false}' >/dev/null
+
+echo
+echo "About is a window of its own"
+# Parked in a corner first: the whole point of a separate window is that it
+# turns up where the eye is, not wherever the pet was last dragged.
+move_to 40 40 || bad "parking the pet" "the window never reached 40,40"
+post '{"panel":"about"}'
+sleep 1
+got=$(field about)
+case "$got" in
+*"0,0 from centre"*) ok "About opens in the middle of the screen" ;;
+*) bad "About opens in the middle of the screen" "$got" ;;
+esac
+want "and leaves the pet where it was" "$(field window)" "at 40,40"
+post '{"panel":"about-close"}'
+sleep 0.5
+want "and closes again" "$(field about)" "closed"
 
 echo
 echo "Show Pet is a toggle"

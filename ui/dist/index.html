@@ -512,6 +512,14 @@ function describe(state, sessions) {
   }
 }
 
+// loadInfo fills the process facts the panels report. Split out of boot() so a
+// test can populate them without also wiring the runtime event handlers, which
+// boot() does and which a test has no window to attach to.
+async function loadInfo() {
+  info = await call("GetInfo");
+  return info;
+}
+
 function buildStats(p) {
   const st = ((view && view.snapshot) || {}).stats || {};
   const h = document.createElement("h2");
@@ -658,6 +666,9 @@ function openMenu() {
       flashBadge(muted ? "Muted" : "Unmuted");
     }, muted),
     separator(),
+    // A real window, not a panel: it opens centred on screen with a close
+    // button, and does not shove the pet's own window about to make room.
+    item("About", () => { el.menu.classList.add("hidden"); call("ShowAbout"); }),
     item("Quit", () => call("Quit")),
   );
   reveal(el.menu);
@@ -749,7 +760,7 @@ async function boot() {
     });
     window.runtime.EventsOn("pet:muted", (m) => { muted = !!m; });
   }
-  info = await call("GetInfo");
+  await loadInfo();
   apply(await call("GetState"));
 }
 

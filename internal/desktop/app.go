@@ -346,6 +346,17 @@ func (a *App) OpenPanel(kind string) error {
 		return fmt.Errorf("no window")
 	}
 	switch kind {
+	case "about", "about-close":
+		// Not panels: About is a native window, not an overlay in the webview.
+		// Handled here anyway because OpenPanel is the only door the loopback
+		// API has into the window, and a test needs to open and close it the
+		// same way it does everything else it cannot click.
+		if kind == "about" {
+			a.ShowAbout()
+		} else {
+			closeAbout()
+		}
+		return nil
 	case "status", "stats", "pets", "menu", "close":
 	default:
 		return fmt.Errorf("unknown panel %q", kind)
@@ -426,6 +437,10 @@ func (a *App) DesktopDiagnostics() map[string]string {
 	}
 	out["overlay"] = a.overlayReport()
 	out["status_menu"] = a.StatusMenu()
+	// A native window is one a test has no other way to see: it is not in the
+	// webview and nothing may read a real menu or window without accessibility
+	// access, which this project does not have.
+	out["about"] = aboutReport()
 	if a.hidden {
 		out["visible"] = "no — hidden from the menu bar"
 	} else {
@@ -661,7 +676,11 @@ func (a *App) SetDropShadow(b bool) {
 
 // Info backs the status and statistics panels.
 type Info struct {
-	Version     string   `json:"version"`
+	Version string `json:"version"`
+	// AppName and Channel are what distinguish the two applications, which run
+	// side by side and otherwise look identical in a panel. See ADR 0008.
+	AppName     string   `json:"app_name"`
+	Channel     string   `json:"channel"`
 	Addr        string   `json:"addr"`
 	ConfigPath  string   `json:"config_path"`
 	PetsDir     string   `json:"pets_dir"`
@@ -673,6 +692,8 @@ func (a *App) GetInfo() Info {
 	cfg := a.eng.Config()
 	out := Info{
 		Version:     Version,
+		AppName:     flavor.Current().AppName,
+		Channel:     string(flavor.Current().Channel),
 		Addr:        a.addr,
 		ConfigPath:  a.cfgPath,
 		PetsDir:     config.PetsDir(),
@@ -683,6 +704,52 @@ func (a *App) GetInfo() Info {
 	}
 	return out
 }
+
+// aboutText builds the two strings the About window shows. Split out of
+// ShowAbout so it can be tested without a window: this is columns of text, and
+// columns are exactly the thing that quietly stops lining up.
+//
+// It names the application, not the pet. Two of these run side by side with
+// separate settings, ports and update channels (ADR 0008), and "which one am I
+// looking at" is the question this window exists to answer. The character is a
+// detail about the app, so it is a row like any other.
+func aboutText(in Info, petName string) (string, string) {
+	var b strings.Builder
+	b.WriteString("A desktop pet that reacts to what a coding agent is doing.\n\n")
+	for _, r := range [][2]string{
+		{"Version", in.Version},
+		{"Channel", in.Channel},
+		{"Event API", in.Addr},
+		{"Character", petName},
+		{"Config", in.ConfigPath},
+		{"Pets", in.PetsDir},
+	} {
+		v := r[1]
+		if v == "" {
+			// An empty column is indistinguishable from a broken one.
+			v = "—"
+		}
+		fmt.Fprintf(&b, "%-10s %s\n", r[0], v)
+	}
+	name := in.AppName
+	if name == "" {
+		name = "Agent Pet"
+	}
+	return name, strings.TrimRight(b.String(), "\n")
+}
+
+// ShowAbout opens the About window. Bound to the frontend as well as reached
+// from the status item, so both menus open the same one window.
+func (a *App) ShowAbout() {
+	var petName string
+	if p, ok := a.eng.ActivePet(); ok {
+		petName = p.Name
+	}
+	showAbout(aboutText(a.GetInfo(), petName))
+}
+
+// CloseAbout hides it again.
+func (a *App) CloseAbout() { closeAbout() }
 
 func (a *App) Quit() { wruntime.Quit(a.ctx) }
 

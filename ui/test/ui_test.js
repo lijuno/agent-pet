@@ -468,6 +468,22 @@ test("the status panel discloses a forced state", withPet(async (w, d) => {
   assert(d.getElementById("panel").textContent.includes("forced"), "a forced state should be disclosed");
 }));
 
+test("About opens the window rather than a panel", withPet(async (w, d) => {
+  w.apply(view());
+  const calls = stubBackend(w, {});
+  w.openMenu();
+  const items = [...d.getElementById("menu").querySelectorAll(".mi")];
+  const about = items.find((r) => r.textContent.trim() === "About");
+  assert(about, `the menu should offer About, got: ${items.map((r) => r.textContent.trim())}`);
+  about.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+  await tick();
+  // A real NSWindow, centred, with a close button — the frontend's whole part
+  // in it is asking for it. If this ever went back to being a panel it would
+  // open inside the pet's own window, wherever that had been dragged to.
+  eq(called(calls, "ShowAbout").length, 1, "About should ask the backend to open the window");
+  assert(d.getElementById("panel").classList.contains("hidden"), "no panel should open");
+}));
+
 test("the statistics panel shows the counters", withPet(async (w, d) => {
   w.apply(view({
     snapshot: {

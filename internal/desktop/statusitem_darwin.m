@@ -97,6 +97,7 @@ void petStatusInstall(const void *png, int len, int onTop, int muted, int shown)
     // Always present. It reports the last check rather than appearing only
     // when there is something to install, so the menu can answer "have I got
     // the latest?" as well as "there is a new one".
+    addItem(menu, @"About Agent Pet", PET_ABOUT);
     petUpdateItem = addItem(menu, @"No update check yet", PET_UPDATE);
     [petUpdateItem setEnabled:NO];
     [menu addItem:[NSMenuItem separatorItem]];
@@ -235,6 +236,107 @@ void petActivate(void) {
   onMain(^{
     [NSApp activateIgnoringOtherApps:YES];
   });
+}
+
+static NSWindow *petAboutWindow = nil;
+static NSTextField *petAboutTitle = nil;
+static NSTextField *petAboutBody = nil;
+
+void petAboutShow(const char *title, const char *body) {
+  NSString *t = [NSString stringWithUTF8String:title];
+  NSString *b = [NSString stringWithUTF8String:body];
+  onMain(^{
+    if (petAboutWindow == nil) {
+      NSRect frame = NSMakeRect(0, 0, 380, 250);
+      petAboutWindow = [[NSWindow alloc]
+          initWithContentRect:frame
+                    styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
+                      backing:NSBackingStoreBuffered
+                        defer:NO];
+      // Closing hides it and the next About reuses it. Left at the default,
+      // AppKit releases the window on close and the static becomes a dangling
+      // pointer that the second About sends a message to.
+      [petAboutWindow setReleasedWhenClosed:NO];
+      [petAboutWindow setTitle:@"About"];
+
+      CGFloat w = frame.size.width - 40;
+      petAboutTitle = [[NSTextField alloc]
+          initWithFrame:NSMakeRect(20, frame.size.height - 58, w, 24)];
+      [petAboutTitle setBezeled:NO];
+      [petAboutTitle setDrawsBackground:NO];
+      [petAboutTitle setEditable:NO];
+      [petAboutTitle setSelectable:NO];
+      [petAboutTitle setFont:[NSFont boldSystemFontOfSize:16]];
+
+      petAboutBody = [[NSTextField alloc]
+          initWithFrame:NSMakeRect(20, 20, w, frame.size.height - 90)];
+      [petAboutBody setBezeled:NO];
+      [petAboutBody setDrawsBackground:NO];
+      [petAboutBody setEditable:NO];
+      // Selectable: the paths in here are the ones somebody wants to copy.
+      [petAboutBody setSelectable:YES];
+      [petAboutBody setFont:[NSFont monospacedSystemFontOfSize:11
+                                                        weight:NSFontWeightRegular]];
+
+      [petAboutWindow.contentView addSubview:petAboutTitle];
+      [petAboutWindow.contentView addSubview:petAboutBody];
+    }
+    [petAboutTitle setStringValue:t];
+    [petAboutBody setStringValue:b];
+    // Centred every time, not just on first open: the point of this window is
+    // that it turns up where you are looking rather than wherever the pet
+    // happens to have been dragged.
+    //
+    // Placed by hand rather than with -center, which is documented to put the
+    // window in the *upper* third — it came out 147pt above the middle, which
+    // is exactly the complaint this window was meant to answer.
+    NSRect vis = [[NSScreen mainScreen] visibleFrame];
+    NSRect f = [petAboutWindow frame];
+    [petAboutWindow setFrameOrigin:NSMakePoint(NSMidX(vis) - f.size.width / 2,
+                                               NSMidY(vis) - f.size.height / 2)];
+    [petAboutWindow makeKeyAndOrderFront:nil];
+    // The app is an accessory with no Dock icon, so it does not become active
+    // by being clicked. Without this the window opens behind whatever has
+    // focus, which looks exactly like nothing happening.
+    [NSApp activateIgnoringOtherApps:YES];
+  });
+}
+
+void petAboutClose(void) {
+  onMain(^{
+    [petAboutWindow orderOut:nil];
+  });
+}
+
+int petAboutReport(char *buf, int cap) {
+  __block NSString *out = @"closed";
+  void (^check)(void) = ^{
+    if (petAboutWindow == nil || ![petAboutWindow isVisible]) {
+      return;
+    }
+    NSRect f = [petAboutWindow frame];
+    NSRect vis = [[petAboutWindow screen] visibleFrame];
+    // Offset from the centre of the visible frame, which is what "centred"
+    // means here — AppKit's own -center leaves it slightly high on purpose.
+    int dx = (int)llabs((long long)(NSMidX(f) - NSMidX(vis)));
+    int dy = (int)llabs((long long)(NSMidY(f) - NSMidY(vis)));
+    out = [NSString stringWithFormat:@"open %dx%d at %d,%d — %d,%d from centre",
+                                     (int)f.size.width, (int)f.size.height,
+                                     (int)f.origin.x, (int)f.origin.y, dx, dy];
+  };
+  if ([NSThread isMainThread]) {
+    check();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), check);
+  }
+  const char *s = [out UTF8String];
+  int n = (int)strlen(s);
+  if (n >= cap) {
+    n = cap - 1;
+  }
+  memcpy(buf, s, n);
+  buf[n] = 0;
+  return n;
 }
 
 int petStatusMenuDump(char *buf, int cap) {

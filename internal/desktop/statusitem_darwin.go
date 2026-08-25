@@ -170,7 +170,7 @@ func (a *App) ClickStatusItem(name string) error {
 	tags := map[string]C.int{
 		"show": C.PET_SHOW, "status": C.PET_STATUS, "stats": C.PET_STATS,
 		"change": C.PET_CHANGE, "ontop": C.PET_ONTOP, "mute": C.PET_MUTE,
-		"quit": C.PET_QUIT, "update": C.PET_UPDATE,
+		"quit": C.PET_QUIT, "update": C.PET_UPDATE, "about": C.PET_ABOUT,
 	}
 	tag, ok := tags[name]
 	if !ok {
@@ -304,6 +304,24 @@ func setStatusCheck(tag C.int, on bool) {
 	C.petStatusSetCheck(tag, v)
 }
 
+// showAbout opens the native About window. The text is built in Go and handed
+// over as two strings, so the cgo side owns nothing but the window.
+func showAbout(title, body string) {
+	t, b := C.CString(title), C.CString(body)
+	defer C.free(unsafe.Pointer(t))
+	defer C.free(unsafe.Pointer(b))
+	C.petAboutShow(t, b)
+}
+
+func closeAbout() { C.petAboutClose() }
+
+// aboutReport describes the About window for the diagnostics endpoint.
+func aboutReport() string {
+	buf := make([]C.char, 256)
+	n := C.petAboutReport(&buf[0], C.int(len(buf)))
+	return C.GoStringN(&buf[0], n)
+}
+
 //export goStatusClick
 func goStatusClick(tag C.int) {
 	statusMu.Lock()
@@ -350,6 +368,8 @@ func (a *App) handleStatusClick(tag C.int) {
 		a.emitPanel("status")
 	case C.PET_STATS:
 		a.emitPanel("stats")
+	case C.PET_ABOUT:
+		a.ShowAbout()
 	case C.PET_CHANGE:
 		// Nothing: the submenu is the picker. AppKit opens it on hover, and an
 		// item with a submenu does not fire its action anyway.
