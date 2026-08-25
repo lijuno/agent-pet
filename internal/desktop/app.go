@@ -2,8 +2,11 @@ package desktop
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -593,6 +596,54 @@ func (a *App) SetUpdate(st update.Status) {
 	a.upd = st
 	a.updMu.Unlock()
 	setUpdateItem(st)
+	a.saveUpdate(st)
+}
+
+// saveUpdate remembers what the last check found, so a restart does not forget
+// it. Failure is logged and otherwise ignored: not being able to write a
+// convenience file is not a reason to stop being a pet.
+func (a *App) saveUpdate(st update.Status) {
+	b, err := json.Marshal(st)
+	if err != nil {
+		return
+	}
+	path := config.UpdateResult()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		a.log.Warn("could not save the update result", "err", err)
+		return
+	}
+	if err := os.WriteFile(path, b, 0o644); err != nil {
+		a.log.Warn("could not save the update result", "err", err)
+	}
+}
+
+// loadUpdate restores it, re-deriving everything that depends on which build is
+// running.
+//
+// Current comes from this binary and never from the file. If the app was
+// updated while it was closed — which is exactly when nothing could be told —
+// the stored Current names the version that got replaced, and Available was
+// computed against it. Both are recomputed here, so a result saved before an
+// update reads correctly after one: latest 0.2.0 saved while running 0.1.0
+// becomes "up to date" once 0.2.0 is the thing running.
+func (a *App) loadUpdate() {
+	b, err := os.ReadFile(config.UpdateResult())
+	if err != nil {
+		return
+	}
+	var st update.Status
+	if err := json.Unmarshal(b, &st); err != nil {
+		return
+	}
+	st.Current = Version
+	st.Available = st.Latest != "" && update.Compare(st.Current, st.Latest) < 0
+	if st.Validate() != nil {
+		// A file this build cannot make sense of is not worth guessing at.
+		return
+	}
+	a.updMu.Lock()
+	a.upd = st
+	a.updMu.Unlock()
 }
 
 // GetUpdate is what the frontend shows in the status panel.

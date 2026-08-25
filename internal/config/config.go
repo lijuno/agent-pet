@@ -243,6 +243,18 @@ func LogsDir() string { return filepath.Join(DataDir(), "logs") }
 // so it lives here rather than in either of them.
 func UpdateStamp() string { return filepath.Join(DataDir(), "update-check") }
 
+// UpdateResult is what the last check found, kept beside the stamp.
+//
+// A file for the same reason the stamp is one: config.yaml is rewritten from
+// memory when the app exits. Separate from the stamp because that file's
+// *mtime* is the throttle and giving it contents as well would mean one file
+// meaning two things.
+//
+// It exists because petd holds a check result only in memory, and an update is
+// a restart — so without this, the state right after updating is always "no
+// update check yet", which is the one moment somebody is certain to look.
+func UpdateResult() string { return filepath.Join(DataDir(), "update-result.json") }
+
 // Load reads the config, filling in defaults for anything absent. The returned
 // error is advisory: cfg is always usable.
 func Load(path string) (Config, error) {

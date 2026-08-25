@@ -1,6 +1,8 @@
 package desktop
 
 import (
+	"io"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -127,4 +129,74 @@ func TestAboutTextMarksEmptyFields(t *testing.T) {
 	if strings.Count(body, "—") != 6 {
 		t.Errorf("every empty field should be marked:\n%s", body)
 	}
+}
+
+// petd is told update results and holds them in memory, so every restart
+// forgets — and an update *is* a restart, which made "no update check yet" the
+// state at the one moment somebody is certain to look. The result is written
+// beside the config now and read back at startup.
+func TestUpdateResultSurvivesARestart(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	defer stubVersion("0.2.0")()
+
+	save(t).SetUpdate(update.Status{
+		Channel: "dev", Current: "0.2.0", Latest: "0.2.0",
+		Available: false, CheckedAt: time.Now(),
+	})
+
+	// A different App: a new process, as far as the file is concerned.
+	b := save(t)
+	b.loadUpdate()
+	got := b.GetUpdate()
+	if got.Latest != "0.2.0" {
+		t.Fatalf("latest = %q, want the saved 0.2.0", got.Latest)
+	}
+	if got.CheckedAt.IsZero() {
+		t.Error("the check time did not survive, so the menu still says nobody looked")
+	}
+	if title := updateItemTitle(got); title != "Up to date" {
+		t.Errorf("menu would say %q after a restart, want %q", title, "Up to date")
+	}
+}
+
+// The case that telling the daemon cannot fix: the app was closed when it was
+// updated, so there was nothing to tell. The stored result names the version
+// that got replaced and its Available was computed against that, so both are
+// re-derived from the binary actually running.
+func TestLoadUpdateRederivesAgainstTheRunningBuild(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	defer stubVersion("0.2.0")()
+
+	// Saved while 0.2.0 was on offer and 0.1.0 was running.
+	save(t).SetUpdate(update.Status{
+		Channel: "dev", Current: "0.1.0", Latest: "0.2.0",
+		Available: true, CheckedAt: time.Now(),
+	})
+
+	b := save(t)
+	b.loadUpdate()
+	got := b.GetUpdate()
+	if got.Current != "0.2.0" {
+		t.Errorf("current = %q, want the running build 0.2.0", got.Current)
+	}
+	if got.Available {
+		t.Error("the update was taken; it must not still be on offer")
+	}
+	if title := updateItemTitle(got); title != "Up to date" {
+		t.Errorf("menu would say %q, want %q", title, "Up to date")
+	}
+}
+
+// stubVersion pretends this binary was stamped by a release build. Tests run
+// without ldflags, so Version is the "dev" sentinel — which Status.Validate
+// rejects as a Latest, being no version at all.
+func stubVersion(v string) func() {
+	old := Version
+	Version = v
+	return func() { Version = old }
+}
+
+func save(t *testing.T) *App {
+	t.Helper()
+	return &App{log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 }
