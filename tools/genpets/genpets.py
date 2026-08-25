@@ -565,9 +565,16 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
 
     # Legs, behind the hem. Two pixels each: at three they touch and become a
     # block, and the gap between them is what reads as legs at all.
+    #
+    # Every bound goes through sx. The one that did not — a bare `- 1` on the
+    # shoe's inner edge — widened the right shoe inward to three pixels and
+    # collapsed the left onto a single column, which is the sort of asymmetry
+    # that is invisible in the code and obvious the moment you look at her.
     for sx in (-1, 1):
-        rect(d, CX + sx * 2, hip, CX + sx * 2 + sx, GROUND - 1, skin)
-        rect(d, CX + sx * 2 - 1, GROUND - 1, CX + sx * 2 + sx, GROUND, dark)
+        inner, outer = CX + sx * 2, CX + sx * 3
+        rect(d, inner, hip, outer, GROUND - 1, skin)
+        # The shoe is one pixel wider than the leg, on the outside.
+        rect(d, inner, GROUND - 1, outer + sx, GROUND, dark)
 
     if state == "working":
         # The keyboard sits in front of her, so it goes down before the hands.
