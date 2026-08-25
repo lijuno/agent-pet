@@ -73,6 +73,8 @@ class Palette:
     lip: tuple = None
     ribbon: tuple = None
     ribbon_dark: tuple = None
+    desk: tuple = None
+    desk_edge: tuple = None
     gold: tuple = None
     gold_light: tuple = None
     gold_dark: tuple = None
@@ -159,6 +161,8 @@ PEACH = Species(
         lip=(206, 116, 116, 255),
         ribbon=(255, 172, 142, 255),   # peach, for the girl called Peach
         ribbon_dark=(226, 124, 104, 255),
+        desk=(198, 166, 132, 255),        # warm wood, against the cool laptop
+        desk_edge=(232, 204, 172, 255),
         gold=(222, 168, 58, 255),
         gold_light=(255, 228, 140, 255),
         gold_dark=(160, 114, 36, 255),
@@ -537,6 +541,26 @@ def bow(d, x, y, pal):
     rect(d, x - 1, y - 1, x + 1, y + 1, dark)
 
 
+def desk(d, pal):
+    """The surface the laptop stands on, in `working` and nowhere else.
+
+    Two rows, because that is what is left: her head takes rows 8 to 27 and
+    everything below it fits in the eight that remain. It stops short of both
+    frame edges on purpose — run all the way across, it reads as a floor she is
+    standing behind rather than a desk she is sitting at.
+
+    Only `working` gets one. It was tried in `thinking` too, to give a propped
+    elbow something to rest on, and that pose never read at this size; the desk
+    was holding up a gesture that did not work rather than earning its own
+    place. Here it earns it: a laptop resting on nothing was the thing that
+    looked wrong.
+    """
+    if not pal.desk:
+        return
+    rect(d, 4, GROUND, W - 5, GROUND + 1, pal.desk)
+    d.line([(4, GROUND), (W - 5, GROUND)], fill=pal.desk_edge or pal.desk)
+
+
 def hand(d, x, y, pal):
     """One hand. Outlined in `line` it is a dark blot at four pixels across, so
     it takes the shadow tone instead."""
@@ -599,11 +623,16 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     # shoe's inner edge — widened the right shoe inward to three pixels and
     # collapsed the left onto a single column, which is the sort of asymmetry
     # that is invisible in the code and obvious the moment you look at her.
-    for sx in (-1, 1):
-        inner, outer = CX + sx * 2, CX + sx * 3
-        rect(d, inner, hip, outer, GROUND - 1, skin)
-        # The shoe is one pixel wider than the leg, on the outside.
-        rect(d, inner, GROUND - 1, outer + sx, GROUND, dark)
+    #
+    # Not at the desk: seated behind one, her legs are under it. Left in, they
+    # poked out below the surface and turned the desk into a shelf she was
+    # standing behind.
+    if state != "working":
+        for sx in (-1, 1):
+            inner, outer = CX + sx * 2, CX + sx * 3
+            rect(d, inner, hip, outer, GROUND - 1, skin)
+            # The shoe is one pixel wider than the leg, on the outside.
+            rect(d, inner, GROUND - 1, outer + sx, GROUND, dark)
 
     # Arms, posed by state — the body has no other way to join in. They hang
     # outside the dress, which is the only place there is room for them.
@@ -652,6 +681,8 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
         necklace(d, CX, sh + 1, pal)
 
     if state == "working":
+        desk(d, pal)
+
         # Hands first, then the laptop over them. She is sitting behind it, so
         # the lid hides all but the outer edge of each hand — drawn after, they
         # punched skin-coloured holes in her own screen, which is the sort of
@@ -836,9 +867,13 @@ def draw_pet(s, state, i, n):
     # ground shadow — shrinks as the pet rises, which is what sells the hop.
     # A character with a body casts it from the feet, not from the head, or a
     # big head throws a shadow wider than anything touching the floor.
-    shadow_w = (12 if s.torso == "chibi" else bw - 2) + bob
-    d.ellipse([CX - shadow_w // 2, GROUND, CX + shadow_w // 2, GROUND + 3],
-              fill=(0, 0, 0, 60))
+    #
+    # None at the desk: the floor it would fall on is behind the desk and out of
+    # sight, so it read as her hovering just in front of the surface.
+    if not (s.torso == "chibi" and state == "working"):
+        shadow_w = (12 if s.torso == "chibi" else bw - 2) + bob
+        d.ellipse([CX - shadow_w // 2, GROUND, CX + shadow_w // 2, GROUND + 3],
+                  fill=(0, 0, 0, 60))
 
     top = cy - bh // 2
 
