@@ -11,14 +11,14 @@ import (
 var t0 = time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
 
 func TestSilentWhenDialogueDisabled(t *testing.T) {
-	s := NewTemplater("gentle", "Momo", false, 1)
+	s := NewTemplater("gentle", "Sanmao", false, 1)
 	if _, ok := s.Say(t0, state.Idle, state.Celebrate, nil, 0); ok {
 		t.Fatal("dialogue is off; the pet should say nothing")
 	}
 }
 
 func TestSpeaksOnMeaningfulTransitions(t *testing.T) {
-	s := NewTemplater("gentle", "Momo", true, 1)
+	s := NewTemplater("gentle", "Sanmao", true, 1)
 	m, ok := s.Say(t0, state.Working, state.Celebrate, nil, 0)
 	if !ok || m.Text == "" {
 		t.Fatal("a celebration is worth commenting on")
@@ -30,7 +30,7 @@ func TestSpeaksOnMeaningfulTransitions(t *testing.T) {
 
 // A pet that talks during every tool call is noise, not company.
 func TestRateLimited(t *testing.T) {
-	s := NewTemplater("cheerful", "Momo", true, 7)
+	s := NewTemplater("cheerful", "Sanmao", true, 7)
 	if _, ok := s.Say(t0, state.Idle, state.Happy, nil, 0); !ok {
 		t.Fatal("the first line should be allowed")
 	}
@@ -44,7 +44,7 @@ func TestRateLimited(t *testing.T) {
 
 // The one exception: the user genuinely needs to know a request is waiting.
 func TestAttentionBypassesTheQuietPeriod(t *testing.T) {
-	s := NewTemplater("calm", "Momo", true, 3)
+	s := NewTemplater("calm", "Sanmao", true, 3)
 	s.Say(t0, state.Idle, state.Happy, nil, 0)
 	if _, ok := s.Say(t0.Add(time.Second), state.Happy, state.Attention, nil, 0); !ok {
 		t.Fatal("an attention request must not be swallowed by rate limiting")
@@ -53,14 +53,14 @@ func TestAttentionBypassesTheQuietPeriod(t *testing.T) {
 
 // §21: playful, not nagging.
 func TestNoTransitionNoTalk(t *testing.T) {
-	s := NewTemplater("gentle", "Momo", true, 5)
+	s := NewTemplater("gentle", "Sanmao", true, 5)
 	if _, ok := s.Say(t0, state.Working, state.Working, nil, 0); ok {
 		t.Fatal("staying in the same state is not worth a line")
 	}
 }
 
 func TestEventDrivenLinesDoNotNeedAStateChange(t *testing.T) {
-	s := NewTemplater("gentle", "Momo", true, 5)
+	s := NewTemplater("gentle", "Sanmao", true, 5)
 	e := events.Event{Source: "git", Event: events.GitCommit}
 	if _, ok := s.Say(t0, state.Working, state.Working, &e, 0); !ok {
 		t.Fatal("a commit is worth acknowledging even without a state change")
@@ -83,7 +83,7 @@ func TestEveryPresetCoversEveryTrigger(t *testing.T) {
 }
 
 func TestUnknownPresetFallsBackToGentle(t *testing.T) {
-	s := NewTemplater("shakespearean", "Momo", true, 2)
+	s := NewTemplater("shakespearean", "Sanmao", true, 2)
 	if _, ok := s.Say(t0, state.Idle, state.Attention, nil, 0); !ok {
 		t.Fatal("an unrecognised personality should still speak")
 	}

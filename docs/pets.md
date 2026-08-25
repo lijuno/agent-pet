@@ -4,7 +4,7 @@ A pack is a directory of PNGs and one JSON file. No build step, no tooling.
 
 ```
 ~/.local/share/agent-pet/pets/
-└── sanmao/
+└── mycat/
     ├── manifest.json
     ├── idle.png
     ├── thinking.png
@@ -44,8 +44,8 @@ idle animation runs at 3 fps.
 
 ```json
 {
-  "id": "sanmao",
-  "name": "Sanmao",
+  "id": "mycat",
+  "name": "My Cat",
   "version": 1,
   "author": "you",
   "description": "A small round cat.",

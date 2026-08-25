@@ -579,9 +579,9 @@ Three built-in packs ship in the binary:
 
 | id | | |
 |---|---|---|
-| `sanmao` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
+| `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, a bicycle to work on |
 | `peach` | Peach (桃桃), a girl in a white dress | long dark hair over one shoulder, peach bow, gold necklace |
-| `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, and a bicycle to work on |
+| `sanmao` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
 
 Pick one from the menu-bar item's **Change Pet** submenu, or with
 `petctl pet peach`. `tools/genpets` carries a fourth species, `byte`, as a

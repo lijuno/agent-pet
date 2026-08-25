@@ -2,8 +2,14 @@
 """Generate the built-in pixel-art pet packs.
 
 Every built-in pet is drawn from the same parametric creature, so the ten
-states read consistently across characters: same eye grammar, same prop
-positions, same bob rhythm. Only the silhouette and palette change.
+states read consistently across characters: the same eye grammar, and the same
+props in the same corner of the frame.
+
+What a character may change has grown past the silhouette and the palette it
+started at — the head is an ellipse or a rounded rectangle, the face may wear
+brows and glasses, and `working` is a desk for one of them and a bicycle for
+another, which also suspends the bob. Anything a species does not set falls
+back to what the cat does.
 
 Output: ui/dist/pets/<id>/{manifest.json, <state>.png}
 Each PNG is a horizontal strip of N frames, 40x40 each, with alpha.
@@ -15,7 +21,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from PIL import Image, ImageChops, ImageDraw
 
@@ -144,7 +150,6 @@ class Species:
     head_dy: int = 0
     eye_dy: int = 0
     mouth_dy: int = 0
-    extras: dict = field(default_factory=dict)
 
 
 SANMAO = Species(
@@ -1169,9 +1174,10 @@ def hairline(img, s, top, bw, bh, cy, pal):
         # bumps down here is the only curl left on the character and reads as
         # a mistake rather than as hair.
         rect(o, x0 - 3, top - 4, x1 + 3, top + 2, pal.hair)
-        # Sideburns, the same length on both sides. His hair is symmetrical;
-        # the asymmetry this character carries is the jumper over one shoulder,
-        # and two of them in one figure is a figure that has been drawn twice.
+        # Sideburns, the same length on both sides. Nothing about him is
+        # asymmetrical: Peach carries hers in her hair, and he was given a
+        # jumper over one shoulder for a while to carry his, but a plain
+        # charcoal shirt is what he wears and symmetry is what that leaves.
         rect(o, x0, top + 2, x0 + 1, top + bh - 10, pal.hair)
         rect(o, x1 - 1, top + 2, x1, top + bh - 10, pal.hair)
 

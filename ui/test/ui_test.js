@@ -49,7 +49,7 @@ function anim(over) {
 function view(over) {
   return Object.assign({
     pet: "sanmao",
-    pet_name: "Momo",
+    pet_name: "Sanmao",
     scale: 1,
     on_top: true,
     animation: anim(),
