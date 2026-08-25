@@ -416,6 +416,51 @@ test("the status panel says so when nothing is running", withPet(async (w, d) =>
   assert(d.getElementById("panel").textContent.includes("Nothing running."), "empty state missing");
 }));
 
+test("updateLine reports every answer the updater can give", withPet(async (w) => {
+  const at = new Date(Date.now() - 2 * 3600e3).toISOString();
+  // Never checked is an answer, not a blank: the pet does not check for itself,
+  // so "nobody has looked" is a real state somebody can sit in for days.
+  eq(w.updateLine(null), "never checked");
+  eq(w.updateLine({ current: "1.0.0" }), "never checked");
+  eq(w.updateLine({ current: "1.0.0", latest: "1.0.0", checked_at: at }), "up to date · 2h 0m ago");
+  eq(w.updateLine({ current: "1.0.0", latest: "1.1.0", available: true, checked_at: at }),
+     "1.1.0 available · 2h 0m ago");
+  eq(w.updateLine({ current: "1.0.0", checked_at: at }), "nothing published · 2h 0m ago");
+  eq(w.updateLine({ current: "1.2.0-dev.1", latest: "1.1.0", checked_at: at }),
+     "ahead of the channel · 2h 0m ago");
+  eq(w.updateLine({ current: "1.0.0", error: "timeout", checked_at: at }), "check failed · 2h 0m ago");
+  // An error outranks a stale success, or a check that could not run leaves the
+  // previous answer on screen looking current.
+  eq(w.updateLine({ current: "1.0.0", latest: "1.0.0", error: "timeout", checked_at: at }),
+     "check failed · 2h 0m ago");
+}));
+
+test("the status panel says when the last update check ran", withPet(async (w, d) => {
+  w.apply(view());
+  stubBackend(w, {
+    GetUpdate: () => ({
+      current: "1.0.0", latest: "1.0.0", available: false,
+      checked_at: new Date(Date.now() - 90 * 60e3).toISOString(),
+    }),
+  });
+  w.togglePanel("status");
+  await tick(); // the row is filled from GetUpdate
+  const text = d.getElementById("panel").textContent;
+  assert(text.includes("Update"), "the status panel should carry an Update row");
+  assert(text.includes("up to date"), `wanted the last result, got: ${text}`);
+  assert(text.includes("1h 30m ago"), `wanted the elapsed time, got: ${text}`);
+}));
+
+test("the panel says so rather than lying when no backend answers", withPet(async (w, d) => {
+  w.apply(view());
+  // No stub at all: backend() is null, call() resolves null, and the row must
+  // still end up with something true in it.
+  w.togglePanel("status");
+  await tick();
+  const text = d.getElementById("panel").textContent;
+  assert(text.includes("never checked"), `wanted "never checked", got: ${text}`);
+}));
+
 test("the status panel discloses a forced state", withPet(async (w, d) => {
   // Otherwise `petctl test` looks like the pet is broken.
   w.apply(view({ snapshot: { state: "celebrate", forced: true, sessions: [], stats: {} } }));

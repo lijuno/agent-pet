@@ -325,6 +325,9 @@ function row(parent, label, value) {
   const b = document.createElement("span"); b.textContent = value;
   r.append(a, b);
   parent.appendChild(r);
+  // Returned so a caller filling a row from an async call can reach the value
+  // without going hunting for it in the DOM.
+  return { row: r, label: a, value: b };
 }
 
 /* --- panels -------------------------------------------------------------- */
@@ -420,6 +423,28 @@ function togglePanel(kind) {
   reveal(el.panel);
 }
 
+// updateLine says what the last update check found and how long ago it ran.
+//
+// It lives here rather than in the menu-bar title because this panel is rebuilt
+// every time it opens, so the elapsed time is computed the moment somebody
+// reads it. Nothing rebuilds a menu-bar item while it sits there, and a title
+// saying "checked 2m ago" four hours later is worse than one that never said.
+//
+// The pet does not check for itself — the daemon opens no connections (ADR
+// 0008). This reports what `petctl` last told it, and "never" is an answer
+// worth printing rather than hiding.
+function updateLine(st) {
+  if (!st || !st.checked_at) return "never checked";
+  const ago = dur(Date.now() * 1e6 - Date.parse(st.checked_at) * 1e6) + " ago";
+  // An error outranks a stale success: a check that could not run must not
+  // leave the previous answer looking current.
+  if (st.error) return "check failed · " + ago;
+  if (st.available && st.latest) return st.latest + " available · " + ago;
+  if (!st.latest) return "nothing published · " + ago;
+  if (st.latest === st.current) return "up to date · " + ago;
+  return "ahead of the channel · " + ago;
+}
+
 function buildStatus(p) {
   const snap = (view && view.snapshot) || {};
   const h = document.createElement("h2");
@@ -434,6 +459,9 @@ function buildStatus(p) {
     row(p, "For", dur(Date.now() * 1e6 - Date.parse(snap.since) * 1e6));
   }
   if (snap.forced) row(p, "Note", "forced by petctl test");
+
+  const updRow = row(p, "Update", "…");
+  call("GetUpdate").then((st) => { updRow.value.textContent = updateLine(st); });
 
   const box = document.createElement("div");
   box.className = "sessions";
