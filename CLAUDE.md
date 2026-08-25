@@ -2,7 +2,8 @@
 
 A macOS desktop pet that reacts to what a coding agent is doing. Claude Code
 fires hooks → `petctl hook claude` POSTs an event → a state machine reduces
-events to one visible state → a transparent Wails window draws a pixel-art cat.
+events to one visible state → a transparent Wails window draws a pixel-art
+character.
 
 Read [README.md](README.md) first for what it does. This file is about
 working on it.
@@ -14,10 +15,11 @@ window, the menu-bar item, and the Claude Code adapter. Two characters ship —
 Sanmao (`momo`) and Peach (`peach`) — and a third stays defined but unshipped
 in `tools/genpets` as the worked example; see the README's Characters section.
 
-Over-the-air updates are in too. Two things about them are load-bearing and
-neither is obvious from the code: the updater lives in `petctl` rather than
-`petd` so the daemon stays offline, and the "dev channel" is a **second
-application** (`Agent Pet (dev)`) rather than a setting. Read
+Over-the-air updates are in too. Three things about them are load-bearing and
+none is obvious from the code: the updater lives in `petctl` rather than `petd`
+so the daemon keeps no HTTP client, `petd` nonetheless starts one subprocess —
+`petctl update --if-due`, at launch, and only that — and the "dev channel" is a
+**second application** (`Agent Pet (dev)`) rather than a setting. Read
 [ADR 0008](docs/adr/0008-over-the-air-updates.md) before touching any of it —
 a channel picker was built first and deliberately deleted.
 
@@ -90,9 +92,16 @@ looks arbitrary — much of it is load-bearing.
 
 Each of these cost an hour or more to find.
 
-- **A stale `petd` holds port 9876.** A new instance exits on startup and
-  `petctl` keeps talking to the old one, so your rebuild appears to do
-  nothing. `pkill -9 -f 'MacOS/petd'` before relaunching.
+- **A stale `petd` holds the port.** A new instance cannot bind and stops, so
+  your rebuild appears to do nothing. It says so in a dialog now rather than
+  only on stderr, which nothing launched from the Finder can show.
+  `pkill -9 -f 'MacOS/petd'` before relaunching.
+- **A copy in `build/bin` will answer for the installed app.** The lock is by
+  bundle identifier, so whichever started first holds the port and the other
+  exits — and with both at the same version nothing on screen tells them apart.
+  A release build took over this machine's dev port twice, and `petctl doctor`
+  pointed confidently at `/Applications` both times. It names the answering
+  binary now when the two differ. `make release` leaves such a copy behind.
 - **A failed `make build` leaves the previous `.app` in place.** A green test
   run after a failed build tested the old binary and means nothing. Check the
   build said `Built '...'` before believing a result.
@@ -134,9 +143,11 @@ Each of these cost an hour or more to find.
 - **`petctl update` re-execs a copy of itself out of the bundle** before
   touching it, passing `os.Args` through. A new flag works automatically; a
   flag read from somewhere other than `os.Args` will silently not survive.
-- **Nothing has been published on either channel yet.** A 404 from
-  `raw.githubusercontent.com` is the correct answer today, and there is a test
-  asserting it reads as "nothing yet" rather than as a broken updater.
+- **Both channels have been published to.** The release channel is on 0.1.0
+  and the dev channel is well ahead of it, so a build from `master` reads as
+  "ahead of the channel" against release, which is correct and not a fault.
+  The 404-means-nothing-published path still exists and still has a test; it is
+  just no longer what you will see.
 - **The Wails single-instance lock is keyed by bundle identifier.** With a
   shared key the second app to start binds its port, logs `petd started`, and
   then exits with **status 0 and no error at all** — Wails checks the lock

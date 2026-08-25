@@ -132,6 +132,7 @@ summarising it: these messages name the specific check that failed.
 | `macOS will not accept the downloaded app` | Gatekeeper refused it. Report the output verbatim. |
 | `the pet is still holding 127.0.0.1:9876` | The old app did not quit. Ask the user to quit it from the menu bar, then retry. Nothing was changed. |
 | `cannot stage an update next to …` | No write access to `/Applications`. The user needs to install it themselves, or move the app somewhere they own. |
+| `the pet answering on the event port is a different copy` | The bundle was replaced, but another build — often one left in a project's `build/bin` — holds the port, so the new app exited on the single-instance lock. The message names its path. Quit that one and open the installed app. Nothing is wrong with the download. |
 
 A signature or team failure means the file is not what the author published, or
 the download was corrupted, and neither you nor the user can tell those apart

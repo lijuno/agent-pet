@@ -53,8 +53,11 @@ can be typed wrong. Every field is validated on the way in — see
 `internal/update` — and `.github/workflows/updates.yml` re-checks the whole file
 against the real asset whenever one of them changes.
 
-Neither file exists yet. Until one does, `petctl update --check` reports that
-nothing has been published, which is true.
+Both files exist and both channels have been published to. `petctl update
+--check` against a channel with no manifest is still a supported answer — it
+reports that nothing has been published rather than treating the 404 as a broken
+updater, and there is a test for it — but that is no longer the state either
+channel is in.
 
 `make release` writes the one matching the app it just built, so publishing to
 the wrong channel would mean building the wrong app — which `scripts/release.sh`

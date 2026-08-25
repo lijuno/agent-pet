@@ -45,10 +45,15 @@ in places, so "I cannot click it" is expected, not a fault.
 
 This is almost always the same cause: **the old app was still running.**
 
-The app holds a local event port. A second copy that starts while the first
-still holds it exits immediately instead of reporting a conflict, so the
-update looks like it succeeded while the old version keeps running. `petctl`
-then talks to the old one and reports the old version.
+The app holds a local event port, and the single-instance lock is keyed by
+bundle identifier — so whichever copy started first keeps it and the other one
+stops. Recent builds say so in a dialog; older ones exited without a word, which
+is why an update could look like it succeeded while the old version kept
+running. `petctl` then talks to whatever is on the port and reports its version.
+
+It is not always the *old* app holding it. A build left in a project's
+`build/bin` answers for the installed one just as well, and when both are the
+same version nothing on screen tells them apart.
 
 Quit the app completely, confirm nothing is left, then start the new one:
 
@@ -62,8 +67,17 @@ Then confirm the version actually changed:
 petctl doctor
 ```
 
-If it still reports the old version, the new bundle did not land in
-`/Applications` — re-run `/agent-pet:install`.
+`petctl doctor` names the binary that is actually answering when it is not the
+one it just listed:
+
+```text
+✓ Agent Pet   0.2.0        running on 127.0.0.1:9876
+              /Applications/agent-pet.app
+              ⚠ answering from /Users/…/build/bin/agent-pet.app/Contents/MacOS/petd
+```
+
+If it still reports the old version and names no other copy, the new bundle did
+not land in `/Applications` — re-run `/agent-pet:install`.
 
 ## The plugin and the app disagree
 

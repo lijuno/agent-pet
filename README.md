@@ -82,7 +82,7 @@ session you are in now will not pick them up.
 ### First run
 
 Agent Pet is a menu-bar app: nothing appears in the Dock. Before an agent
-connects, the cat is grey and asleep — that is correct, not a fault. Colour and
+connects, the pet is grey and asleep — that is correct, not a fault. Colour and
 motion mean something is there to watch.
 
 `petctl doctor` says more than you expect: whether the app is running, which
@@ -205,8 +205,12 @@ it swaps the bundle — old one moved aside, not deleted, until the new one has
 landed — waits for the event port to actually come free, and starts the new
 version. A build you made yourself is never replaced.
 
-When a check finds something, an item naming the version appears in the menu-bar
-menu and opens the release notes. It does not install: the app holds no updater
+The menu-bar menu always carries an update item, and it says what the last check
+found: the version on offer, `Up to date`, `Nothing published yet`, `Ahead of
+the channel`, `Update check failed`, or `No update check yet` before anything has
+looked. Those are six different answers and none is reported as another. When
+there is a version it opens the release notes; otherwise there is no page behind
+it and it is not pressable. It never installs: the app holds no updater
 and opens no connections of its own. `petctl` does the work, which is why
 [SECURITY.md](SECURITY.md) can still say the daemon never dials out.
 
