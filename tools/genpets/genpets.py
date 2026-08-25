@@ -91,8 +91,10 @@ class Palette:
     # the face it crosses and cooler than it: a pale frame at this size is not
     # wire but the rim of a pair of goggles, which is what he wore first.
     frame: tuple = None
-    # A garment worn over the garment: the jumper slung across one shoulder.
-    wrap: tuple = None
+    # The paint on a bicycle frame. The tyres are not here: rubber is black on
+    # every bicycle ever made, so they take a literal, the way the lit panel of
+    # a screen does.
+    bike: tuple = None
     # think is the colour of the thinking dots. They used to be drawn in
     # `line`, the character's own outline, which made the one state that says
     # "the agent is reasoning" the hardest of all to notice. Props that carry a
@@ -108,6 +110,10 @@ class Species:
     palette: Palette
     ears: str = "cat"       # cat | antenna | none
     face: str = "muzzle"    # muzzle | screen | soft
+    # The outline of the head itself. Every character had one ellipse for it
+    # until a square-jawed one turned up, and a jaw is most of what a face is
+    # recognised by before any of the features are legible.
+    head: str = "round"     # round | square
     tail: bool = True
     body_w: int = 24
     body_h: int = 22
@@ -121,8 +127,6 @@ class Species:
     # eyes behind glasses has the opposite problem and needs them.
     brows: bool = False
     glasses: str = "none"    # none | rect
-    # A jumper over one shoulder.
-    drape: bool = False
     # The faint blush worn in every state. Separate from `lashes`, which used
     # to stand in for it: they travel together on one character and that is not
     # a rule.
@@ -130,6 +134,9 @@ class Species:
     # A separate body under the head, rather than one ellipse that is both.
     torso: str = "none"      # none | chibi
     garment: str = "dress"   # dress | tee
+    # What the character is doing in `working`. The state means the agent is
+    # busy; what busy looks like is the character's own.
+    work: str = "desk"       # desk | bike
     # Where the head sits, and where the face sits inside it. A merged
     # head-and-body puts the eyes near the middle of the one ellipse and lets
     # the chin run into the chest; once the head is only a head, the face has
@@ -206,7 +213,7 @@ PEACH = Species(
 JUANMAO = Species(
     pid="juanmao",
     name="Juanmao (卷毛)",
-    description="A man with curly hair and rectangular glasses, in a charcoal tee.",
+    description="A man with curly hair and rectangular glasses, who works from a bicycle.",
     palette=Palette(
         # Warmer and a shade deeper than Peach's skin, and pushed apart from
         # her the same way she was pushed apart from her photograph: two
@@ -216,15 +223,14 @@ JUANMAO = Species(
         body_dark=(202, 158, 130, 255),
         belly=(244, 214, 190, 255),
         line=(84, 56, 46, 255),
-        accent=(255, 178, 96, 255),    # amber: sparkles, and the screen glow
+        accent=(255, 178, 96, 255),    # amber, for the sparkles of `celebrate`
         eye=(46, 34, 30, 255),
         blush=(236, 150, 130, 120),
         hair=(40, 32, 28, 255),
         hair_light=(112, 88, 72, 255),  # the lit edge of a curl
         cloth=(56, 60, 70, 255),       # a charcoal t-shirt
         cloth_line=(38, 42, 50, 255),
-        wrap=(126, 138, 156, 255),     # the jumper over his shoulder
-        pants=(84, 96, 120, 255),
+        pants=(112, 128, 156, 255),
         shoe=(42, 46, 56, 255),
         frame=(74, 68, 74, 255),
         jaw=(216, 176, 148, 255),
@@ -233,13 +239,15 @@ JUANMAO = Species(
         # drawings that happen to ship together.
         desk=(198, 166, 132, 255),
         desk_edge=(232, 204, 172, 255),
-        shell=(186, 192, 204, 255),
+        shell=(186, 192, 204, 255),   # handlebars, and the hub of a wheel
+        bike=(228, 108, 76, 255),     # the frame, in a red he would pick
         nose=None,
         think=(140, 202, 255, 255),    # cool, against an amber accent
     ),
-    ears="none", face="human", tail=False, body_w=21, body_h=19,
-    hair="curly", lashes=False, brows=True, glasses="rect", drape=True,
-    torso="chibi", garment="tee", head_dy=-6, eye_dy=4, mouth_dy=4,
+    ears="none", face="human", head="square", tail=False, body_w=21, body_h=19,
+    hair="curly", lashes=False, brows=True, glasses="rect",
+    torso="chibi", garment="tee", work="bike",
+    head_dy=-6, eye_dy=4, mouth_dy=4,
 )
 
 
@@ -596,6 +604,21 @@ def mouth(d, mx, my, kind, pal, muzzle_style="cat"):
 # the character
 # --------------------------------------------------------------------------
 
+# The radius of the corner on a square head. Five of twenty-one across: less
+# and he is a brick, more and he is the ellipse everyone else has.
+JAW_R = 5
+
+
+def head_shape(d, s, x0, y0, x1, y1, **kw):
+    """The outline of the head, and the mask everything drawn on it is clipped
+    to. Both go through here so they cannot disagree — they did, once, and the
+    fringe was clipped to an ellipse the face no longer was."""
+    if s.head == "square":
+        d.rounded_rectangle([x0, y0, x1, y1], radius=JAW_R, **kw)
+    else:
+        d.ellipse([x0, y0, x1, y1], **kw)
+
+
 def blush(d, s, cx, ey, pal, soft=False):
     """Cheeks. Skipped for screen faces: a robot has no cheeks, and the marks
     would land outside the panel and read as damage.
@@ -664,7 +687,7 @@ def markings(img, s, top, bw, bh, cy, pal):
 
     # Clip to the body, inset by one pixel so the outline stays unbroken.
     mask = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mask).ellipse([x0 + 1, top + 1, x1 - 1, top + bh - 1], fill=255)
+    head_shape(ImageDraw.Draw(mask), s, x0 + 1, top + 1, x1 - 1, top + bh - 1, fill=255)
     overlay.putalpha(ImageChops.multiply(overlay.getchannel("A"), mask))
     img.alpha_composite(overlay)
 
@@ -714,13 +737,107 @@ def desk(d, pal):
     d.line([(4, GROUND), (W - 5, GROUND)], fill=pal.desk_edge or pal.desk)
 
 
+# The bicycle is anchored to the ground, not to the rider. He bobs; it does
+# not, any more than the laptop does — a bicycle that breathes on the beat is
+# the one thing in the frame that cannot.
+# It is drawn low, past GROUND and into the rows the ground shadow would have
+# used: the wheels are what touches the floor here, and every row they can be
+# given down there is a row the curls on his head do not lose at the top.
+HUB_Y = 32          # the hub of the one wheel there is
+BAR_Y = 26          # the handlebars, and therefore his hands
+
+
+def bicycle(d, i, pal):
+    """The bike head on, coming toward you.
+
+    It was drawn from the side first, two circles and a diamond, which is the
+    most recognisable bicycle there is — and wrong, because the rider on it has
+    a face and two hands drawn from the front. Two wheels side by side put the
+    viewer at the kerb; symmetrical hands and a symmetrical face put the viewer
+    in front of the bike. One of the two had to go, and it could not be the
+    face: the other nine states are that face.
+
+    So the wheel is edge on and there is only one of it, the fork straddles it
+    where a front view puts both blades, and the bars run across with a grip at
+    each end for the two hands that were already there.
+
+    Drawn after the rider. Head on, the front wheel and the bars are the
+    nearest things in the frame — his knees pass behind them, which is also
+    what stops the wheel being a shape floating between his legs.
+    """
+    # Rubber is black on every bicycle ever made, so the tyre is a literal
+    # rather than a palette entry, the way the lit panel of a screen is.
+    tyre = (46, 44, 48, 255)
+    tread = (146, 144, 154, 255)
+    rim = (168, 172, 184, 255)
+    paint = pal.bike or pal.body_dark
+    metal = pal.shell or pal.body_dark
+    top = HUB_Y - 5
+
+    # The fork: two blades either side of the wheel, and the crown across them.
+    # This is most of what says the bicycle is pointing at you rather than
+    # standing beside you — from the kerb the two blades are one line.
+    for sx in (-1, 1):
+        d.line([(CX + sx * 3, top + 1), (CX + sx * 3, HUB_Y + 2)], fill=paint)
+    d.line([(CX - 3, top + 1), (CX + 3, top + 1)], fill=paint)
+    # The stem, up the middle to the bar. Without it the handlebars hang in
+    # front of his chest with nothing holding them.
+    d.line([(CX, BAR_Y + 1), (CX, top + 1)], fill=metal)
+
+    # The wheel: five across and twelve down. A bicycle tyre seen head on is a
+    # slot, and at seven across this was a motorbike. A dark tyre with the lit
+    # edge of the rim down the middle of it — one value cannot be seen against
+    # both a light desktop and a dark one, so it carries two, the way the
+    # thinking dots do.
+    d.ellipse([CX - 2, top, CX + 2, HUB_Y + 6], fill=tyre)
+    d.line([(CX, top + 2), (CX, HUB_Y + 4)], fill=rim)
+    px(d, CX, HUB_Y, metal)
+
+    # Tread, and the tread is what turns.
+    #
+    # The spokes cannot do it: they are edge on, and there is no rim feature to
+    # follow either. But the tyre has a pattern on it, the pattern is regular,
+    # and the surface facing the viewer travels downward as the bike comes at
+    # you — so blocks marching down the tyre a row a frame are a wheel rolling,
+    # from exactly the angle where nothing else can say so.
+    #
+    # The period is four rows and there are four frames. Any other pairing and
+    # the pattern lands where it started before the strip does, and the wheel
+    # stutters once a cycle for ever.
+    # Eight rows of tyre, four frames, one block every four rows: each frame
+    # shows exactly two blocks. Over any other span the count flickers between
+    # two and three and the tread pulses instead of rolling.
+    #
+    # The top row of the eight is where the tyre narrows to three pixels, so
+    # the block narrows with it. Drawn at the full width up there it lands on
+    # nothing and hangs off the side of the wheel.
+    for y in range(HUB_Y - 3, HUB_Y + 5):
+        if (y - i) % 4:
+            continue
+        for dx in ((-2, -1, 1, 2) if y > HUB_Y - 3 else (-1, 1)):
+            px(d, CX + dx, y, tread)
+
+
+def feet(i):
+    """How high each foot is this frame.
+
+    Head on, a crank is a circle seen edge on: the near half of it points at
+    the viewer and foreshortens to nothing, so a foot going round travels up
+    and down and hardly at all across. Two pixels of rise is the whole of the
+    animation, and with the wheel unable to show that it is turning it is also
+    the whole of the motion in the state.
+    """
+    rise = (2, 0, -2, 0)
+    return HUB_Y + 1 + rise[i % 4], HUB_Y + 1 + rise[(i + 2) % 4]
+
+
 def hand(d, x, y, pal):
     """One hand. Outlined in `line` it is a dark blot at four pixels across, so
     it takes the shadow tone instead."""
     d.ellipse([x - 2, y - 2, x + 2, y + 2], fill=pal.body, outline=pal.body_dark)
 
 
-def hands_at(state, i, sh, hip):
+def hands_at(state, i, sh, hip, bike=False):
     """Where the two hands are this frame.
 
     Shared, because the arm and the hand on the end of it are drawn at
@@ -729,6 +846,12 @@ def hands_at(state, i, sh, hip):
     """
     out = []
     for sx in (-1, 1):
+        if bike and state == "working":
+            # Anchored to the bar, which is anchored to the ground. His
+            # shoulders rise and fall a pixel on the bob and the arms take up
+            # the difference, which is what arms do.
+            out.append((CX + sx * 8, BAR_Y))
+            continue
         if state == "celebrate":
             hx, hy = CX + sx * 9, sh - 2
         elif state == "working":
@@ -768,8 +891,13 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
         return
     d = ImageDraw.Draw(img)
     sh = top + bh                  # the shoulder line, right under the chin
-    hip = GROUND - 3
+    biking = s.work == "bike" and state == "working"
+    # On the bike he is lifted clear of the ground to make room for it, so the
+    # hem has to follow the shoulders instead of the floor. Left on GROUND the
+    # shirt stretched to ten rows and he wore a nightshirt to work.
+    hip = sh + 5 if biking else GROUND - 3
     skin, dark, line = pal.body, pal.body_dark, pal.line
+
 
     # Legs, behind the hem. Two pixels each: at three they touch and become a
     # block, and the gap between them is what reads as legs at all.
@@ -782,8 +910,8 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     # Not at the desk: seated behind one, her legs are under it. Left in, they
     # poked out below the surface and turned the desk into a shelf she was
     # standing behind.
+    leg, foot = pal.pants or skin, pal.shoe or dark
     if state != "working":
-        leg, foot = pal.pants or skin, pal.shoe or dark
         for sx in (-1, 1):
             inner, outer = CX + sx * 2, CX + sx * 3
             rect(d, inner, hip, outer, GROUND - 1, leg)
@@ -798,7 +926,7 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     # end of a sleeve and becomes a disc pasted on top of her. `working` is the
     # exception because there the hand has to sit on the laptop, and the laptop
     # is drawn after the dress for reasons of its own.
-    for sx, (hx, hy) in zip((-1, 1), hands_at(state, i, sh, hip)):
+    for sx, (hx, hy) in zip((-1, 1), hands_at(state, i, sh, hip, biking)):
         d.line([(CX + sx * 4, sh + 1), (hx, hy)], fill=skin, width=3)
         if state != "working":
             hand(d, hx, hy, pal)
@@ -838,22 +966,21 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     else:
         d.polygon([(CX - 4, sh - 1), (CX, sh + 3), (CX + 4, sh - 1)], fill=skin)
 
-    if s.drape:
-        # A jumper slung over one shoulder: across the collarbone, over the
-        # shoulder, and down the front. It is the only asymmetry he has —
-        # Peach's is her hair, and a character with a symmetrical silhouette
-        # and a symmetrical face reads as a diagram of a person.
-        wool = pal.wrap or pal.body_dark
-        # Wide, and hanging off the shoulder rather than crossing the chest:
-        # three pixels of it on the diagonal is a seatbelt, which is what the
-        # first one looked like. Cloth has to have a width before it is cloth.
-        d.polygon([(CX + 1, sh - 1), (CX + 7, sh), (CX + 8, sh + 4),
-                   (CX + 7, sh + 7), (CX + 3, sh + 6), (CX + 4, sh + 2)],
-                  fill=wool)
-        # One fold, along the fall. Wool is the one thing on him that is
-        # neither skin nor hair nor charcoal, and flat it reads as a hole cut
-        # in the shirt.
-        d.line([(CX + 5, sh + 3), (CX + 5, sh + 5)], fill=pal.belly)
+    if biking:
+        # A thigh out to a knee and a shin back in to a pedal, per side. The
+        # knees are wider than the feet because that is what a cyclist seen
+        # head on looks like, and with the wheel edge on they are the only
+        # thing in the state that moves.
+        #
+        # Drawn after the shirt rather than before it — these come out from
+        # under a hem instead of hanging behind one, and behind it the hem
+        # swallowed them whole.
+        for sx, fy in zip((-1, 1), feet(i)):
+            knee = (CX + sx * 6, fy - 4)
+            d.line([(CX + sx * 3, hip - 2), knee], fill=leg, width=3)
+            d.line([knee, (CX + sx * 4, fy)], fill=leg, width=3)
+            rect(d, CX + sx * 4 - 1, fy, CX + sx * 4 + 1, fy + 1, foot)
+
 
 
 def torso_front(d, s, state, i, top, bw, bh, cy, pal):
@@ -870,13 +997,28 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
     """
     if s.torso != "chibi":
         return
-    sh, hip = top + bh, GROUND - 3
+    sh = top + bh
+    hip = sh + 5 if (s.work == "bike" and state == "working") else GROUND - 3
     skin, dark, line = pal.body, pal.body_dark, pal.line
 
     if pal.gold:
         necklace(d, CX, sh + 1, pal)
 
-    if state == "working":
+    if state == "working" and s.work == "bike":
+        bicycle(d, i, pal)
+        # The bar, its grips, then the hands over them: he is holding it, and
+        # hands drawn under it are two discs peeping out from behind a stick.
+        # The grips are what makes it a handlebar rather than a rail — a bar
+        # with nothing on the ends is the one he had, and he appeared to be
+        # holding a broom.
+        metal = pal.shell or dark
+        d.line([(CX - 10, BAR_Y), (CX + 10, BAR_Y)], fill=metal)
+        for sx in (-1, 1):
+            rect(d, CX + sx * 10, BAR_Y - 1, CX + sx * 9, BAR_Y + 1, (46, 44, 48, 255))
+        for hx, hy in hands_at(state, i, sh, hip, True):
+            hand(d, hx, hy, pal)
+
+    elif state == "working":
         desk(d, pal)
 
         # Hands first, then the laptop over them. She is sitting behind it, so
@@ -934,35 +1076,30 @@ def hair_back(d, s, top, bw, bh, cy, pal):
     x0, x1 = CX - bw // 2, CX + bw // 2
 
     if s.hair == "curly":
-        # Wide rather than tall. A curly head wants volume and the volume has
-        # to go somewhere; upward it leaves the frame on `celebrate`, where the
-        # bob lifts him four rows, and a haircut that is trimmed by the top of
-        # the window in one state out of ten is a haircut with a bug in it.
-        # Sideways there is room, because the props are all above y=18.
-        d.ellipse([x0 - 3, top - 3, x1 + 2, top + 8], fill=pal.hair)
-        # The lumps are the curls. A smooth arc of any thickness is a haircut,
-        # and the first version of this was one — the silhouette is the only
-        # place the curl can live, because the inside of the mass is a single
-        # colour at any size this drawing has.
+        # One smooth mass, and nothing standing on top of it.
         #
-        # Uneven on purpose, in radius and in spacing: a ring of equal circles
-        # is a wig. Every one of them stays inside x1 + 3 and above the
-        # shoulders, because the top-right corner is the prop column, and a Z
-        # drawn dark and drawn last on top of black hair leaves `sleeping` with
-        # no signal at all.
-        for lx_, ly_, r in ((x0 - 3, top + 1, 3), (x0 - 1, top - 2, 3),
-                            (CX - 5, top - 2, 3), (CX + 1, top - 2, 3),
-                            (CX + 6, top - 1, 3), (x1 + 1, top + 2, 3)):
-            d.ellipse([lx_ - r, ly_ - r, lx_ + r, ly_ + r], fill=pal.hair)
-        # Lit curls, scattered inside the mass rather than laid along its
-        # edge. On the edge they read as a second, lighter haircut sitting on
-        # the first; inside, each short arc is one curl catching the light and
-        # four of them are hair that curls. They are drawn well inside the
-        # silhouette for that reason and not for any other.
+        # It was built out of overlapping lumps for a while — the wave along
+        # the top edge was the only thing in the drawing saying the hair was
+        # anything but straight. Five rows of it are ever seen, though, and a
+        # wave inside five rows is a decoration on a shape that has no room for
+        # one. The name says curly; the silhouette does not have to shout it.
+        #
+        # Its top is five rows above the skull and no higher: `celebrate` lifts
+        # him four, and hair that leaves the top of the window in one state out
+        # of ten is hair with a bug in it. The right edge stops at the head's
+        # own, the way Peach's crown does and for her reason — that corner is
+        # the prop column, and the Z of `sleeping` is drawn dark and drawn last,
+        # so one lost in black hair leaves the state with no signal at all.
+        d.ellipse([x0 - 3, top - 5, x1 + 1, top + 10], fill=pal.hair)
+
+        # Two lit ticks, and small ones. Five rows of hair cannot carry a
+        # highlight of any size: at three arcs it was a light band across the
+        # head and the whole thing read as a straw hat, and at one arc per lump
+        # it read as speckled. Both were tried, in that order.
         light = pal.hair_light or pal.hair
-        for ax, ay, r in ((x0 + 1, top, 2), (CX - 4, top - 1, 2),
-                          (CX + 3, top - 1, 2), (x1 - 1, top + 2, 2)):
-            d.arc([ax - r, ay - r, ax + r, ay + r], 160, 340, fill=light)
+        for ax, ay in ((CX - 7, top - 3), (CX + 3, top - 4)):
+            d.line([(ax, ay), (ax + 2, ay)], fill=light)
+            px(d, ax + 3, ay + 1, light)
         return
 
     # The crown. It hugs the head on the side the hair is swept *away* from,
@@ -1022,23 +1159,20 @@ def hairline(img, s, top, bw, bh, cy, pal):
         # It makes for a high hairline. That is the price of the brows, and
         # they are worth it: they are the only part of this face that moves
         # besides the eyes, and the eyes are three pixels wide behind glass.
-        # A curl was hung out of the middle of this, into the gap between the
-        # brows, to break the straight edge. It reached the brows, the two
-        # merged, and the pair read as one angry V — so the edge stays straight
-        # and the curls in the silhouette above do that job on their own.
+        #
+        # The edge is straight. It was scalloped while the mass above it was
+        # made of lumps, so that the two agreed; with the mass smooth, a row of
+        # bumps down here is the only curl left on the character and reads as
+        # a mistake rather than as hair.
         rect(o, x0 - 3, top - 4, x1 + 3, top + 2, pal.hair)
-
         # Sideburns, the same length on both sides. His hair is symmetrical;
         # the asymmetry this character carries is the jumper over one shoulder,
         # and two of them in one figure is a figure that has been drawn twice.
         rect(o, x0, top + 2, x0 + 1, top + bh - 10, pal.hair)
         rect(o, x1 - 1, top + 2, x1, top + bh - 10, pal.hair)
-        light = pal.hair_light or pal.hair
-        o.arc([CX - 7, top - 2, CX - 3, top + 2], 200, 340, fill=light)
-        o.arc([CX + 1, top - 1, CX + 5, top + 3], 200, 340, fill=light)
 
         mask = Image.new("L", (W, H), 0)
-        ImageDraw.Draw(mask).ellipse([x0 + 1, top + 1, x1 - 1, top + bh - 1], fill=255)
+        head_shape(ImageDraw.Draw(mask), s, x0 + 1, top + 1, x1 - 1, top + bh - 1, fill=255)
         overlay.putalpha(ImageChops.multiply(overlay.getchannel("A"), mask))
         img.alpha_composite(overlay)
         return
@@ -1061,7 +1195,7 @@ def hairline(img, s, top, bw, bh, cy, pal):
     rect(o, x1 - 3, top + 3, x1, top + bh - 6, pal.hair)
 
     mask = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mask).ellipse([x0 + 1, top + 1, x1 - 1, top + bh - 1], fill=255)
+    head_shape(ImageDraw.Draw(mask), s, x0 + 1, top + 1, x1 - 1, top + bh - 1, fill=255)
     overlay.putalpha(ImageChops.multiply(overlay.getchannel("A"), mask))
     img.alpha_composite(overlay)
 
@@ -1116,7 +1250,17 @@ def draw_pet(s, state, i, n):
     pal = s.palette
 
     bob = BOB.get(state, [0])[i % len(BOB.get(state, [0]))]
-    cy = 23 + bob + s.head_dy
+    # A rider sits above his bicycle, so `working` lifts him — as far as it can
+    # before the curls on top of his head meet the top of the window, and one
+    # row past that, which the frame is welcome to have.
+    #
+    # And he stops bobbing on it. The bob is a body bouncing on its own; on a
+    # saddle the bouncing is done by the legs, and the frame the bob carried an
+    # extra row upward was the one that lost a quarter of his hair.
+    lift = 4 if (s.work == "bike" and state == "working") else 0
+    if lift:
+        bob = 0
+    cy = 23 + bob + s.head_dy - lift
     bw, bh = s.body_w, s.body_h
 
     # Squash and stretch. A body that only translates looks like a sticker;
@@ -1177,15 +1321,22 @@ def draw_pet(s, state, i, n):
             d.ellipse([x - 1, cy - 3, x + 1, cy + 3], outline=pal.line)
 
     # --- body
-    d.ellipse([CX - bw // 2, top, CX + bw // 2, top + bh], fill=pal.body, outline=pal.line)
+    head_shape(d, s, CX - bw // 2, top, CX + bw // 2, top + bh,
+               fill=pal.body, outline=pal.line)
     if s.torso != "none":
         # Soften the jaw. The head's outline is there to part the silhouette
         # from the background, but along the bottom the head meets her own
         # shoulders — nothing to part — and `line` drawn there is a hard brown
         # bar directly under the mouth. The arc stops short of the sides, which
         # do overhang the body and still need the real outline.
-        d.arc([CX - bw // 2, top, CX + bw // 2, top + bh], 55, 125,
-              fill=pal.jaw or pal.body_dark)
+        if s.head == "square":
+            # A straight jaw takes a straight softening, inset by the corner
+            # radius so the two corners keep the outline that shapes them.
+            d.line([(CX - bw // 2 + JAW_R, top + bh), (CX + bw // 2 - JAW_R, top + bh)],
+                   fill=pal.jaw or pal.body_dark)
+        else:
+            d.arc([CX - bw // 2, top, CX + bw // 2, top + bh], 55, 125,
+                  fill=pal.jaw or pal.body_dark)
     markings(img, s, top, bw, bh, cy, pal)
     torso_front(d, s, state, i, top, bw, bh, cy, pal)
     hairline(img, s, top, bw, bh, cy, pal)
@@ -1225,7 +1376,7 @@ def draw_pet(s, state, i, n):
     # Props are placed against the frame, not against the character: the
     # top-right corner is reserved for them, and a head that rides higher would
     # otherwise push the Z's of `sleeping` off the top edge entirely.
-    pcy = cy - s.head_dy
+    pcy = cy - s.head_dy + lift
     ey = cy - 4 + s.eye_dy
     my = cy + 4
 
@@ -1279,9 +1430,32 @@ def draw_pet(s, state, i, n):
     elif state == "working":
         eyes(d, face_cx, ey, "squint", pal, lashes=s.lashes, own_brows=s.brows)
         mouth(d, face_cx, my, "flat", pal, mstyle)
-        for k in range(2):
-            if (i + k) % 2 == 0:
-                sparkle(d, PROP_X + 3 + k * 5, pcy - 9 + k * 4, pal.accent, 1)
+        if s.work == "bike":
+            # Sweat, and no sparkles.
+            #
+            # The sparkles say something is going well at the desk, and they
+            # only say it while there is a desk: beside a bicycle the same two
+            # marks are an orange dot nobody can name. This state already has a
+            # bicycle in it to say what he is doing, so the props can say how
+            # hard it is instead.
+            #
+            # Four drops off both temples, each falling two rows and then
+            # giving way to the next, so two are in the air at any moment. One
+            # pair alternating in place reads as a face with two blue marks
+            # stuck to it, which is what he had.
+            #
+            # They alternate sides down the list, and that is load-bearing: the
+            # two in the air are always consecutive, so listing both left ones
+            # first put both of them over the same temple on half the frames,
+            # where they touched and fused into one long drip.
+            for k, (dx, dy) in enumerate(((-11, -9), (9, -10), (-13, -4), (11, -5))):
+                phase = (i - k) % 4
+                if phase < 2:
+                    sweat(d, CX + dx, pcy + dy + phase * 2, (118, 190, 236, 255))
+        else:
+            for k in range(2):
+                if (i + k) % 2 == 0:
+                    sparkle(d, PROP_X + 3 + k * 5, pcy - 9 + k * 4, pal.accent, 1)
     elif state == "attention":
         eyes(d, face_cx, ey, "wide", pal, lashes=s.lashes, own_brows=s.brows)
         mouth(d, face_cx, my, "o", pal, mstyle)

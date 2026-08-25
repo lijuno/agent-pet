@@ -568,7 +568,7 @@ Three built-in packs ship in the binary:
        alt="Peach, a girl with long dark hair and a white dress, cycling through the same ten states: at the laptop for working, arms up for celebrate, asleep with Z's for sleeping."
        width="240">
   <img src="docs/media/states-juanmao.gif"
-       alt="Juanmao, a man with curly hair and rectangular glasses, cycling through the same ten states: brows lowered at the laptop for working, angled for worried, arms up for celebrate."
+       alt="Juanmao, a man with curly hair and rectangular glasses, cycling through the same ten states: out on his bicycle for working, brows angled for worried, arms up for celebrate."
        width="240">
 </p>
 
@@ -581,7 +581,7 @@ Three built-in packs ship in the binary:
 |---|---|---|
 | `momo` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
 | `peach` | Peach (桃桃), a girl in a white dress | long dark hair over one shoulder, peach bow, gold necklace |
-| `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, a jumper over one shoulder |
+| `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, and a bicycle to work on |
 
 Pick one from the menu-bar item's **Change Pet** submenu, or with
 `petctl pet peach`. `tools/genpets` carries a fourth species, `byte`, as a
