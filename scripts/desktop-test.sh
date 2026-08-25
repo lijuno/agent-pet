@@ -47,6 +47,12 @@ want() { # want <name> <haystack> <needle>
 	*) bad "$1" "expected '$3' in: $2" ;;
 	esac
 }
+gone() { # gone <name> <haystack> <needle>
+	case "$2" in
+	*"$3"*) bad "$1" "did not expect '$3' in: $2" ;;
+	*) ok "$1" ;;
+	esac
+}
 
 if ! curl -sS --max-time 3 "$BASE/healthz" >/dev/null 2>&1; then
 	echo "petd is not running on $P — start the app first" >&2
@@ -61,15 +67,18 @@ want "the status item is installed" "$(field menu_bar)" "installed"
 # Dock icon nobody notices in review.
 want "the app keeps out of the Dock" "$(field dock)" "menu bar only"
 menu=$(field status_menu)
-for item in "Show Pet" "Pet Status" "Statistics" "Change Pet" "Always on Top" "About" "Quit"; do
+for item in "Show Pet" "Pet Status" "Change Pet" "Always on Top" "About" "Quit"; do
 	want "the menu offers $item" "$menu" "$item"
 done
+# Counters nobody asked for. They live on in `petctl status`, where somebody
+# curious can go and look, rather than in a menu everybody has to read past.
+gone "the menu no longer offers Statistics" "$menu" "Statistics"
 
 echo
 echo "Every menu item survives being clicked"
 # The suite used to click only Show Pet. Three of the others emitted an event
 # from the main thread and killed the process, and nothing here noticed.
-for item in show show status stats about change ontop ontop pet:momo update; do
+for item in show show status about change ontop ontop pet:momo update; do
 	if ! curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
 		bad "clicking $item" "petd is gone — an earlier item killed it"
 		break

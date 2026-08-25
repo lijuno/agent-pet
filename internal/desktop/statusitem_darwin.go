@@ -166,7 +166,7 @@ func (a *App) StatusMenu() string {
 // action, so a test drives the same path as a click rather than a copy of it.
 func (a *App) ClickStatusItem(name string) error {
 	tags := map[string]C.int{
-		"show": C.PET_SHOW, "status": C.PET_STATUS, "stats": C.PET_STATS,
+		"show": C.PET_SHOW, "status": C.PET_STATUS,
 		"change": C.PET_CHANGE, "ontop": C.PET_ONTOP,
 		"quit": C.PET_QUIT, "update": C.PET_UPDATE, "about": C.PET_ABOUT,
 	}
@@ -374,8 +374,6 @@ func (a *App) handleStatusClick(tag C.int) {
 		a.SetShown(a.hidden)
 	case C.PET_STATUS:
 		a.emitPanel("status")
-	case C.PET_STATS:
-		a.emitPanel("stats")
 	case C.PET_ABOUT:
 		a.ShowAbout()
 	case C.PET_CHANGE:

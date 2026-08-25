@@ -94,7 +94,7 @@ flavour it is, where its config lives, and whether the hooks are installed.
 |---|---|
 | Drag | Move the pet. Its position is remembered. |
 | Double-click | Pet it. |
-| Right-click | Menu: status, statistics, change pet, size, always on top, drop shadow, about, quit. |
+| Right-click | Menu: status, change pet, size, always on top, drop shadow, about, quit. |
 | Menu bar | The same commands under the `Pet` menu while the app is frontmost. |
 
 The pet also lives in the macOS menu bar. Its icon shows the current state and
@@ -629,7 +629,8 @@ docs/adr/              architectural decisions
 **Milestones 1 and 2 are in** — the pet engine, the local event API, `petctl`,
 the desktop window, a pixel-art character, the Claude Code adapter and plugin,
 and over-the-air updates. The Codex adapter is Milestone 3, and statistics are
-still in memory rather than a durable store;
+collected but not shown — they are in memory rather than a durable store, and
+`petctl status` is where to read them;
 [ADR 0006](docs/adr/0006-milestone-1-boundaries.md) records which seam each
 deferred piece attaches to.
 

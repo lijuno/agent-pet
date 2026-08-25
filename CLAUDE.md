@@ -27,6 +27,12 @@ Next, per [ADR 0006](docs/adr/0006-milestone-1-boundaries.md): the Codex
 adapter (Milestone 3), a git `post-commit` adapter, and a durable SQLite store
 for statistics (Milestone 4, currently in-memory only).
 
+The counters are still collected and still reach `/state` and `petctl status`;
+what they no longer have is a menu item. The Statistics panel was deleted
+because nobody opened it twice, not because the numbers stopped mattering — a
+use worth the screen space may yet turn up, and the store is still planned. Do
+not restore the menu entry as a fix for the missing panel.
+
 ## Running it
 
 ```bash

@@ -77,7 +77,6 @@ void petStatusInstall(const void *png, int len, int onTop, int shown) {
     NSMenuItem *show = addItem(menu, @"Show Pet", PET_SHOW);
     [show setState:shown ? NSControlStateValueOn : NSControlStateValueOff];
     addItem(menu, @"Pet Status", PET_STATUS);
-    addItem(menu, @"Statistics", PET_STATS);
     // A submenu, so the characters appear beside the menu bar menu rather
     // than in a panel next to the pet. An item with a submenu opens it instead
     // of firing its action, which is what we want here.

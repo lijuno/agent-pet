@@ -356,7 +356,7 @@ func (a *App) OpenPanel(kind string) error {
 			closeAbout()
 		}
 		return nil
-	case "status", "stats", "pets", "menu", "close":
+	case "status", "pets", "menu", "close":
 	default:
 		return fmt.Errorf("unknown panel %q", kind)
 	}
@@ -903,9 +903,6 @@ func (a *App) appMenu() *menu.Menu {
 	pet := m.AddSubmenu("Pet")
 	pet.AddText("Pet Status", keys.CmdOrCtrl("i"), func(*menu.CallbackData) {
 		wruntime.EventsEmit(a.ctx, "pet:panel", "status")
-	})
-	pet.AddText("Statistics", keys.CmdOrCtrl("s"), func(*menu.CallbackData) {
-		wruntime.EventsEmit(a.ctx, "pet:panel", "stats")
 	})
 	pet.AddSeparator()
 	pet.AddText("Change Pet…", nil, func(*menu.CallbackData) {

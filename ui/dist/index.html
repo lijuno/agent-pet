@@ -417,7 +417,6 @@ function togglePanel(kind) {
   el.panel.dataset.kind = kind;
   el.panel.replaceChildren();
   if (kind === "status") buildStatus(el.panel);
-  else if (kind === "stats") buildStats(el.panel);
   else if (kind === "pets") buildPets(el.panel);
   reveal(el.panel);
 }
@@ -519,33 +518,6 @@ async function loadInfo() {
   return info;
 }
 
-function buildStats(p) {
-  const st = ((view && view.snapshot) || {}).stats || {};
-  const h = document.createElement("h2");
-  h.textContent = "Statistics";
-  const sub = document.createElement("div");
-  sub.className = "sub";
-  sub.textContent = "Since petd started. Durable history arrives with the SQLite store.";
-  p.append(h, sub);
-
-  row(p, "Events seen", st.events_seen || 0);
-  row(p, "Sessions", st.sessions_started || 0);
-  row(p, "Tasks completed", st.tasks_completed || 0);
-  row(p, "Tests passed", st.tests_passed || 0);
-  row(p, "Tests failed", st.tests_failed || 0);
-  row(p, "Commits", st.commits || 0);
-  row(p, "Errors", st.errors || 0);
-  row(p, "Times petted", st.interactions || 0);
-
-  if (info) {
-    const box = document.createElement("div");
-    box.className = "sessions";
-    row(box, "Event API", info.addr || "—");
-    row(box, "Personality", info.personality || "—");
-    p.appendChild(box);
-  }
-}
-
 async function buildPets(p) {
   const h = document.createElement("h2");
   h.textContent = "Change pet";
@@ -637,7 +609,6 @@ function openMenu() {
 
   el.menu.append(
     item("Pet Status", () => { el.menu.classList.add("hidden"); togglePanel("status"); }),
-    item("Statistics", () => { el.menu.classList.add("hidden"); togglePanel("stats"); }),
     item("Change Pet…", () => { el.menu.classList.add("hidden"); togglePanel("pets"); }),
     separator(),
     ...sizeItems(),
@@ -735,7 +706,6 @@ function apply(v) {
     const kind = el.panel.dataset.kind;
     el.panel.replaceChildren();
     if (kind === "status") buildStatus(el.panel);
-    else if (kind === "stats") buildStats(el.panel);
     // A session appearing makes the panel taller; refit the window to it.
     reveal(el.panel);
   }

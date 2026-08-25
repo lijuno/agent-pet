@@ -478,26 +478,6 @@ test("About opens the window rather than a panel", withPet(async (w, d) => {
   assert(d.getElementById("panel").classList.contains("hidden"), "no panel should open");
 }));
 
-test("the statistics panel shows the counters", withPet(async (w, d) => {
-  w.apply(view({
-    snapshot: {
-      state: "idle", forced: false, sessions: [],
-      stats: { events_seen: 42, sessions_started: 3, tasks_completed: 7, tests_passed: 2, tests_failed: 1, commits: 4, errors: 5, interactions: 9 },
-    },
-  }));
-  w.togglePanel("stats");
-  const text = d.getElementById("panel").textContent;
-  for (const n of ["42", "3", "7", "2", "1", "4", "5", "9"]) {
-    assert(text.includes(n), `counter ${n} missing from the statistics panel`);
-  }
-}));
-
-test("statistics render as zero rather than blank when absent", withPet(async (w, d) => {
-  w.apply(view({ snapshot: { state: "idle", forced: false, sessions: [], stats: {} } }));
-  w.togglePanel("stats");
-  assert(d.getElementById("panel").textContent.includes("0"), "missing counters should read 0");
-}));
-
 test("clicking the same panel twice closes it", withPet(async (w, d) => {
   const panel = d.getElementById("panel");
   w.apply(view());
@@ -511,9 +491,10 @@ test("switching panel kinds keeps the panel open", withPet(async (w, d) => {
   const panel = d.getElementById("panel");
   w.apply(view());
   w.togglePanel("status");
-  w.togglePanel("stats");
+  w.togglePanel("pets");
+  await tick(); // buildPets awaits ListPets
   assert(!panel.classList.contains("hidden"), "panel should stay open when switching kinds");
-  eq(panel.dataset.kind, "stats");
+  eq(panel.dataset.kind, "pets");
 }));
 
 test("an open panel refreshes when state arrives", withPet(async (w, d) => {

@@ -15,7 +15,6 @@
 enum {
   PET_SHOW = 1,
   PET_STATUS = 2,
-  PET_STATS = 3,
   PET_CHANGE = 4,
   PET_ONTOP = 5,
   PET_UPDATE = 7,
