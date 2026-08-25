@@ -88,11 +88,11 @@ func TestAboutTextNamesTheApplication(t *testing.T) {
 		AppName: "Agent Pet (dev)", Version: "0.2.0-dev.3", Channel: "dev",
 		Addr: "127.0.0.1:9877", ConfigPath: "/c/config.yaml", PetsDir: "/d/pets",
 	}
-	title, body := aboutText(in, "Peach (桃桃)")
+	title, body := aboutText(in)
 	if title != "Agent Pet (dev)" {
 		t.Errorf("title = %q, want the application name", title)
 	}
-	for _, want := range []string{"0.2.0-dev.3", "dev", "127.0.0.1:9877", "Peach (桃桃)", "/c/config.yaml", "/d/pets"} {
+	for _, want := range []string{"0.2.0-dev.3", "dev", "127.0.0.1:9877", "/c/config.yaml", "/d/pets"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body is missing %q:\n%s", want, body)
 		}
@@ -101,7 +101,7 @@ func TestAboutTextNamesTheApplication(t *testing.T) {
 	// offset. A value that runs into its label is what the padding prevents,
 	// and it is invisible until somebody opens the window. Checked by offset
 	// rather than by splitting on a space: "Event API" has one in it.
-	for _, label := range []string{"Version", "Channel", "Event API", "Character", "Config", "Pets"} {
+	for _, label := range []string{"Version", "Channel", "Event API", "Config", "Pets"} {
 		var line string
 		for _, l := range strings.Split(body, "\n") {
 			if strings.HasPrefix(l, label) {
@@ -119,14 +119,24 @@ func TestAboutTextNamesTheApplication(t *testing.T) {
 	}
 }
 
+// The active character is a preference the user changes from the menu at any
+// time, not a fact about this build. In a window called About it reads as
+// though the character were part of what the application is.
+func TestAboutTextOmitsTheCharacter(t *testing.T) {
+	_, body := aboutText(Info{AppName: "Agent Pet", Version: "0.2.0"})
+	if strings.Contains(body, "Character") {
+		t.Errorf("About should not carry the active character:\n%s", body)
+	}
+}
+
 // An empty field must say so rather than leaving a blank where a value goes: a
 // missing value and a broken layout look identical otherwise.
 func TestAboutTextMarksEmptyFields(t *testing.T) {
-	title, body := aboutText(Info{}, "")
+	title, body := aboutText(Info{})
 	if title != "Agent Pet" {
 		t.Errorf("title = %q, want a fallback name", title)
 	}
-	if strings.Count(body, "—") != 6 {
+	if strings.Count(body, "—") != 5 {
 		t.Errorf("every empty field should be marked:\n%s", body)
 	}
 }

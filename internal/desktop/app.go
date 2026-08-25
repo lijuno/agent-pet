@@ -752,18 +752,21 @@ func (a *App) GetInfo() Info {
 // ShowAbout so it can be tested without a window: this is columns of text, and
 // columns are exactly the thing that quietly stops lining up.
 //
-// It names the application, not the pet. Two of these run side by side with
-// separate settings, ports and update channels (ADR 0008), and "which one am I
-// looking at" is the question this window exists to answer. The character is a
-// detail about the app, so it is a row like any other.
-func aboutText(in Info, petName string) (string, string) {
+// It is about the application, not about the pet. Two of these run side by
+// side with separate settings, ports and update channels (ADR 0008), and "which
+// one am I looking at" is the question this window exists to answer.
+//
+// The active character is deliberately not here. It is a preference the user
+// changes from the menu whenever they like, so it belongs with the other
+// per-session facts in the status panel; in a window called About it reads as
+// though the character were part of what this build *is*.
+func aboutText(in Info) (string, string) {
 	var b strings.Builder
 	b.WriteString("A desktop pet that reacts to what a coding agent is doing.\n\n")
 	for _, r := range [][2]string{
 		{"Version", in.Version},
 		{"Channel", in.Channel},
 		{"Event API", in.Addr},
-		{"Character", petName},
 		{"Config", in.ConfigPath},
 		{"Pets", in.PetsDir},
 	} {
@@ -783,13 +786,7 @@ func aboutText(in Info, petName string) (string, string) {
 
 // ShowAbout opens the About window. Bound to the frontend as well as reached
 // from the status item, so both menus open the same one window.
-func (a *App) ShowAbout() {
-	var petName string
-	if p, ok := a.eng.ActivePet(); ok {
-		petName = p.Name
-	}
-	showAbout(aboutText(a.GetInfo(), petName))
-}
+func (a *App) ShowAbout() { showAbout(aboutText(a.GetInfo())) }
 
 // CloseAbout hides it again.
 func (a *App) CloseAbout() { closeAbout() }
