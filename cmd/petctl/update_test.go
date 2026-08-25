@@ -329,3 +329,61 @@ func TestInstalledStatusReadsAsUpToDate(t *testing.T) {
 		t.Errorf("the status petd is about to be told does not validate: %v", err)
 	}
 }
+
+// The copy `petctl update` makes of itself must survive until the update is
+// done. Deleting it at startup — which is what used to happen — unlinks the
+// running executable, and macOS then cannot verify the process's code
+// signature when TLS asks it to, so the manifest fetch fails with
+// `SecPolicyCreateSSL error: 0`. Over-the-air updates were broken outright.
+func TestSweepSparesTheRunningCopy(t *testing.T) {
+	dir := t.TempDir()
+	old := time.Now().Add(-2 * detachedGrace)
+
+	mine := filepath.Join(dir, "petctl-update-mine")
+	stale := filepath.Join(dir, "petctl-update-stale")
+	fresh := filepath.Join(dir, "petctl-update-fresh")
+	other := filepath.Join(dir, "something-else")
+	for _, d := range []string{mine, stale, fresh, other} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, d := range []string{mine, stale, other} {
+		if err := os.Chtimes(d, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	sweepDetached(dir, mine, time.Now())
+
+	if _, err := os.Stat(mine); err != nil {
+		t.Error("the sweep took the copy this process is running from")
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Error("the sweep took a copy young enough to be another update in flight")
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Error("a copy left behind by an earlier run should be swept")
+	}
+	if _, err := os.Stat(other); err != nil {
+		t.Error("the sweep took a directory that is not ours")
+	}
+}
+
+// With no marker set this is not the detached copy at all, and every stale copy
+// is fair game.
+func TestSweepWithNoCopyOfItsOwn(t *testing.T) {
+	dir := t.TempDir()
+	old := time.Now().Add(-2 * detachedGrace)
+	stale := filepath.Join(dir, "petctl-update-stale")
+	if err := os.MkdirAll(stale, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
+	}
+	sweepDetached(dir, "", time.Now())
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Error("a stale copy should be swept when there is no run of our own")
+	}
+}

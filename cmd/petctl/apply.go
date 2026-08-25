@@ -22,6 +22,11 @@ import (
 // replacing. See reexecOutside.
 const detachedEnv = "AGENT_PET_UPDATE_DETACHED"
 
+// detachedGrace is how long a copy is left alone before the sweep will take it.
+// Longer than an update takes, so a second update running concurrently is never
+// the thing that gets swept.
+const detachedGrace = 30 * time.Minute
+
 // quitWait is how long the running app is given to let go of the event port.
 // Replacing the bundle while the old daemon still holds it produces the exact
 // failure CLAUDE.md warns about: the update appears to do nothing, because the
@@ -34,6 +39,10 @@ const quitWait = 15 * time.Second
 const launchWait = 30 * time.Second
 
 func apply(c *client, m update.Manifest, o updateOpts) error {
+	// The copy this may be running from is needed until the work is done — see
+	// cleanupDetached for what deleting it early cost.
+	defer releaseDetached()
+
 	if version == update.DevBuild {
 		return fmt.Errorf("this is a dev build; refusing to replace it with %s", m.Version)
 	}
@@ -198,15 +207,50 @@ func reexecOutside(target string) error {
 	return syscall.Exec(dst, os.Args, env)
 }
 
-// cleanupDetached removes the copy made by reexecOutside. Called at startup by
-// the copy itself: unlinking a running executable is fine, and doing it now
-// means no temporary directory outlives the command however it ends.
+// cleanupDetached sweeps copies left behind by earlier runs of `petctl update`.
+// Called at startup, and deliberately not on this run's own copy.
+//
+// It used to delete exactly that, on the reasoning that unlinking a running
+// executable is fine. It is fine for running the program and fatal for talking
+// to the network: on macOS the TLS verifier asks Security.framework to build an
+// SSL policy, that call verifies the calling process's code signature, and it
+// cannot verify an image that has been unlinked. The manifest fetch then fails
+// with `tls: ... SecPolicyCreateSSL error: 0`, which broke over-the-air updates
+// for every installation whose petctl lives inside the bundle it is replacing —
+// that is, all of them.
+//
+// So this run's copy goes at the end of the run instead, in releaseDetached,
+// and anything a crash left behind is swept here on the next one.
 func cleanupDetached() {
-	dir := os.Getenv(detachedEnv)
-	if dir == "" {
+	sweepDetached(os.TempDir(), os.Getenv(detachedEnv), time.Now())
+}
+
+// sweepDetached removes stale copies under dir, never `mine`, and never one
+// young enough to belong to an update running right now — two of these can be
+// in flight if somebody starts a second one, and taking the executable out from
+// under it would be the very bug this function exists because of.
+func sweepDetached(dir, mine string, now time.Time) {
+	matches, err := filepath.Glob(filepath.Join(dir, "petctl-update-*"))
+	if err != nil {
 		return
 	}
-	_ = os.RemoveAll(dir)
+	for _, d := range matches {
+		if mine != "" && filepath.Clean(d) == filepath.Clean(mine) {
+			continue
+		}
+		st, err := os.Stat(d)
+		if err != nil || now.Sub(st.ModTime()) < detachedGrace {
+			continue
+		}
+		_ = os.RemoveAll(d)
+	}
+}
+
+// releaseDetached removes this run's own copy, once nothing needs it any more.
+func releaseDetached() {
+	if dir := os.Getenv(detachedEnv); dir != "" {
+		_ = os.RemoveAll(dir)
+	}
 }
 
 func within(path, dir string) bool {
