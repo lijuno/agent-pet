@@ -313,6 +313,16 @@ func showAbout(title, body string) {
 
 func closeAbout() { C.petAboutClose() }
 
+// Alert shows a modal message. It exists for failures that happen before the
+// window does, where the only other channel is stderr — which nothing launched
+// from the Finder has anywhere to show.
+func Alert(title, body string) {
+	t, b := C.CString(title), C.CString(body)
+	defer C.free(unsafe.Pointer(t))
+	defer C.free(unsafe.Pointer(b))
+	C.petAlert(t, b)
+}
+
 // aboutReport describes the About window for the diagnostics endpoint.
 func aboutReport() string {
 	buf := make([]C.char, 256)

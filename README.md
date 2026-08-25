@@ -21,8 +21,10 @@ prompt appears, it turns and asks for you. Tests pass, it celebrates.
    agent events  ──▶  local state machine  ──▶  expressive character
 ```
 
-Nothing leaves your machine. The app has no network client at all — it listens
-on loopback and calls nothing out. See [Privacy](#privacy).
+Nothing about your work leaves your machine. The app has no network client at
+all — it listens on loopback and calls nothing out. The one thing that does go
+out is an update check: a small JSON manifest, fetched by `petctl`, at most once
+a day, and off with one line of config. See [Privacy](#privacy).
 
 ---
 
@@ -208,10 +210,38 @@ menu and opens the release notes. It does not install: the app holds no updater
 and opens no connections of its own. `petctl` does the work, which is why
 [SECURITY.md](SECURITY.md) can still say the daemon never dials out.
 
+The pet asks for a check when it starts, so the answer is right the first time
+you look rather than after the next Claude Code session. It asks by running
+`petctl update --if-due` — the same throttle, so opening the app repeatedly is
+not repeated checking, and nothing at all when `update.check: false`. That one
+subprocess is the only one the daemon starts, and it is why SECURITY.md says
+"exactly one" rather than "none".
+
 A check runs on its own at most once a day, when a Claude Code session starts;
 `update.check: false` in the config file stops it. Upgrading never turns it on
 for you: the file is rewritten in full on every quit, so an installation that
 predates this default already has its own answer written down.
+
+#### If you replace the app by hand
+
+Downloading a release and dragging it into `/Applications` works — the build is
+signed and notarized, and nothing here objects to it. It just skips everything
+above, so two things are yours to do:
+
+**Quit the pet first.** The event port is held by whichever copy is running, and
+a second one cannot have it. Replace the bundle underneath a running pet and the
+new app opens, finds the port taken, and stops — you are still looking at the
+old one, from wherever it happens to live. It says so in a dialog now rather
+than exiting in silence, but quitting first avoids the question.
+
+**Expect "No update check yet" until something checks.** The daemon is *told*
+what the latest version is; it never looks. `petctl update` tells it as part of
+finishing, which is the step a manual replacement does not run. The next Claude
+Code session will check and the answer sticks from then on, or
+`petctl update --check` does it immediately.
+
+`petctl doctor` names the bundle that is actually answering, which is the fast
+way to tell whether the copy you installed is the copy you are looking at.
 
 ### Two apps, not two channels
 
@@ -269,8 +299,15 @@ reporting, not an obstacle to route around.
 - No prompts, no source code, no command arguments are recorded. Default logs
   contain event categories only; `logging.verbose: true` adds tool names.
 - The pet itself has no network client of any kind: it listens on loopback and
-  calls nothing out. Updates are fetched by `petctl`, a separate program, and
-  only when you run it — automatic checks are off until you turn them on.
+  calls nothing out. Every byte that goes out is fetched by `petctl`, a separate
+  program the daemon cannot import.
+- The only thing fetched is a small JSON manifest naming the newest release, and
+  the release itself if you choose to install it. Nothing about you is sent:
+  `petctl` asks `raw.githubusercontent.com` for a file, and that request carries
+  no identifier the project put there.
+- That check runs at most once a day — when a Claude Code session starts, and
+  once when the pet is launched. `update.check: false` stops it entirely, and
+  upgrading never turns it back on for you.
 - Character packs are built from local images. Nothing is uploaded, and there is
   no image-generation service to opt into.
 - No accessibility, screen-recording, camera, microphone or keyboard-monitoring

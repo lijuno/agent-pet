@@ -40,6 +40,7 @@ type updateOpts struct {
 	checkOnly bool
 	jsonOut   bool
 	quiet     bool
+	ifDue     bool
 	channel   update.Channel
 	app       string
 }
@@ -52,6 +53,10 @@ func cmdUpdate(c *client, args []string) error {
 			o.checkOnly = true
 		case a == "--json":
 			o.jsonOut = true
+		case a == "--if-due":
+			// petd starts this when it comes up. Same throttle as the session
+			// hook, so launching the app repeatedly is not repeated checking.
+			o.quiet, o.checkOnly, o.ifDue = true, true, true
 		case a == "--quiet":
 			// The background check started by a session hook. It says nothing
 			// unless asked: the pet is ambient and this runs while somebody is
@@ -76,6 +81,11 @@ func cmdUpdate(c *client, args []string) error {
 		default:
 			return fmt.Errorf("unknown option %q for `petctl update`", a)
 		}
+	}
+	// Asked to check only if one is due. petd asks this every time it starts,
+	// which is as often as somebody opens the app.
+	if o.ifDue && !updateCheckDue() {
+		return nil
 	}
 	return runUpdate(c, o)
 }

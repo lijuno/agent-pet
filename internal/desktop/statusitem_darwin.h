@@ -102,6 +102,10 @@ int petStatusMenuDump(char *buf, int cap);
 // target and all, so a test exercises the same path as the user.
 void petStatusClickItem(int tag);
 
+// petAlert shows a modal alert and waits for it to be dismissed. For the one
+// message that has to arrive before there is a window to put it in.
+void petAlert(const char *title, const char *body);
+
 // petAboutShow opens the About window, centred on screen, creating it the first
 // time. It is a real NSWindow with a title bar and a close button rather than
 // an overlay in the pet: Wails v2 has exactly one window and it is the

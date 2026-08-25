@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -31,6 +32,43 @@ import (
 var assets embed.FS
 
 var version = "dev"
+
+// startUpdateCheck asks petctl to look for a newer version, once, in the
+// background.
+//
+// petd does not do the looking. It has no HTTP client and never gains one: the
+// code that reaches the network lives in cmd/petctl, a main package this
+// program cannot import even by accident, and that is what keeps "the daemon
+// opens no outbound connections" a fact about the build rather than a habit
+// (ADR 0008).
+//
+// What it does now is spawn — one known binary, from inside its own bundle,
+// with fixed arguments. That claim is the one being spent here, and it buys the
+// answer to "am I up to date?" being right the first time somebody looks
+// instead of after the next Claude Code session. petctl decides whether a check
+// is due at all: --if-due honours update.check and the same daily throttle the
+// session hook uses, so opening the app five times is not five checks.
+//
+// Detached and never waited for. A network call must not hold up a pet.
+func startUpdateCheck(log *slog.Logger) {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	petctl := filepath.Join(filepath.Dir(exe), "petctl")
+	if _, err := os.Stat(petctl); err != nil {
+		// A build run from `go run` has no petctl beside it. Nothing to do.
+		return
+	}
+	cmd := exec.Command(petctl, "update", "--if-due")
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		log.Warn("could not start the update check", "err", err)
+		return
+	}
+	go func() { _ = cmd.Wait() }()
+}
 
 func main() {
 	var (
@@ -109,6 +147,17 @@ func main() {
 		if err := srv.Listen(cfg.Server); err != nil {
 			fmt.Fprintln(os.Stderr, "petd:", err)
 			fmt.Fprintln(os.Stderr, "  (another petd may already be running — try `petctl status`)")
+			// Say it where it can be seen. Launched from the Finder there is no
+			// stderr anywhere, so this failure looked exactly like an app that
+			// declined to open for no reason — and the usual cause is a copy of
+			// the pet still running from somewhere else, which is precisely
+			// what happens when somebody replaces the bundle by hand without
+			// quitting it first.
+			if !*headless {
+				desktop.Alert(flavor.Current().AppName+" is already running",
+					"Another copy has the event port ("+cfg.Server.Addr+"), so this one cannot start.\n\n"+
+						"Quit it from the menu bar and open this one again. `petctl doctor` says which copy is running.")
+			}
 			os.Exit(1)
 		}
 		go func() {
@@ -117,6 +166,7 @@ func main() {
 			}
 		}()
 		log.Info("petd started", "version", version, "addr", srv.Addr(), "pets", lib.Len())
+		startUpdateCheck(log)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -34,12 +34,49 @@ package that `petd` cannot import even by accident.
 
 So SECURITY.md's paragraph needed one sentence added rather than deleting.
 
+### `petd` starts one subprocess: the update check, at launch
+
+**Revised.** This document originally said `petd` spawns no processes at all,
+and rejected installing from the menu bar on that basis. The no-subprocess rule
+is now one exception wide.
+
+The argument it overturns is worth keeping, because it is still most of the
+reason the rest of this holds: a daemon that starts no processes cannot be
+talked into starting the wrong one, and the loopback API — which anything
+running as this user can post to — could not reach `exec` at all.
+
+What overturned it: the daemon is *told* update results and holds them only in
+memory, so a freshly started one knows nothing and its menu says "no update
+check yet". That is true and useless, and it is the state somebody is in the
+first time they open the app, straight after installing it, and straight after
+replacing the bundle by hand. Persisting the last result across restarts fixed
+the second and third of those; nothing fixes the first except looking.
+
+So `petd` runs `petctl update --if-due` once at launch: one known binary, beside
+its own executable in its own bundle, with fixed arguments, detached and never
+waited for. It reads nothing back — `petctl` posts what it finds over loopback
+like any other caller — and `petctl` decides whether to check at all, using the
+same daily throttle and the same `update.check` setting as the session hook.
+
+What did *not* change, and is the reason this is the cheaper of the two ways to
+get here: `petd` still has no HTTP client, and `internal/update` still contains
+no `net/http`. The code that reaches the network is still in `cmd/petctl`, a
+main package `petd` cannot import even by accident. "The daemon opens no
+outbound connections" is still enforced by the compiler rather than by anybody
+remembering. Giving `petd` an HTTP client would have been the other way, and it
+would have spent that guarantee instead of this one.
+
+Installing from the menu bar stays rejected. One subprocess with a fixed path
+and fixed arguments is a thing you can audit; a menu item that installs software
+is a different question and is not answered by this.
+
 ### The menu bar opens URLs through NSWorkspace, not the Wails runtime
 
-`runtime.BrowserOpenURL` runs `/usr/bin/open` as a subprocess. `petd` spawns no
-processes and SECURITY.md says that too, so the status item calls
-`[NSWorkspace openURL:]` from the cgo file that already exists. Six lines of
-Objective-C, and a claim that stays true.
+`runtime.BrowserOpenURL` runs `/usr/bin/open` as a subprocess. The status item
+calls `[NSWorkspace openURL:]` from the cgo file that already exists — six lines
+of Objective-C. Written when `petd` spawned nothing at all; kept now for a
+narrower reason, that the one subprocess it does start should stay the only one
+and stay easy to find.
 
 ### Two applications, not two channels
 
@@ -205,10 +242,13 @@ cannot write to `/Applications`. Neither matters yet for a cosmetic app of about
 same `petctl update` command.
 
 **Installing from the menu bar.** The status item shows a version and opens the
-release page; it does not install. Doing so would mean `petd` spawning a
-subprocess, and the claim it would cost is worth more than the click it would
-save — particularly when the audience for this app is one whose agent can run
-`petctl update` for them.
+release page; it does not install. The original reason — that it would mean
+`petd` spawning a subprocess — no longer stands on its own, now that `petd`
+spawns one to check. What stands is the difference between the two acts:
+checking reads a small JSON file and changes nothing, while installing replaces
+the application, and a menu item that replaces an application on a single click
+wants more thought than "the process was already allowed to fork". The audience
+for this app is also one whose agent can run `petctl update` for them.
 
 **A channel switch.** Covered above: it was built, and then deleted in favour of
 two apps. The code that went is worth naming so it does not come back — a

@@ -15,8 +15,11 @@ say so and how you would like to be named.
 
 A desktop pet that watches a coding agent. It runs entirely on one machine:
 the daemon opens no outbound connections of any kind, contains no HTTP client,
-never executes a subprocess, and the embedded frontend loads no remote script,
-font or image. It requests no accessibility, screen-recording, camera,
+and the embedded frontend loads no remote script, font or image.
+
+It starts exactly one subprocess, and only one: `petctl update --if-due`, from
+inside its own bundle, once when it launches. That is the update check, and the
+next section is about it. It requests no accessibility, screen-recording, camera,
 microphone or keyboard-monitoring permission, and needs no elevated privileges.
 
 It does listen: `127.0.0.1:9876` carries the event API that adapters and
@@ -30,9 +33,19 @@ and installs lives in `petctl` — a separate program `petd` cannot import. The
 daemon holds a version number it was *told* over the loopback API and shows it
 in a menu; it has no way to find one out.
 
-The same reasoning is why the menu-bar item opens a release page through
-`NSWorkspace` rather than the Wails runtime's `BrowserOpenURL`, which would run
-`/usr/bin/open` as a subprocess.
+`petd` starts that check itself, at launch — one known binary, beside its own
+executable, with fixed arguments. It reads nothing back: `petctl` reports what
+it found over the loopback API like any other caller, and whether a check runs
+at all is `petctl`'s decision, throttled to once a day and off entirely when
+`update.check: false`.
+
+The daemon still opens no connection. Which program dials out did not change;
+what changed is that the daemon may now ask it to.
+
+That is the only process it starts. The menu-bar item still opens a release page
+through `NSWorkspace` rather than the Wails runtime's `BrowserOpenURL`, which
+would run `/usr/bin/open` — one deliberate subprocess with a fixed path is a
+thing you can audit, and a general habit of shelling out is not.
 
 What `petctl` does reach:
 

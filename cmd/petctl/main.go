@@ -573,6 +573,7 @@ func reportApps() {
 		var running, version string
 		var h struct {
 			Version string `json:"version"`
+			Exe     string `json:"exe"`
 		}
 		if err := (&client{base: "http://" + f.Addr}).do(http.MethodGet, "/healthz", nil, &h); err == nil {
 			running, version = "running on "+f.Addr, h.Version
@@ -583,6 +584,16 @@ func reportApps() {
 			fmt.Printf("    %s %-18s %-12s %s%s\n", tick, f.AppName, version, running, here)
 			if installed {
 				fmt.Printf("      %-18s %s\n", "", path)
+			}
+			// Which copy is answering, when it is not the one just named. The
+			// port is held by whichever started first, so a build left in a
+			// worktree can be the pet you are looking at while doctor points
+			// at /Applications — and with both at the same version there is
+			// nothing else to tell them apart. Older builds do not report an
+			// exe; nothing to compare is not a mismatch.
+			if h.Exe != "" && installed && !within(h.Exe, path) {
+				fmt.Printf("      %-18s %s answering from %s\n", "", warn, h.Exe)
+				fmt.Printf("      %-18s %s\n", "", "quit it and open the installed copy")
 			}
 		case installed:
 			fmt.Printf("    · %-18s %-12s installed, not running%s\n", f.AppName, "", here)

@@ -236,6 +236,23 @@ void petActivate(void) {
   });
 }
 
+void petAlert(const char *title, const char *body) {
+  NSString *t = [NSString stringWithUTF8String:title];
+  NSString *b = [NSString stringWithUTF8String:body];
+  // Runs before Wails has started, so the application object may not exist
+  // yet. +sharedApplication creates it; without this the alert never draws.
+  [NSApplication sharedApplication];
+  // Accessory apps do not come forward on their own, and an alert nobody can
+  // see is the failure this exists to fix.
+  [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+  [NSApp activateIgnoringOtherApps:YES];
+  NSAlert *a = [[NSAlert alloc] init];
+  [a setMessageText:t];
+  [a setInformativeText:b];
+  [a addButtonWithTitle:@"OK"];
+  [a runModal];
+}
+
 static NSWindow *petAboutWindow = nil;
 static NSTextField *petAboutTitle = nil;
 static NSTextField *petAboutBody = nil;

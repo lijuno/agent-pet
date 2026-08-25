@@ -29,8 +29,11 @@ func setUpdateItem(update.Status)       {}
 func showAbout(string, string)          {}
 func closeAbout()                       {}
 func aboutReport() string               { return "closed" }
-func openURL(string)                    {}
-func (a *App) StatusMenu() string       { return "" }
+
+// Alert is a no-op off macOS.
+func Alert(string, string)        {}
+func openURL(string)              {}
+func (a *App) StatusMenu() string { return "" }
 
 func (a *App) ClickStatusItem(string) error {
 	return errors.New("no status item on this platform")

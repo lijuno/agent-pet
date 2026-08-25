@@ -104,10 +104,20 @@ func dueForCheck(interval time.Duration, last, now time.Time) bool {
 // asking. It runs at most once an interval. And it is started and abandoned —
 // never waited for — because the hook has a budget measured in milliseconds and
 // a network call does not fit in it.
-func maybeCheckForUpdates() {
+// updateCheckDue reports whether an automatic check should run now, and claims
+// the slot if so.
+//
+// Shared by the two things that start one: a Claude Code session hook, and petd
+// coming up. Both arrive at unpredictable times and neither should mean a
+// network call — opening the app five times in a minute is not five checks.
+//
+// The stamp is written before the check runs, not after. A check that fails
+// should not mean the next one tries again immediately, and neither should one
+// that never finishes.
+func updateCheckDue() bool {
 	cfg, _ := config.Load(config.Path())
 	if !cfg.Update.Check {
-		return
+		return false
 	}
 	stamp := config.UpdateStamp()
 	var last time.Time
@@ -115,15 +125,16 @@ func maybeCheckForUpdates() {
 		last = st.ModTime()
 	}
 	if !dueForCheck(cfg.Update.Interval.D(), last, time.Now()) {
-		return
+		return false
 	}
-	// Stamped before the check runs, not after. A check that fails should not
-	// mean the next session tries again immediately, and neither should one
-	// that never finishes.
 	if err := os.MkdirAll(filepath.Dir(stamp), 0o755); err != nil {
-		return
+		return false
 	}
-	if err := os.WriteFile(stamp, nil, 0o644); err != nil {
+	return os.WriteFile(stamp, nil, 0o644) == nil
+}
+
+func maybeCheckForUpdates() {
+	if !updateCheckDue() {
 		return
 	}
 
