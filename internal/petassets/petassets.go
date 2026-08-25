@@ -189,9 +189,20 @@ func (l *Library) List() []Pet {
 	for _, p := range l.pets {
 		out = append(out, p)
 	}
+	// By the name the user sees, not by the id. Every surface that shows this
+	// list — the Change Pet submenu, the panel in the window, `petctl pets` —
+	// shows names, and an id can differ from its name by more than case:
+	// `momo` is displayed as Sanmao. Sorted by id, the menu read Juanmao,
+	// Sanmao, Peach, which is alphabetical in a column nobody can see and
+	// therefore random in the one they can.
+	//
+	// Id breaks the tie, so the order cannot depend on map iteration.
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Builtin != out[j].Builtin {
 			return out[i].Builtin
+		}
+		if !strings.EqualFold(out[i].Name, out[j].Name) {
+			return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
 		}
 		return out[i].ID < out[j].ID
 	})

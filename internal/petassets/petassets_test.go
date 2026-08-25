@@ -168,3 +168,34 @@ func TestMissingUserPetsDirIsNotAnError(t *testing.T) {
 		t.Fatalf("most users have no pets directory; that must not be an error: %v", err)
 	}
 }
+
+// TestListOrdersByDisplayedName pins the order of the Change Pet submenu and
+// the panel beside it. Both show names; the ids they sort by are invisible, so
+// an order that follows the id looks random on screen. `momo` is displayed as
+// Sanmao, which is where this was noticed.
+func TestListOrdersByDisplayedName(t *testing.T) {
+	pack := func(id, name string) string {
+		return `{"id": "` + id + `", "name": "` + name + `",
+		         "animations": {"idle": "idle.png"}}`
+	}
+	fsys := fstest.MapFS{
+		"pets/a/manifest.json": {Data: []byte(pack("momo", "Sanmao (三毛)"))},
+		"pets/b/manifest.json": {Data: []byte(pack("juanmao", "Juanmao (卷毛)"))},
+		"pets/c/manifest.json": {Data: []byte(pack("peach", "Peach (桃桃)"))},
+	}
+	l := NewLibrary()
+	if err := l.LoadBuiltin(fsys, "pets", "/pets"); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	var got []string
+	for _, p := range l.List() {
+		got = append(got, p.ID)
+	}
+	want := []string{"juanmao", "peach", "momo"}
+	for i := range want {
+		if i >= len(got) || got[i] != want[i] {
+			t.Fatalf("order by name: got %v, want %v", got, want)
+		}
+	}
+}
