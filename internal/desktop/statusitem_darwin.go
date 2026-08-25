@@ -72,19 +72,16 @@ func (a *App) startTray(ctx context.Context) {
 		// Wails overrides it at launch — see petHideFromDock.
 		C.petHideFromDock()
 
-		onTop, muted, shown := 0, 0, 0
+		onTop, shown := 0, 0
 		if a.alwaysOnTop {
 			onTop = 1
-		}
-		if a.muted {
-			muted = 1
 		}
 		if !a.hidden {
 			shown = 1
 		}
 		icon := trayIconBytes()
 		C.petStatusInstall(unsafe.Pointer(&icon[0]), C.int(len(icon)),
-			C.int(onTop), C.int(muted), C.int(shown))
+			C.int(onTop), C.int(shown))
 
 		// The menu is built with a placeholder first line. Set it now rather
 		// than waiting for the first event, so the dev app says which app it
@@ -169,7 +166,7 @@ func (a *App) StatusMenu() string {
 func (a *App) ClickStatusItem(name string) error {
 	tags := map[string]C.int{
 		"show": C.PET_SHOW, "status": C.PET_STATUS, "stats": C.PET_STATS,
-		"change": C.PET_CHANGE, "ontop": C.PET_ONTOP, "mute": C.PET_MUTE,
+		"change": C.PET_CHANGE, "ontop": C.PET_ONTOP,
 		"quit": C.PET_QUIT, "update": C.PET_UPDATE, "about": C.PET_ABOUT,
 	}
 	tag, ok := tags[name]
@@ -377,10 +374,6 @@ func (a *App) handleStatusClick(tag C.int) {
 		next := !a.alwaysOnTop
 		a.SetAlwaysOnTop(next)
 		setStatusCheck(C.PET_ONTOP, next)
-	case C.PET_MUTE:
-		next := !a.muted
-		a.SetMuted(next)
-		setStatusCheck(C.PET_MUTE, next)
 	case C.PET_UPDATE:
 		// The pet cannot install anything — it holds no updater and opens no
 		// connections. It shows the release, and `petctl update` does the work.

@@ -61,7 +61,7 @@ want "the status item is installed" "$(field menu_bar)" "installed"
 # Dock icon nobody notices in review.
 want "the app keeps out of the Dock" "$(field dock)" "menu bar only"
 menu=$(field status_menu)
-for item in "Show Pet" "Pet Status" "Statistics" "Change Pet" "Always on Top" "Mute" "About" "Quit"; do
+for item in "Show Pet" "Pet Status" "Statistics" "Change Pet" "Always on Top" "About" "Quit"; do
 	want "the menu offers $item" "$menu" "$item"
 done
 
@@ -69,7 +69,7 @@ echo
 echo "Every menu item survives being clicked"
 # The suite used to click only Show Pet. Three of the others emitted an event
 # from the main thread and killed the process, and nothing here noticed.
-for item in show show status stats about change ontop ontop mute mute pet:momo update; do
+for item in show show status stats about change ontop ontop pet:momo update; do
 	if ! curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
 		bad "clicking $item" "petd is gone — an earlier item killed it"
 		break

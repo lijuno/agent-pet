@@ -43,7 +43,7 @@ static void onMain(void (^block)(void)) {
   }
 }
 
-void petStatusInstall(const void *png, int len, int onTop, int muted, int shown) {
+void petStatusInstall(const void *png, int len, int onTop, int shown) {
   NSData *data = [NSData dataWithBytes:png length:len];
   onMain(^{
     if (petItem != nil) {
@@ -89,8 +89,6 @@ void petStatusInstall(const void *png, int len, int onTop, int muted, int shown)
 
     NSMenuItem *top = addItem(menu, @"Always on Top", PET_ONTOP);
     [top setState:onTop ? NSControlStateValueOn : NSControlStateValueOff];
-    NSMenuItem *mute = addItem(menu, @"Mute", PET_MUTE);
-    [mute setState:muted ? NSControlStateValueOn : NSControlStateValueOff];
 
     // Hidden until a check finds something. An always-present item reporting
     // nothing is worse than no item.

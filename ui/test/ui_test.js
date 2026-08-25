@@ -51,7 +51,6 @@ function view(over) {
     pet: "momo",
     pet_name: "Momo",
     scale: 1,
-    muted: false,
     on_top: true,
     animation: anim(),
     snapshot: {
@@ -77,7 +76,7 @@ function session(over) {
 /* --- harness ------------------------------------------------------------- */
 
 // withPet loads a fresh copy of the real UI and hands the test its window and
-// document. A fresh frame per test keeps leaked state (an open panel, a mute
+// document. A fresh frame per test keeps leaked state (an open panel, a size
 // flag, a pending timer) from one test out of the next.
 // Keep in step with WindowSize in app.go: the window is only as tall as the
 // character until an overlay opens, because space above the pet is screen the
@@ -369,11 +368,6 @@ test("a bubble shows when there is something to say", withPet(async (w, d) => {
   const bubble = d.getElementById("bubble");
   assert(bubble.classList.contains("show"), "bubble should be visible");
   eq(bubble.textContent, "Tests passed!");
-}));
-
-test("muting silences the bubble", withPet(async (w, d) => {
-  w.apply(view({ muted: true, bubble: { text: "quiet please", ttl_ns: 5e9 } }));
-  assert(!d.getElementById("bubble").classList.contains("show"), "a muted pet must not speak");
 }));
 
 test("an open panel suppresses the bubble", withPet(async (w, d) => {
@@ -691,19 +685,6 @@ test("Quit asks the backend to quit", withPet(async (w, d) => {
     .dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
   await tick();
   eq(called(calls, "Quit").length, 1, "Quit should reach the backend");
-}));
-
-test("muting from the menu silences the pet immediately", withPet(async (w, d) => {
-  w.apply(view({ bubble: { text: "hello", ttl_ns: 5e9 } }));
-  const calls = stubBackend(w);
-  w.openMenu();
-  [...d.getElementById("menu").querySelectorAll(".mi")]
-    .find((r) => r.textContent.includes("Mute"))
-    .dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
-  await tick();
-  eq(called(calls, "SetMuted").length, 1, "Mute should reach the backend");
-  eq(called(calls, "SetMuted")[0].args[0], true);
-  assert(!d.getElementById("bubble").classList.contains("show"), "muting should dismiss the bubble on screen");
 }));
 
 /* --- interaction --------------------------------------------------------- */

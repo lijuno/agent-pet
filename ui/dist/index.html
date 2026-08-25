@@ -231,7 +231,6 @@ let info = null;
 let pets = [];
 let currentAnimKey = "";
 let bubbleTimer = null;
-let muted = false;
 
 /* --- backend plumbing ---------------------------------------------------- */
 
@@ -293,7 +292,7 @@ function renderAnimation(anim, scale) {
 
 function showBubble(text, ttlNanos) {
   // A bubble under an open panel is unreadable and looks broken.
-  if (muted || !text || overlayOpen()) return;
+  if (!text || overlayOpen()) return;
   el.bubble.textContent = text;
   el.bubble.classList.add("show");
   clearTimeout(bubbleTimer);
@@ -658,13 +657,6 @@ function openMenu() {
       openMenu();
       flashBadge(next ? "Shadow on" : "Shadow off");
     }, view ? view.drop_shadow !== false : true),
-    item("Mute", async () => {
-      muted = !muted;
-      await call("SetMuted", muted);
-      el.bubble.classList.remove("show");
-      openMenu();
-      flashBadge(muted ? "Muted" : "Unmuted");
-    }, muted),
     separator(),
     // A real window, not a panel: it opens centred on screen with a close
     // button, and does not shove the pet's own window about to make room.
@@ -733,7 +725,6 @@ function inactive(v) {
 function apply(v) {
   if (!v) return;
   view = v;
-  muted = !!v.muted;
   renderAnimation(v.animation, v.scale);
   document.body.classList.toggle("inactive", inactive(v));
   // Only an explicit false turns it off, so a payload from a build that
@@ -758,7 +749,6 @@ async function boot() {
       else if (kind === "close") closeOverlays();
       else togglePanel(kind);
     });
-    window.runtime.EventsOn("pet:muted", (m) => { muted = !!m; });
   }
   await loadInfo();
   apply(await call("GetState"));

@@ -92,7 +92,7 @@ flavour it is, where its config lives, and whether the hooks are installed.
 |---|---|
 | Drag | Move the pet. Its position is remembered. |
 | Double-click | Pet it. |
-| Right-click | Menu: status, statistics, change pet, size, always on top, mute, quit. |
+| Right-click | Menu: status, statistics, change pet, size, always on top, drop shadow, about, quit. |
 | Menu bar | The same commands under the `Pet` menu while the app is frontmost. |
 
 The pet also lives in the macOS menu bar. Its icon shows the current state and

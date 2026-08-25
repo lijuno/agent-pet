@@ -34,7 +34,6 @@ type App struct {
 
 	cfgPath     string
 	alwaysOnTop bool
-	muted       bool
 	addr        string
 
 	// The character-only window size, and where the window was before an
@@ -128,9 +127,6 @@ func (a *App) startup(ctx context.Context) {
 				if up.Pet != lastPet {
 					lastPet = up.Pet
 					a.refreshPetMenu()
-				}
-				if a.muted {
-					up.Bubble = nil
 				}
 				wruntime.EventsEmit(ctx, "pet:update", a.decorate(up))
 			}
@@ -513,7 +509,6 @@ type View struct {
 	engine.Update
 	Animation  *AnimationView `json:"animation"`
 	PetName    string         `json:"pet_name"`
-	Muted      bool           `json:"muted"`
 	OnTop      bool           `json:"on_top"`
 	Scale      float64        `json:"scale"`
 	DropShadow bool           `json:"drop_shadow"`
@@ -535,7 +530,6 @@ type AnimationView struct {
 func (a *App) decorate(up engine.Update) View {
 	v := View{
 		Update:     up,
-		Muted:      a.muted,
 		OnTop:      a.alwaysOnTop,
 		Scale:      a.eng.Config().Pet.Scale,
 		DropShadow: a.eng.Config().Pet.DropShadow,
@@ -590,8 +584,6 @@ func (a *App) SetAlwaysOnTop(b bool) {
 	a.alwaysOnTop = b
 	wruntime.WindowSetAlwaysOnTop(a.ctx, b)
 }
-
-func (a *App) SetMuted(b bool) { a.muted = b }
 
 // SetUpdate records what a check found and retitles the menu-bar item. Called
 // by the server when petctl posts a result; there is no other way for the app
@@ -860,12 +852,6 @@ func (a *App) appMenu() *menu.Menu {
 	top.OnClick(func(cb *menu.CallbackData) {
 		a.SetAlwaysOnTop(cb.MenuItem.Checked)
 	})
-	mute := pet.AddCheckbox("Mute", a.muted, nil, nil)
-	mute.OnClick(func(cb *menu.CallbackData) {
-		a.SetMuted(cb.MenuItem.Checked)
-		wruntime.EventsEmit(a.ctx, "pet:muted", cb.MenuItem.Checked)
-	})
-
 	pet.AddSeparator()
 	pet.AddSeparator()
 	pet.AddText("Quit", keys.CmdOrCtrl("q"), func(*menu.CallbackData) { a.Quit() })
