@@ -652,6 +652,13 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
         necklace(d, CX, sh + 1, pal)
 
     if state == "working":
+        # Hands first, then the laptop over them. She is sitting behind it, so
+        # the lid hides all but the outer edge of each hand — drawn after, they
+        # punched skin-coloured holes in her own screen, which is the sort of
+        # thing you only see once you look at it.
+        for hx, hy in hands_at(state, i, sh, hip):
+            hand(d, hx, hy, pal)
+
         # A laptop. The lid stops one row under her chin — the face is the
         # whole signal this state sends and nothing may climb into it — and
         # runs down to the base, which is the only way to get a screen tall
@@ -668,16 +675,19 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
         # between panel and bezel is what makes it a screen. Same literal the
         # robot's face uses.
         rect(d, CX - 5, lid + 1, CX + 5, base - 2, (38, 46, 58, 255))
-        for k in (0, 2):
-            d.line([(CX - 3, lid + 2 + k), (CX + 1 + k, lid + 2 + k)], fill=pal.accent)
+        # Two rows of glow whose lengths change every frame: text arriving,
+        # which is what she is doing. The screen has to carry the animation now
+        # that her hands are behind the lid — while they showed, the tapping
+        # was the motion and the screen could sit still.
+        for k, w in enumerate(((6, 3), (8, 5), (4, 7), (7, 4))[i % 4]):
+            d.line([(CX - 4, lid + 2 + k * 2), (CX - 4 + w, lid + 2 + k * 2)],
+                   fill=pal.accent)
         # The base, wider than the lid. That overhang is most of what says
         # laptop rather than television.
         rect(d, CX - 8, base, CX + 8, base + 1, shell)
         d.line([(CX - 8, base), (CX + 8, base)], fill=dark)
 
-    if state == "working":
-        for hx, hy in hands_at(state, i, sh, hip):
-            hand(d, hx, hy, pal)
+
 
 
 def hair_back(d, s, top, bw, bh, cy, pal):
