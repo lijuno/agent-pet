@@ -537,6 +537,35 @@ def bow(d, x, y, pal):
     rect(d, x - 1, y - 1, x + 1, y + 1, dark)
 
 
+def hand(d, x, y, pal):
+    """One hand. Outlined in `line` it is a dark blot at four pixels across, so
+    it takes the shadow tone instead."""
+    d.ellipse([x - 2, y - 2, x + 2, y + 2], fill=pal.body, outline=pal.body_dark)
+
+
+def hands_at(state, i, sh, hip):
+    """Where the two hands are this frame.
+
+    Shared, because the arm and the hand on the end of it are drawn at
+    different depths: the arm before the dress so the dress sleeves it, the
+    hand after the laptop so it rests on top. They must agree.
+    """
+    out = []
+    for sx in (-1, 1):
+        if state == "celebrate":
+            hx, hy = CX + sx * 9, sh - 2
+        elif state == "working":
+            hx, hy = CX + sx * 5, GROUND - 2
+        else:
+            hx, hy = CX + sx * 8, hip - 2
+        if state in ("celebrate", "working"):
+            # Two hands tapping out of phase. The only asymmetry in her that is
+            # meant to be there.
+            hy += (i + (sx > 0)) % 2
+        out.append((hx, hy))
+    return out
+
+
 def torso(img, s, state, i, top, bw, bh, cy, pal):
     """A small body under a big head.
 
@@ -576,26 +605,18 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
         # The shoe is one pixel wider than the leg, on the outside.
         rect(d, inner, GROUND - 1, outer + sx, GROUND, dark)
 
-    if state == "working":
-        # The keyboard sits in front of her, so it goes down before the hands.
-        rect(d, CX - 8, hip + 2, CX + 8, hip + 4, dark)
-        d.rectangle([CX - 8, hip + 2, CX + 8, hip + 4], outline=line)
-
     # Arms, posed by state — the body has no other way to join in. They hang
     # outside the dress, which is the only place there is room for them.
-    for sx in (-1, 1):
-        if state == "celebrate":
-            hx, hy = CX + sx * 9, sh - 2
-        elif state == "working":
-            hx, hy = CX + sx * 4, hip + 1
-        else:
-            hx, hy = CX + sx * 8, hip - 2
-        if state in ("celebrate", "working"):
-            hy += (i + (sx > 0)) % 2
+    #
+    # The hand goes down with its arm, under the dress, in every state but
+    # `working`: drawn after the dress instead, it stops being a hand at the
+    # end of a sleeve and becomes a disc pasted on top of her. `working` is the
+    # exception because there the hand has to sit on the laptop, and the laptop
+    # is drawn after the dress for reasons of its own.
+    for sx, (hx, hy) in zip((-1, 1), hands_at(state, i, sh, hip)):
         d.line([(CX + sx * 4, sh + 1), (hx, hy)], fill=skin, width=3)
-        # A hand outlined in `line` is a dark blot at four pixels across. The
-        # shadow tone is enough to round it off.
-        d.ellipse([hx - 2, hy - 2, hx + 2, hy + 2], fill=skin, outline=dark)
+        if state != "working":
+            hand(d, hx, hy, pal)
 
     # The dress: shoulders, a waist, then the flare. No outline across the top
     # — the chin sits on it, and a drawn edge there reads as a choker.
@@ -606,8 +627,57 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     d.line(dress[1:5], fill=edge)
     d.line([dress[5], dress[4]], fill=edge)
 
-    # The neck opening, and what hangs in it.
+    # The neck opening. What hangs in it is torso_front's, not this function's.
     d.polygon([(CX - 4, sh - 1), (CX, sh + 3), (CX + 4, sh - 1)], fill=skin)
+
+
+def torso_front(d, s, state, i, top, bw, bh, cy, pal):
+    """Everything that belongs in front of the chin, in the order it overlaps.
+
+    The head is drawn after the body, so anything sitting high on the chest —
+    the necklace, a laptop held up to type on — has to be put down after it or
+    the chin paints over it. The necklace learned that the hard way: drawn with
+    the body, two of every three of its pixels were behind her jaw.
+
+    Order here is the whole point. Necklace, then laptop over it, then hands
+    over that. She is holding the laptop, so it hides the chain — which is what
+    holding a laptop does.
+    """
+    if s.torso != "chibi":
+        return
+    sh, hip = top + bh, GROUND - 3
+    skin, dark, line = pal.body, pal.body_dark, pal.line
+
+    if pal.gold:
+        necklace(d, CX, sh + 1, pal)
+
+    if state == "working":
+        # A laptop. The lid stops one row under her chin — the face is the
+        # whole signal this state sends and nothing may climb into it — and
+        # runs down to the base, which is the only way to get a screen tall
+        # enough to read as a screen rather than as a bar.
+        shell = pal.cloth_line or line
+        # Both ends anchored to the ground, not to her shoulders. Hung off `sh`
+        # the lid grew and shrank a pixel on the bob, and a laptop that breathes
+        # is the one thing in the frame that cannot.
+        base = GROUND - 1
+        lid = base - 6
+        rect(d, CX - 6, lid, CX + 6, base - 1, shell)
+        # A dark panel with the glow on it. A pale screen the same value as the
+        # shell around it leaves the whole thing one flat shape; the contrast
+        # between panel and bezel is what makes it a screen. Same literal the
+        # robot's face uses.
+        rect(d, CX - 5, lid + 1, CX + 5, base - 2, (38, 46, 58, 255))
+        for k in (0, 2):
+            d.line([(CX - 3, lid + 2 + k), (CX + 1 + k, lid + 2 + k)], fill=pal.accent)
+        # The base, wider than the lid. That overhang is most of what says
+        # laptop rather than television.
+        rect(d, CX - 8, base, CX + 8, base + 1, shell)
+        d.line([(CX - 8, base), (CX + 8, base)], fill=dark)
+
+    if state == "working":
+        for hx, hy in hands_at(state, i, sh, hip):
+            hand(d, hx, hy, pal)
 
 
 def hair_back(d, s, top, bw, bh, cy, pal):
@@ -810,12 +880,7 @@ def draw_pet(s, state, i, n):
         d.arc([CX - bw // 2, top, CX + bw // 2, top + bh], 55, 125,
               fill=pal.jaw or pal.body_dark)
     markings(img, s, top, bw, bh, cy, pal)
-    if s.torso != "none" and pal.gold:
-        # After the head, not with the body. Drawn in torso() it goes down
-        # before the head does, and the chin paints over two of every three
-        # pixels of it — which is why it read as a faint seam rather than as a
-        # necklace, whatever colour it was given.
-        necklace(d, CX, top + bh + 1, pal)
+    torso_front(d, s, state, i, top, bw, bh, cy, pal)
     hairline(img, s, top, bw, bh, cy, pal)
     if s.accessory == "bow":
         # On the tucked side: the other one is under the fall of the hair, and
