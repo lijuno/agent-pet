@@ -102,9 +102,9 @@ curl -sS --max-time 5 -X POST "$BASE/pet" -H 'content-type: application/json' \
 	-d '{"id":"momo"}' >/dev/null
 sleep 0.6
 menu=$(field status_menu)
-want "it lists the cat" "$menu" ":>SanMao"
+want "it lists the cat" "$menu" ":>Sanmao"
 want "it lists the girl" "$menu" ">Peach"
-want "the character in use is ticked" "$menu" ">SanMao (三毛)[on]"
+want "the character in use is ticked" "$menu" ">Sanmao (三毛)[on]"
 
 # Switching needs somewhere to switch to. Two characters ship, so this runs;
 # it stays guarded because a build with one pack should skip rather than fail.
@@ -126,7 +126,7 @@ else
 	curl -sS --max-time 5 -X POST "$BASE/pet" -H 'content-type: application/json' \
 		-d '{"id":"momo"}' >/dev/null
 	sleep 0.8
-	want "and follows a change made elsewhere" "$(field status_menu)" ">SanMao (三毛)[on]"
+	want "and follows a change made elsewhere" "$(field status_menu)" ">Sanmao (三毛)[on]"
 fi
 
 echo

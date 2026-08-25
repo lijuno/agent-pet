@@ -11,7 +11,7 @@ working on it.
 
 Milestones 1 and 2 are in: the engine, the loopback event API, `petctl`, the
 window, the menu-bar item, and the Claude Code adapter. Two characters ship —
-SanMao (`momo`) and Peach (`peach`) — and a third stays defined but unshipped
+Sanmao (`momo`) and Peach (`peach`) — and a third stays defined but unshipped
 in `tools/genpets` as the worked example; see the README's Characters section.
 
 Over-the-air updates are in too. Two things about them are load-bearing and

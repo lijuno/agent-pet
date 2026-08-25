@@ -156,7 +156,7 @@ behavior:
   dialogue: true        # speech bubbles
 
 personality:
-  name: SanMao (三毛)
+  name: Sanmao (三毛)
   personality: gentle   # gentle cheerful calm mischievous sarcastic energetic
 
 thresholds:
@@ -520,7 +520,7 @@ Two built-in packs ship in the binary:
 
 <p align="center">
   <img src="docs/media/states.gif"
-       alt="SanMao, a tortoiseshell tabby, cycling through the ten states as pixel-art animations labelled with their names and frame rates."
+       alt="Sanmao, a tortoiseshell tabby, cycling through the ten states as pixel-art animations labelled with their names and frame rates."
        width="240">
   <img src="docs/media/states-peach.gif"
        alt="Peach, a girl with long dark hair and a white dress, cycling through the same ten states: at the laptop for working, arms up for celebrate, asleep with Z's for sleeping."
@@ -534,7 +534,7 @@ Two built-in packs ship in the binary:
 
 | id | | |
 |---|---|---|
-| `momo` | SanMao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
+| `momo` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
 | `peach` | Peach (桃桃), a girl in a white dress | long dark hair over one shoulder, peach bow, gold necklace |
 
 Pick one from the menu-bar item's **Change Pet** submenu, or with

@@ -173,7 +173,7 @@ func Default() Config {
 			"git":    {Enabled: false},
 		},
 		Personality: Personality{
-			Name: "SanMao (三毛)", Preset: "gentle",
+			Name: "Sanmao (三毛)", Preset: "gentle",
 			Energy: 65, Curiosity: 80, Snark: 10, Patience: 90,
 		},
 		Thresholds: Thresholds{
