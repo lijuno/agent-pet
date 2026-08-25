@@ -603,6 +603,19 @@ func (a *App) SetUpdate(st update.Status) {
 // it. Failure is logged and otherwise ignored: not being able to write a
 // convenience file is not a reason to stop being a pet.
 func (a *App) saveUpdate(st update.Status) {
+	// Only a result that names a version is worth carrying across a restart.
+	// Without a Latest this says "we looked and the channel had nothing", which
+	// is the least useful thing to remember and the most likely to be stale by
+	// the next launch — and it is what a bare {"available":false} produces,
+	// which is the fixture the desktop suite posts. Remembering that turned a
+	// test artefact into durable state that survived restarts.
+	//
+	// The file is left alone rather than removed: what it holds is the last
+	// time we learned what the channel had, and that is still the best answer
+	// available.
+	if st.Latest == "" {
+		return
+	}
 	b, err := json.Marshal(st)
 	if err != nil {
 		return
@@ -617,8 +630,9 @@ func (a *App) saveUpdate(st update.Status) {
 	}
 }
 
-// loadUpdate restores it, re-deriving everything that depends on which build is
-// running.
+// LoadUpdate reads back what was saved, re-deriving everything that depends on
+// which build is running. It has no side effects: main hands the result to the
+// server, which is the one door into "petd learned a result".
 //
 // Current comes from this binary and never from the file. If the app was
 // updated while it was closed — which is exactly when nothing could be told —
@@ -626,24 +640,27 @@ func (a *App) saveUpdate(st update.Status) {
 // computed against it. Both are recomputed here, so a result saved before an
 // update reads correctly after one: latest 0.2.0 saved while running 0.1.0
 // becomes "up to date" once 0.2.0 is the thing running.
-func (a *App) loadUpdate() {
+func LoadUpdate() (update.Status, bool) {
 	b, err := os.ReadFile(config.UpdateResult())
 	if err != nil {
-		return
+		return update.Status{}, false
 	}
 	var st update.Status
 	if err := json.Unmarshal(b, &st); err != nil {
-		return
+		return update.Status{}, false
+	}
+	if st.Latest == "" {
+		// Same rule on the way in, which also heals a file written before that
+		// rule existed.
+		return update.Status{}, false
 	}
 	st.Current = Version
 	st.Available = st.Latest != "" && update.Compare(st.Current, st.Latest) < 0
 	if st.Validate() != nil {
 		// A file this build cannot make sense of is not worth guessing at.
-		return
+		return update.Status{}, false
 	}
-	a.updMu.Lock()
-	a.upd = st
-	a.updMu.Unlock()
+	return st, true
 }
 
 // GetUpdate is what the frontend shows in the status panel.

@@ -154,10 +154,11 @@ func TestUpdateResultSurvivesARestart(t *testing.T) {
 		Available: false, CheckedAt: time.Now(),
 	})
 
-	// A different App: a new process, as far as the file is concerned.
-	b := save(t)
-	b.loadUpdate()
-	got := b.GetUpdate()
+	// A new process, as far as the file is concerned.
+	got, ok := LoadUpdate()
+	if !ok {
+		t.Fatal("nothing was restored")
+	}
 	if got.Latest != "0.2.0" {
 		t.Fatalf("latest = %q, want the saved 0.2.0", got.Latest)
 	}
@@ -183,9 +184,10 @@ func TestLoadUpdateRederivesAgainstTheRunningBuild(t *testing.T) {
 		Available: true, CheckedAt: time.Now(),
 	})
 
-	b := save(t)
-	b.loadUpdate()
-	got := b.GetUpdate()
+	got, ok := LoadUpdate()
+	if !ok {
+		t.Fatal("nothing was restored")
+	}
 	if got.Current != "0.2.0" {
 		t.Errorf("current = %q, want the running build 0.2.0", got.Current)
 	}
@@ -204,6 +206,30 @@ func stubVersion(v string) func() {
 	old := Version
 	Version = v
 	return func() { Version = old }
+}
+
+// A result that names no version is not worth carrying across a restart: it
+// says only "we looked and found nothing", which is the least useful answer and
+// the most likely to be stale by the next launch. It is also exactly what a
+// bare {"available":false} produces — the fixture the desktop suite posts — so
+// remembering it turned a test artefact into durable state.
+func TestAResultWithNoVersionIsNotRemembered(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	defer stubVersion("0.2.0")()
+
+	a := save(t)
+	a.SetUpdate(update.Status{Channel: "dev", Current: "0.2.0", Latest: "0.2.0", CheckedAt: time.Now()})
+	// Then a check that found nothing published. It must not overwrite what we
+	// know, and it must not be restored as an answer of its own.
+	a.SetUpdate(update.Status{Channel: "dev", Current: "0.2.0", CheckedAt: time.Now()})
+
+	got, ok := LoadUpdate()
+	if !ok {
+		t.Fatal("the earlier result should still be on disk")
+	}
+	if got.Latest != "0.2.0" {
+		t.Errorf("latest = %q, want the last result that named a version", got.Latest)
+	}
 }
 
 func save(t *testing.T) *App {

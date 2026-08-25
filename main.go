@@ -139,6 +139,14 @@ func main() {
 	srv.SetShown = app.SetShown
 	// How a check reaches the menu bar. petd is told; it never asks.
 	srv.OnUpdate = app.SetUpdate
+	// What the last check found, from before this process existed. petd is told
+	// results and holds them in memory, so without this the menu says "no
+	// update check yet" after every restart — and an update is a restart.
+	//
+	// Through the server, so /update and the menu bar cannot disagree.
+	if st, ok := desktop.LoadUpdate(); ok {
+		srv.RestoreUpdate(st)
+	}
 
 	if err := desktop.Run(app, desktop.Options{
 		Assets:  assets,

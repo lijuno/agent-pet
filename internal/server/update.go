@@ -68,6 +68,25 @@ func (s *Server) postUpdate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.updateStatus())
 }
 
+// RestoreUpdate seeds the last result from outside a request — at startup,
+// from what was saved before the process was replaced.
+//
+// It goes through the server rather than straight into the menu because the
+// server is what /update answers with and what `petctl doctor` reads. Restoring
+// into the menu alone left the two disagreeing: the menu bar said one thing and
+// the endpoint another, which is worse than either being stale.
+func (s *Server) RestoreUpdate(st update.Status) {
+	if st.Validate() != nil || st.Channel != s.channel() {
+		return
+	}
+	s.upd.mu.Lock()
+	s.upd.last = st
+	s.upd.mu.Unlock()
+	if s.OnUpdate != nil {
+		s.OnUpdate(s.updateStatus())
+	}
+}
+
 // updateStatus is the current answer. Current and Channel are always this
 // build's own: what the caller claimed about either is not evidence.
 func (s *Server) updateStatus() update.Status {

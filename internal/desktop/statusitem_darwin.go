@@ -79,12 +79,6 @@ func (a *App) startTray(ctx context.Context) {
 		if !a.hidden {
 			shown = 1
 		}
-		// What the last check found, from before this process existed. petd
-		// is told results and holds them in memory, so without this the menu
-		// says "no update check yet" after every restart — and an update is a
-		// restart.
-		a.loadUpdate()
-
 		icon := trayIconBytes()
 		C.petStatusInstall(unsafe.Pointer(&icon[0]), C.int(len(icon)),
 			C.int(onTop), C.int(shown))
