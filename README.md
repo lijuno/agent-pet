@@ -149,7 +149,7 @@ firing at all.
 
 ```yaml
 pet:
-  active: momo          # momo, peach, or your own pack
+  active: momo          # momo, peach, juanmao, or your own pack
   always_on_top: true
   scale: 1.0
   drop_shadow: true     # off if it reads as a halo on a light wallpaper
@@ -558,7 +558,7 @@ hardening applied to untrusted input.
 
 ### Characters
 
-Two built-in packs ship in the binary:
+Three built-in packs ship in the binary:
 
 <p align="center">
   <img src="docs/media/states.gif"
@@ -567,10 +567,13 @@ Two built-in packs ship in the binary:
   <img src="docs/media/states-peach.gif"
        alt="Peach, a girl with long dark hair and a white dress, cycling through the same ten states: at the laptop for working, arms up for celebrate, asleep with Z's for sleeping."
        width="240">
+  <img src="docs/media/states-juanmao.gif"
+       alt="Juanmao, a man with curly hair and rectangular glasses, cycling through the same ten states: brows lowered at the laptop for working, angled for worried, arms up for celebrate."
+       width="240">
 </p>
 
 <p align="center">
-  <sub>Both characters, every state, rendered from the sprites they ship —
+  <sub>Every character, every state, rendered from the sprites they ship —
   <code>make states-gif</code>.</sub>
 </p>
 
@@ -578,12 +581,13 @@ Two built-in packs ship in the binary:
 |---|---|---|
 | `momo` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
 | `peach` | Peach (桃桃), a girl in a white dress | long dark hair over one shoulder, peach bow, gold necklace |
+| `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, a jumper over one shoulder |
 
 Pick one from the menu-bar item's **Change Pet** submenu, or with
-`petctl pet peach`. `tools/genpets` carries a third species, `byte`, as a
-worked example of a species that is neither of these; shipping it is one line.
+`petctl pet peach`. `tools/genpets` carries a fourth species, `byte`, as a
+worked example of a species that is none of these; shipping it is one line.
 
-Both provide all ten states as 40×40 pixel-art sprite strips. Regenerate
+All three provide all ten states as 40×40 pixel-art sprite strips. Regenerate
 them with:
 
 ```bash

@@ -149,11 +149,12 @@ version-sync:
 
 # The README's state figure. Generated from the shipped sprites and manifest so
 # it cannot drift into advertising an animation the pet does not have.
-# One figure per shipped character. Both, because a README that shows one of
-# two characters is a README that will show one of three.
+# One figure per shipped character. All of them, because a README that shows
+# one of two characters is a README that will show one of three.
 states-gif:
 	@python3 scripts/make-states-gif.py --pet momo
 	@python3 scripts/make-states-gif.py --pet peach
+	@python3 scripts/make-states-gif.py --pet juanmao
 
 # Fails with the command that fixes it, rather than "command not found" for a
 # binary that may well be installed.
