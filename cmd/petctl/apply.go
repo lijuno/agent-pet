@@ -22,6 +22,16 @@ import (
 // replacing. See reexecOutside.
 const detachedEnv = "AGENT_PET_UPDATE_DETACHED"
 
+// targetEnv carries the bundle being replaced across the re-exec.
+//
+// The copy runs from a temporary directory, so it cannot work the target out
+// the way the original did — os.Executable no longer points inside any bundle.
+// os.Args does not carry it either: the target is usually derived rather than
+// named, so there is no --app in there to pass along. Without this the copy
+// gets as far as the download and then refuses its own work, saying the very
+// thing that is true of it and beside the point: that it is not inside an app.
+const targetEnv = "AGENT_PET_UPDATE_TARGET"
+
 // detachedGrace is how long a copy is left alone before the sweep will take it.
 // Longer than an update takes, so a second update running concurrently is never
 // the thing that gets swept.
@@ -47,7 +57,7 @@ func apply(c *client, m update.Manifest, o updateOpts) error {
 		return fmt.Errorf("this is a dev build; refusing to replace it with %s", m.Version)
 	}
 
-	target, err := targetBundle(o.app)
+	target, err := resolveTarget(o.app)
 	if err != nil {
 		return err
 	}
@@ -145,6 +155,16 @@ func installedStatus(m update.Manifest, installed string) update.Status {
 // targetBundle is the .app this petctl belongs to. It is found from the running
 // executable rather than assumed to be in /Applications: updating a copy other
 // than the one in use is how you get an update that appears to do nothing.
+// resolveTarget names the bundle to replace: what was asked for, or what an
+// earlier pass through reexecOutside carried across for the copy, which cannot
+// see it from where it now stands.
+func resolveTarget(app string) (string, error) {
+	if app == "" {
+		app = os.Getenv(targetEnv)
+	}
+	return targetBundle(app)
+}
+
 func targetBundle(override string) (string, error) {
 	if override != "" {
 		abs, err := filepath.Abs(override)
@@ -201,7 +221,7 @@ func reexecOutside(target string) error {
 	if err := copyFile(exe, dst, 0o755); err != nil {
 		return err
 	}
-	env := append(os.Environ(), detachedEnv+"="+dir)
+	env := append(os.Environ(), detachedEnv+"="+dir, targetEnv+"="+target)
 	// Exec, not Start: the copy inherits the terminal and the exit code, so
 	// this stays one command from the caller's point of view.
 	return syscall.Exec(dst, os.Args, env)

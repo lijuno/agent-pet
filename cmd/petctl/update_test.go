@@ -387,3 +387,31 @@ func TestSweepWithNoCopyOfItsOwn(t *testing.T) {
 		t.Error("a stale copy should be swept when there is no run of our own")
 	}
 }
+
+// TestTheCopyIsToldWhatItIsReplacing covers the second half of the re-exec,
+// which had no cover at all and did not work.
+//
+// The copy runs from a temporary directory. os.Executable no longer points
+// inside any bundle there, and os.Args does not name one either — the target
+// is derived from the running binary rather than passed as a flag — so unless
+// it is carried across explicitly the copy downloads the update and then
+// refuses to install it, on the grounds that it is not inside an app. Which is
+// true of it, and beside the point.
+func TestTheCopyIsToldWhatItIsReplacing(t *testing.T) {
+	const target = "/Applications/agent-pet-dev.app"
+	t.Setenv(targetEnv, target)
+
+	got, err := resolveTarget("")
+	if err != nil {
+		t.Fatalf("a copy that was told its target should resolve it: %v", err)
+	}
+	if got != target {
+		t.Fatalf("resolved %q, want %q", got, target)
+	}
+
+	// An explicit --app still wins over what was carried.
+	if got, err := resolveTarget("/Applications/agent-pet.app"); err != nil ||
+		got != "/Applications/agent-pet.app" {
+		t.Fatalf("--app should win over the carried target, got %q/%v", got, err)
+	}
+}
