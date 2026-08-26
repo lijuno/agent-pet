@@ -593,7 +593,7 @@ Six built-in packs ship in the binary:
 | `damao` | Damao (大毛), a boy of fourteen | a great pile of hair, an olive windbreaker, out running |
 | `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, a bicycle to work on |
 | `maomao` | Maomao (毛毛), a boy of seven | a short crop, round clear glasses, a pencil to work with |
-| `peach` | Peach (桃桃), a girl in a white dress | long dark hair over one shoulder, peach bow, gold necklace |
+| `peach` | Peach (桃桃), a girl in a light blue skirt | long dark hair over one shoulder, peach bow, gold necklace |
 | `sanmao` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
 
 Pick one from the menu-bar item's **Change Pet** submenu, or with

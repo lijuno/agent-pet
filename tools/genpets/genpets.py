@@ -105,6 +105,9 @@ class Palette:
     # reads as a jacket worn over nothing at all, which on a boy of fourteen is
     # a different character.
     inner: tuple = None
+    # The lower half of a dress, when it is a skirt of its own colour rather
+    # than more of the top. Unset, the garment is all one piece.
+    skirt: tuple = None
     # think is the colour of the thinking dots. They used to be drawn in
     # `line`, the character's own outline, which made the one state that says
     # "the agent is reasoning" the hardest of all to notice. Props that carry a
@@ -200,7 +203,7 @@ SANMAO = Species(
 PEACH = Species(
     pid="peach",
     name="Peach (桃桃)",
-    description="A girl in a white dress, with long dark hair, a peach bow and a gold necklace.",
+    description="A girl in a white top and a light blue skirt, with long dark hair and a peach bow.",
     palette=Palette(
         # Skin, hair and eyes are sampled from the reference photo and then
         # pushed apart: at 40px, tones a camera can tell apart collapse into
@@ -218,6 +221,7 @@ PEACH = Species(
         hair_light=(88, 68, 72, 255),
         cloth=(250, 250, 250, 255),
         cloth_line=(196, 200, 212, 255),   # a cool grey; her outline is warm
+        skirt=(158, 198, 234, 255),        # a light blue skirt under the white top
         jaw=(228, 186, 164, 255),          # one step under the skin, no more
         lip=(206, 116, 116, 255),
         ribbon=(255, 172, 142, 255),   # peach, for the girl called Peach
@@ -1263,6 +1267,16 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
         shirt = [(CX - 5, sh), (CX + 5, sh), (CX + 4, sh + 3), (CX + 6, hip),
                  (CX - 6, hip), (CX - 4, sh + 3)]
     d.polygon(shirt, fill=pal.cloth or skin)
+    if s.garment == "dress" and pal.skirt:
+        # A skirt rather than more dress: the same flare, filled separately
+        # from the waist down. Drawn before the outline so the silhouette is
+        # still drawn once, round both pieces together.
+        # The waist sits a row above where the dress narrows, because the whole
+        # garment is only five rows: split at the dress's own waist the skirt
+        # got two of them and read as a band round her middle rather than as
+        # something she is wearing.
+        d.polygon([(CX - 4, sh + 2), (CX + 4, sh + 2),
+                   (CX + 6, hip), (CX - 6, hip)], fill=pal.skirt)
     edge = pal.cloth_line or line
     d.line(shirt[1:5], fill=edge)
     d.line([shirt[5], shirt[4]], fill=edge)
