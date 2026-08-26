@@ -283,9 +283,9 @@ MAOMAO = Species(
         blush=(244, 158, 150, 160),
         hair=(46, 36, 30, 255),
         hair_light=(104, 82, 66, 255),
-        cloth=(76, 122, 186, 255),     # a blue t-shirt
-        cloth_line=(54, 92, 148, 255),
-        shoe=(72, 96, 152, 255),       # blue trainers, over bare legs
+        cloth=(88, 160, 104, 255),     # a green t-shirt, because he likes green
+        cloth_line=(58, 118, 74, 255),
+        shoe=(64, 92, 78, 255),        # trainers to match, over bare legs
         # Clear plastic. Pale on purpose, which every other frame in this file
         # is not: on Juanmao a pale rim read as goggles, and the difference is
         # that these are round and enormous, which nothing but a pair of
