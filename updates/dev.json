@@ -1,10 +1,10 @@
 {
   "channel": "dev",
-  "version": "0.3.0-dev.2",
-  "url": "https://github.com/lijuno/agent-pet/releases/download/v0.3.0-dev.2/agent-pet-dev-0.3.0-dev.2-universal.zip",
-  "sha256": "0cb334e931824b969314395f2dfbf7d24b71f420311258b405db6cb8b2a84922",
-  "size": 19744608,
+  "version": "0.3.0-dev.3",
+  "url": "https://github.com/lijuno/agent-pet/releases/download/v0.3.0-dev.3/agent-pet-dev-0.3.0-dev.3-universal.zip",
+  "sha256": "00eb7607d0905feb592ffae4f9d38c246ba76d47f4743dfc453fbaaef874c86e",
+  "size": 19768651,
   "min_macos": "12.0",
   "published": "2026-08-26",
-  "notes_url": "https://github.com/lijuno/agent-pet/releases/tag/v0.3.0-dev.2"
+  "notes_url": "https://github.com/lijuno/agent-pet/releases/tag/v0.3.0-dev.3"
 }
