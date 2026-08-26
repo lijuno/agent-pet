@@ -203,3 +203,38 @@ func TestListOrdersByDisplayedName(t *testing.T) {
 		}
 	}
 }
+
+// TestDisabledPacksAreHiddenButStillLoad covers pet.disabled, which is a
+// filter on the pickers and not an unload. Both halves matter: a disabled pack
+// must not reach the Change Pet submenu, and it must still resolve, because a
+// config may name one as active and the character on screen has to be drawn
+// whether or not it is in the menu.
+func TestDisabledPacksAreHiddenButStillLoad(t *testing.T) {
+	pack := func(id string) string {
+		return `{"id": "` + id + `", "name": "` + id + `",
+		         "animations": {"idle": "idle.png"}}`
+	}
+	fsys := fstest.MapFS{
+		"pets/a/manifest.json": {Data: []byte(pack("alpha"))},
+		"pets/b/manifest.json": {Data: []byte(pack("bravo"))},
+	}
+	l := NewLibrary()
+	if err := l.LoadBuiltin(fsys, "pets", "/pets"); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	l.Disable([]string{"bravo"})
+	var got []string
+	for _, p := range l.List() {
+		got = append(got, p.ID)
+	}
+	if len(got) != 1 || got[0] != "alpha" {
+		t.Fatalf("a disabled pack should not be offered, got %v", got)
+	}
+	if _, ok := l.Get("bravo"); !ok {
+		t.Fatal("a disabled pack must still resolve, or an active one cannot be drawn")
+	}
+	if p, ok := l.Any("bravo"); !ok || p.ID != "bravo" {
+		t.Fatalf("naming a disabled pack as active should still find it, got %v/%v", p.ID, ok)
+	}
+}

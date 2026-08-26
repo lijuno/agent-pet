@@ -43,6 +43,16 @@ type Pet struct {
 	// PNG frames themselves and stays either way — hence the narrow name.
 	DropShadow bool `yaml:"drop_shadow"`
 	Sound      bool `yaml:"sound"`
+	// Disabled names packs to keep out of the pickers — the Change Pet
+	// submenu, the panel in the window, `petctl pets`. Four characters ship
+	// and somebody who wants two of them should not have to read past the
+	// other two every time they switch.
+	//
+	// A deny list rather than an allow list, so a pack added later shows up
+	// without anybody editing this. It hides rather than unloads: the id still
+	// resolves, so `pet.active` naming a disabled pack still draws it — see
+	// the note on that in main.go.
+	Disabled []string `yaml:"disabled"`
 }
 
 type Behavior struct {

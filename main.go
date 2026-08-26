@@ -136,6 +136,23 @@ func main() {
 		fmt.Fprintln(os.Stderr, "petd: no pet assets found — the binary was built without ui/dist/pets")
 		os.Exit(1)
 	}
+	// pet.disabled keeps packs out of the pickers. Two things it is not
+	// allowed to do, both of them for the same reason — a menu has to agree
+	// with the window:
+	//
+	// It cannot hide the character on screen. Whatever `active` names stays in
+	// the list, ticked, however the config lists it; taking that one out of
+	// the menu means changing `active` as well.
+	//
+	// And it cannot hide all of them. A Change Pet submenu with no entries is
+	// a bug report rather than a preference, so a list that empties the
+	// library is dropped and said out loud.
+	lib.Disable(exceptActive(cfg.Pet.Disabled, cfg.Pet.Active))
+	if len(lib.List()) == 0 {
+		log.Warn("pet.disabled would hide every character; ignoring it",
+			"disabled", cfg.Pet.Disabled)
+		lib.Disable(nil)
+	}
 
 	eng := engine.New(cfg, lib, log)
 	server.Version = version
@@ -224,6 +241,18 @@ func runHeadless(ctx context.Context, cancel context.CancelFunc, srv *server.Ser
 
 // newLogger writes concise lines to both stderr and a log file. §32: event
 // categories only, no prompts, no source, no command arguments.
+
+// exceptActive is pet.disabled with the character on screen taken out of it.
+func exceptActive(disabled []string, active string) []string {
+	out := make([]string, 0, len(disabled))
+	for _, id := range disabled {
+		if id != active {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 func newLogger(cfg config.Config) (*slog.Logger, func()) {
 	level := slog.LevelInfo
 	switch strings.ToLower(cfg.Logging.Level) {

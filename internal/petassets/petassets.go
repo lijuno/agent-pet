@@ -110,10 +110,26 @@ func (p Pet) Missing() []state.State {
 
 // Library holds every pet available to the runtime.
 type Library struct {
-	pets map[string]Pet
+	pets   map[string]Pet
+	hidden map[string]bool
 }
 
-func NewLibrary() *Library { return &Library{pets: map[string]Pet{}} }
+func NewLibrary() *Library {
+	return &Library{pets: map[string]Pet{}, hidden: map[string]bool{}}
+}
+
+// Disable keeps packs out of List, which is what every picker is built from.
+// Get still finds them: hiding a character from the menu is not the same as
+// unloading it, and the one a config names as active has to draw whether it is
+// in the menu or not.
+func (l *Library) Disable(ids []string) {
+	l.hidden = map[string]bool{}
+	for _, id := range ids {
+		if id = strings.TrimSpace(id); id != "" {
+			l.hidden[id] = true
+		}
+	}
+}
 
 // LoadBuiltin reads packs out of an embedded filesystem. root is the directory
 // holding one subdirectory per pet.
@@ -187,6 +203,9 @@ func (l *Library) Get(id string) (Pet, bool) {
 func (l *Library) List() []Pet {
 	out := make([]Pet, 0, len(l.pets))
 	for _, p := range l.pets {
+		if l.hidden[p.ID] {
+			continue
+		}
 		out = append(out, p)
 	}
 	// By the name the user sees, not by the id. Every surface that shows this
@@ -212,7 +231,9 @@ func (l *Library) List() []Pet {
 
 func (l *Library) Len() int { return len(l.pets) }
 
-// Any returns a usable pet: the requested one, or the first available.
+// Any returns a usable pet: the requested one, or the first available. The
+// requested one is looked up rather than searched for, so a disabled pack that
+// a config still names as active is found and drawn.
 func (l *Library) Any(preferred string) (Pet, bool) {
 	if p, ok := l.Get(preferred); ok {
 		return p, true

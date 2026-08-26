@@ -150,6 +150,7 @@ firing at all.
 ```yaml
 pet:
   active: sanmao        # sanmao, peach, juanmao, maomao, or your own pack
+  disabled: []          # ids to keep out of the Change Pet menu
   always_on_top: true
   scale: 1.0
   drop_shadow: true     # off if it reads as a halo on a light wallpaper
@@ -597,6 +598,12 @@ them with:
 ```bash
 make pets     # python3 tools/genpets/genpets.py
 ```
+
+Characters you never use can be kept out of the **Change Pet** submenu and the
+panel beside it with `pet.disabled` in the config, which takes a list of ids. It
+hides rather than unloads, so one named in `pet.active` is still drawn — and it
+will not hide the character on screen or the last one left, because a menu that
+disagrees with the window is worse than a menu with an entry too many.
 
 Your own packs go in `~/.local/share/agent-pet/pets/<id>/` and are picked up
 at startup. A pack with the same id as a built-in replaces it. The format is one
