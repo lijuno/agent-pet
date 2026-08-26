@@ -1093,7 +1093,7 @@ def hands_at(state, i, sh, hip, work="desk"):
         elif state == "working":
             hx, hy = CX + sx * 5, GROUND - 2
         else:
-            hx, hy = CX + sx * 8, hip - 2
+            hx, hy = CX + sx * HAND_REACH, hip - 2
         if state in ("celebrate", "working"):
             # Two hands tapping out of phase. The only asymmetry in her that is
             # meant to be there.
@@ -1231,8 +1231,8 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
         # what makes it a shirt rather than a dress; it is no longer wider than
         # the shoulders it is on.
         for sx in (-1, 1):
-            d.polygon([(CX + sx * 4, sh), (CX + sx * 6, sh + 1),
-                       (CX + sx * 5, sh + 4), (CX + sx * 3, sh + 3)],
+            d.polygon([(CX + sx * 4, sh), (CX + sx * SLEEVE_REACH, sh + 1),
+                       (CX + sx * (SLEEVE_REACH - 1), sh + 4), (CX + sx * 3, sh + 3)],
                       fill=pal.cloth or skin)
 
     # The neck opening. What hangs in it is torso_front's, not this function's.
@@ -1636,6 +1636,20 @@ BOB = {
     "heart":     [-1, 0, -1, 0],
 }
 
+# How far down the arm a sleeve runs, where a hanging hand sits, and the bare
+# forearm the two have to leave between them — all measured in pixels out from
+# the centre line.
+#
+# One source of truth for the three of them, and a check below that they still
+# agree. They did not: the sleeve ran to eight and so did the hand, so the
+# sleeve met the fist and three characters had hands growing out of their
+# shoulders. It cannot be caught in the finished sprite, because the arm and
+# the hand are the same colour — "sleeve against forearm" and "sleeve against
+# knuckles" are the same pixels. It can only be caught here.
+SLEEVE_REACH = 6
+HAND_REACH = 8
+ARM_GAP = 2
+
 CX = 19          # character centre x
 GROUND = 35      # where the shadow sits
 PROP_X = 27      # left edge of the prop column, top-right
@@ -1953,7 +1967,25 @@ def contact_sheet(path="/tmp/contact_sheet.png", scale=5):
     return path
 
 
+def check_rules():
+    """The rules that are about the drawing rather than about the drawn.
+
+    The sprite rules in internal/petassets check the finished PNGs, which is
+    where most faults show. This one cannot show there — see SLEEVE_REACH — so
+    it is checked before anything is drawn, and `make pets` stops rather than
+    writing art that is wrong in a way nothing downstream can see.
+    """
+    if HAND_REACH - SLEEVE_REACH < ARM_GAP:
+        raise SystemExit(
+            f"sleeve reaches {SLEEVE_REACH} and the hand sits at {HAND_REACH}, "
+            f"leaving {HAND_REACH - SLEEVE_REACH} pixels of forearm; {ARM_GAP} are needed.\n"
+            "  A sleeve that reaches the hand leaves no arm between the two, and the\n"
+            "  character has hands growing out of his shoulders. Shorten the sleeve or\n"
+            "  move the hand out — do not lower ARM_GAP.")
+
+
 if __name__ == "__main__":
+    check_rules()
     for sp in SPECIES:
         print("wrote", build(sp))
     print("contact sheet:", contact_sheet())

@@ -71,6 +71,14 @@ character, and it was found by writing the rule rather than by looking. The
 table exists to stop the list growing — a new character starts at zero. Do not
 raise an entry to make a test pass; lower the character or shorten the hair.
 
+One rule cannot live there and is checked in `tools/genpets` instead, by
+`check_rules` before anything is drawn: a sleeve has to stop short of the hand.
+It is invisible in the finished sprite because the arm and the hand are the
+same colour — "sleeve against forearm" and "sleeve against knuckles" are the
+same pixels — so `make pets` stops rather than writing art nothing downstream
+can tell is wrong. Anything else about the drawing rather than the drawn
+belongs beside it.
+
 `make test-ui` serves the repo and opens `ui/test/index.html`, which loads the
 real UI into an iframe per test. `make test-desktop` drives a running app
 through `POST /window` — the only way to check a menu is not clipped in the
