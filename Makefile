@@ -155,6 +155,7 @@ states-gif:
 	@python3 scripts/make-states-gif.py --pet sanmao
 	@python3 scripts/make-states-gif.py --pet peach
 	@python3 scripts/make-states-gif.py --pet juanmao
+	@python3 scripts/make-states-gif.py --pet maomao
 
 # Fails with the command that fixes it, rather than "command not found" for a
 # binary that may well be installed.

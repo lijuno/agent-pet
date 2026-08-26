@@ -124,7 +124,7 @@ class Species:
     body_w: int = 24
     body_h: int = 22
     markings: str = "none"  # none | tortie
-    hair: str = "none"      # none | side | curly
+    hair: str = "none"      # none | side | curly | crop
     lashes: bool = False
     accessory: str = "none"  # none | bow
     # Eyebrows the character wears in every state, drawn above whatever else
@@ -132,7 +132,11 @@ class Species:
     # three rows tall, and brows over them leave no forehead. A face with small
     # eyes behind glasses has the opposite problem and needs them.
     brows: bool = False
-    glasses: str = "none"    # none | rect
+    glasses: str = "none"    # none | rect | round
+    # The eye a child has and an adult does not: the same oval the lashed eye
+    # is built on, without the lash line over it. Two switches rather than one,
+    # because a boy of seven has the size and not the lashes.
+    big_eyes: bool = False
     # The faint blush worn in every state. Separate from `lashes`, which used
     # to stand in for it: they travel together on one character and that is not
     # a rule.
@@ -142,7 +146,7 @@ class Species:
     garment: str = "dress"   # dress | tee
     # What the character is doing in `working`. The state means the agent is
     # busy; what busy looks like is the character's own.
-    work: str = "desk"       # desk | bike
+    work: str = "desk"       # desk | bike | draw
     # Where the head sits, and where the face sits inside it. A merged
     # head-and-body puts the eyes near the middle of the one ellipse and lets
     # the chin run into the chest; once the head is only a head, the face has
@@ -260,6 +264,54 @@ JUANMAO = Species(
 )
 
 
+MAOMAO = Species(
+    pid="maomao",
+    name="Maomao (毛毛)",
+    description="A seven-year-old boy in clear round glasses, drawing at his desk.",
+    palette=Palette(
+        # Lighter and pinker than either adult. Children are drawn lighter than
+        # they photograph for the same reason everything else here is pushed
+        # apart: three human characters at 40px are told apart by value first
+        # and by everything else second.
+        body=(248, 216, 190, 255),
+        body_dark=(214, 176, 150, 255),
+        belly=(252, 230, 210, 255),
+        line=(88, 60, 50, 255),
+        accent=(122, 196, 255, 255),   # sky blue: his sparkles, and his crayon
+        eye=(44, 34, 30, 255),
+        eye_light=(120, 84, 66, 255),  # a warm rim at the foot of the pupil
+        blush=(244, 158, 150, 160),
+        hair=(46, 36, 30, 255),
+        hair_light=(104, 82, 66, 255),
+        cloth=(76, 122, 186, 255),     # a blue t-shirt
+        cloth_line=(54, 92, 148, 255),
+        shoe=(72, 96, 152, 255),       # blue trainers, over bare legs
+        # Clear plastic. Pale on purpose, which every other frame in this file
+        # is not: on Juanmao a pale rim read as goggles, and the difference is
+        # that these are round and enormous, which nothing but a pair of
+        # children's glasses ever is.
+        frame=(206, 218, 234, 255),
+        jaw=(228, 194, 170, 255),
+        lip=(196, 118, 108, 255),
+        # The same wood Peach and Juanmao's world is furnished with.
+        desk=(198, 166, 132, 255),
+        desk_edge=(232, 204, 172, 255),
+        shell=(206, 212, 222, 255),    # the edge of a sheet of paper
+        nose=None,
+        think=(255, 190, 110, 255),    # warm, against all that blue
+    ),
+    ears="none", face="human", head="round", tail=False,
+    body_w=21, body_h=20,
+    hair="crop", lashes=False, big_eyes=True, glasses="round",
+    soft_blush=True,
+    torso="chibi", garment="tee", work="draw",
+    # Sat five rows lower than the adults and given a rounder head: a short
+    # body under a big round head is the whole of what says child here, and it
+    # says it before any feature on the face is legible.
+    head_dy=-5, eye_dy=2, mouth_dy=4,
+)
+
+
 BYTE = Species(
     pid="byte",
     name="Byte",
@@ -282,7 +334,7 @@ BYTE = Species(
 # antenna instead of ears, a lit screen instead of a face — and the reason the
 # drawing code is parametric at all. Adding it to this list is the whole of
 # shipping it.
-SPECIES = [SANMAO, PEACH, JUANMAO]
+SPECIES = [SANMAO, PEACH, JUANMAO, MAOMAO]
 
 
 # --------------------------------------------------------------------------
@@ -390,7 +442,7 @@ def dots(d, x, y, fill, edge, phase):
 # face centre so every species animates identically.
 # --------------------------------------------------------------------------
 
-def eyes(d, ex, ey, kind, pal, look=(0, 0), lashes=False, own_brows=False):
+def eyes(d, ex, ey, kind, pal, look=(0, 0), lashes=False, own_brows=False, big=False):
     # A plain eye is three pixels wide, so the right one starts at +4 to sit the
     # same distance from centre as the left at -6. At +3 both eyes were shifted
     # one pixel left of the face, which is small enough to look like nothing in
@@ -401,14 +453,18 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0), lashes=False, own_brows=False):
     c = pal.eye
     white = (255, 255, 255, 255)
 
-    if kind == "dot" and lashes:
+    if kind == "dot" and (lashes or big):
         # A tall oval with two catchlights, lined up with the arcs the other
         # kinds draw. Eye size is most of what separates "a girl" from "a cute
         # girl" at 40px — the three-pixel square this replaced read as a face
-        # with its eyes screwed shut.
+        # with its eyes screwed shut. It is also most of what separates a child
+        # from an adult, which is why the oval and the lash line above it are
+        # two switches rather than one: a boy of seven has the eyes and not
+        # the lashes.
         for sx, x0 in ((-1, ex - 7), (1, ex + 4)):
-            d.line([(x0 - 1, ey - 1), (x0 + 4, ey - 1)], fill=c)
-            px(d, x0 + (4 if sx > 0 else -1), ey - 2, c)   # outer lash tick
+            if lashes:
+                d.line([(x0 - 1, ey - 1), (x0 + 4, ey - 1)], fill=c)
+                px(d, x0 + (4 if sx > 0 else -1), ey - 2, c)   # outer lash tick
             d.ellipse([x0 + ox, ey + oy, x0 + 3 + ox, ey + 4 + oy], fill=c)
             if pal.eye_light:
                 rect(d, x0 + 1 + ox, ey + 3 + oy, x0 + 2 + ox, ey + 3 + oy, pal.eye_light)
@@ -450,13 +506,14 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0), lashes=False, own_brows=False):
             d.line([(x, ey + 1), (x + 4, ey + 1)], fill=c)
             px(d, x, ey, c)
             px(d, x + 4, ey, c)
-    elif kind == "squint" and lashes:
+    elif kind == "squint" and (lashes or big):
         # A lowered lid with the eye still under it. `working` is the state she
         # is in most of the time, and the plain squint's two flat bars read as
         # a face switched off rather than a face concentrating.
         for sx, x0 in ((-1, ex - 7), (1, ex + 4)):
-            d.line([(x0 - 1, ey - 1), (x0 + 4, ey - 1)], fill=c)
-            px(d, x0 + (4 if sx > 0 else -1), ey - 2, c)
+            if lashes:
+                d.line([(x0 - 1, ey - 1), (x0 + 4, ey - 1)], fill=c)
+                px(d, x0 + (4 if sx > 0 else -1), ey - 2, c)
             # The same eye, narrowed and dropped a row, rather than a lid drawn
             # on top of it: a bar joined to a pupil reads as a heavy brow, and
             # she spends her working hours looking cross.
@@ -486,7 +543,7 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0), lashes=False, own_brows=False):
             d.line([(rx + 4, ey - 4), (rx + 1, ey - 1)], fill=pal.line)
             d.line([(rx + 4, ey - 3), (rx + 1, ey)], fill=pal.line)
         for x in (lx, rx + 1):
-            if lashes:
+            if lashes or big:
                 rect(d, x - 1, ey + 1, x + 1, ey + 4, c)
             else:
                 rect(d, x, ey + 1, x + 1, ey + 3, c)
@@ -545,7 +602,7 @@ def eyebrows(d, ex, by, kind, pal):
             d.line([(ix, by + inner_dy + row), (ox_, by + outer_dy + row)], fill=c)
 
 
-def spectacles(d, ex, ey, pal):
+def spectacles(d, ex, ey, pal, kind="rect"):
     """Rectangular metal frames, over the eyes.
 
     Drawn after the expression, so the rim passes in front of a startled pupil
@@ -559,6 +616,18 @@ def spectacles(d, ex, ey, pal):
     rather than on the corner of it.
     """
     c = pal.frame or pal.line
+    if kind == "round":
+        # Two circles nearly meeting at the bridge, each centred on the eye
+        # inside it. Round and far too big for the face is what a pair of
+        # children's glasses is; drawn to the same seven-pixel box the adult's
+        # frames use, he would just be a small man.
+        for sx in (-1, 1):
+            cx_ = ex + sx * 5
+            d.ellipse([cx_ - 4, ey - 2, cx_ + 4, ey + 6], outline=c)
+        d.line([(ex - 1, ey + 2), (ex + 1, ey + 2)], fill=c)
+        for sx in (-1, 1):
+            d.line([(ex + sx * 9, ey + 2), (ex + sx * 10, ey + 2)], fill=c)
+        return
     for x0 in (ex - 8, ex + 2):
         x1, y0, y1 = x0 + 6, ey - 2, ey + 4
         d.line([(x0 + 1, y0), (x1 - 1, y0)], fill=c)
@@ -840,6 +909,59 @@ def feet(i):
     return HUB_Y + 1 + rise[i % 4], HUB_Y + 1 + rise[(i + 2) % 4]
 
 
+def drawing(d, i, pal):
+    """A sketchpad stood up on the desk, and the scribble growing on it.
+
+    What `working` means for a seven-year-old. The laptop belongs to the two
+    adults and the bicycle to one of them; the state says the agent is busy,
+    and what busy looks like is the character's own.
+
+    Stood up, not lying flat. A sheet on the desk seen from the front is a
+    three-pixel strip with a child's body across the middle of it, which is how
+    this was drawn first and it read as a napkin. Upright it has the same six
+    rows the laptop has, and those six rows are the only ones there are: his
+    chin is on row 28 and the desk is on 35.
+
+    The scribble is the animation. His hands tap out of phase like everybody
+    else's at this desk, but a child drawing is the line appearing, not the
+    hand moving — so a stroke is added each frame and the page starts over on
+    the fifth, which is one drawing finished and another begun.
+    """
+    edge = pal.shell or pal.body_dark
+    base = GROUND - 1
+    top = base - 5
+    # As wide as Peach's laptop lid and no wider, so the outer edge of each
+    # hand still shows past it. Wider, and he holds a page with no hands.
+    #
+    # A row lower than the chin rather than against it: a white rectangle
+    # touching the jaw stops being a thing he is holding and becomes a bib.
+    d.rectangle([CX - 6, top, CX + 6, base], fill=pal.white, outline=edge)
+    # Crayon, not pencil: at three rows of scribble on a white sheet a grey
+    # line is a smudge and a coloured one is a drawing.
+    #
+    # One zigzag that grows rather than separate marks: separate ones read as
+    # writing, and a child of seven at a sketchpad is not writing. Two rows
+    # thick, because one row of anything on white is a crease.
+    # The zigzag grows in the number of its corners, never in how far it
+    # reaches: it ran off the right-hand edge of the page and out over the desk
+    # when the length was what grew, which is a child drawing on the furniture.
+    corners = [(CX - 4 + k * 2, top + (1 if k % 2 else 3)) for k in range(5)]
+    for dy in (0, 1):
+        d.line([(x, y + dy) for x, y in corners[:i % 4 + 2]], fill=pal.accent)
+
+
+def crayon(d, i, pal):
+    """The crayon, on the page rather than beside it.
+
+    Drawn after the pad and not in a hand: at this size a hand holding a stick
+    is four pixels of skin with one coloured pixel inside it, and the stick is
+    the half worth keeping. On the white it has something to contrast with;
+    out over the desk beside the pad it was a blue mark floating in the air.
+    """
+    d.line([(CX + 6, GROUND - 5), (CX + 4, GROUND - 2)], fill=pal.accent)
+    px(d, CX + 4, GROUND - 1, pal.line)
+
+
 def hand(d, x, y, pal):
     """One hand. Outlined in `line` it is a dark blot at four pixels across, so
     it takes the shadow tone instead."""
@@ -1027,6 +1149,15 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
         for hx, hy in hands_at(state, i, sh, hip, True):
             hand(d, hx, hy, pal)
 
+    elif state == "working" and s.work == "draw":
+        desk(d, pal)
+        drawing(d, i, pal)
+        # Hands after the paper and before the crayon: they rest on the sheet,
+        # and the crayon is in one of them.
+        for hx, hy in hands_at(state, i, sh, hip):
+            hand(d, hx, hy, pal)
+        crayon(d, i, pal)
+
     elif state == "working":
         desk(d, pal)
 
@@ -1080,9 +1211,19 @@ def hair_back(d, s, top, bw, bh, cy, pal):
     Drawn before the body ellipse, so the face lands on top of the half of
     these shapes that crosses it.
     """
-    if s.hair not in ("side", "curly"):
+    if s.hair not in ("side", "curly", "crop"):
         return
     x0, x1 = CX - bw // 2, CX + bw // 2
+
+    if s.hair == "crop":
+        # Hair cut close to the head: two rows proud of the skull and no more.
+        # A child's crop has no volume to draw, so what says it is the low
+        # hairline the fringe puts on the forehead, not anything up here.
+        d.ellipse([x0 - 1, top - 2, x1 + 1, top + 9], fill=pal.hair)
+        light = pal.hair_light or pal.hair
+        d.line([(CX - 5, top - 1), (CX - 2, top - 2)], fill=light)
+        d.line([(CX + 2, top - 2), (CX + 5, top - 1)], fill=light)
+        return
 
     if s.hair == "curly":
         # One smooth mass, and nothing standing on top of it.
@@ -1149,11 +1290,35 @@ def hairline(img, s, top, bw, bh, cy, pal):
     bottom edge of the hair. `worried` needs the room too: its brows are drawn
     in the outline colour, which on hair this dark is no colour at all.
     """
-    if s.hair not in ("side", "curly"):
+    if s.hair not in ("side", "curly", "crop"):
         return
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     o = ImageDraw.Draw(overlay)
     x0, x1 = CX - bw // 2, CX + bw // 2
+
+    if s.hair == "crop":
+        # The fringe, and it comes down low. He has no brows to keep clear of —
+        # a seven-year-old's are faint enough that drawing them at this size
+        # makes him frown — so the hair takes the forehead the brows would have
+        # had, which is most of what makes the face read as a child's.
+        rect(o, x0 - 3, top - 4, x1 + 3, top + 3, pal.hair)
+        # Cut with a comb rather than a ruler: three spikes down out of the
+        # fringe, uneven and off centre. A straight edge on hair this short is
+        # a swimming cap.
+        for sx_, w in ((-6, 2), (-1, 3), (5, 2)):
+            rect(o, CX + sx_, top + 3, CX + sx_ + w, top + 4, pal.hair)
+        # Down the sides in front of the ears, and further down than an adult's
+        # — short hair on a round head has nowhere else to be.
+        rect(o, x0, top + 3, x0 + 1, top + bh - 9, pal.hair)
+        rect(o, x1 - 1, top + 3, x1, top + bh - 9, pal.hair)
+        light = pal.hair_light or pal.hair
+        o.line([(CX - 4, top + 1), (CX + 1, top)], fill=light)
+
+        mask = Image.new("L", (W, H), 0)
+        head_shape(ImageDraw.Draw(mask), s, x0 + 1, top + 1, x1 - 1, top + bh - 1, fill=255)
+        overlay.putalpha(ImageChops.multiply(overlay.getchannel("A"), mask))
+        img.alpha_composite(overlay)
+        return
 
     if s.hair == "curly":
         # The fringe, and the sideburns. Clipped to the head like everything
@@ -1430,15 +1595,15 @@ def draw_pet(s, state, i, n):
 
     if state == "idle":
         eyes(d, face_cx, ey, "closed" if blink else "dot", pal,
-             lashes=s.lashes, own_brows=s.brows)
+             lashes=s.lashes, own_brows=s.brows, big=s.big_eyes)
         mouth(d, face_cx, my, "cat", pal, mstyle)
     elif state == "thinking":
         eyes(d, face_cx, ey, "closed" if blink else "dot", pal, look=(-1, -1),
-             lashes=s.lashes, own_brows=s.brows)
+             lashes=s.lashes, own_brows=s.brows, big=s.big_eyes)
         mouth(d, face_cx, my, "flat", pal, mstyle)
         dots(d, PROP_X + 1, pcy - 10, pal.think or pal.accent, pal.line, i)
     elif state == "working":
-        eyes(d, face_cx, ey, "squint", pal, lashes=s.lashes, own_brows=s.brows)
+        eyes(d, face_cx, ey, "squint", pal, lashes=s.lashes, own_brows=s.brows, big=s.big_eyes)
         mouth(d, face_cx, my, "flat", pal, mstyle)
         if s.work == "bike":
             # Sweat, and no sparkles.
@@ -1467,33 +1632,33 @@ def draw_pet(s, state, i, n):
                 if (i + k) % 2 == 0:
                     sparkle(d, PROP_X + 3 + k * 5, pcy - 9 + k * 4, pal.accent, 1)
     elif state == "attention":
-        eyes(d, face_cx, ey, "wide", pal, lashes=s.lashes, own_brows=s.brows)
+        eyes(d, face_cx, ey, "wide", pal, lashes=s.lashes, own_brows=s.brows, big=s.big_eyes)
         mouth(d, face_cx, my, "o", pal, mstyle)
         bang(d, PROP_X + 4, pcy - 16 + i % 2, (236, 78, 78, 255))
     elif state == "confused":
-        eyes(d, face_cx, ey, "confused", pal, own_brows=s.brows)
+        eyes(d, face_cx, ey, "confused", pal, own_brows=s.brows, big=s.big_eyes)
         mouth(d, face_cx, my, "wobble", pal, mstyle)
         question(d, PROP_X + 4, pcy - 14 - (i % 2), pal.line)
     elif state == "worried":
-        eyes(d, face_cx, ey, "worried", pal, own_brows=s.brows)
+        eyes(d, face_cx, ey, "worried", pal, own_brows=s.brows, big=s.big_eyes)
         mouth(d, face_cx, my, "wobble", pal, mstyle)
         sweat(d, PROP_X + 2, pcy - 9 + (i % 2) * 2, (118, 190, 236, 255))
     elif state == "happy":
-        eyes(d, face_cx, ey, "happy", pal, own_brows=s.brows)
+        eyes(d, face_cx, ey, "happy", pal, own_brows=s.brows, big=s.big_eyes)
         mouth(d, face_cx, my, "wide_smile", pal, mstyle)
         blush(d, s, CX, ey, pal)
     elif state == "celebrate":
-        eyes(d, face_cx, ey, "sparkle", pal, own_brows=s.brows)
+        eyes(d, face_cx, ey, "sparkle", pal, own_brows=s.brows, big=s.big_eyes)
         mouth(d, face_cx, my, "wide_smile", pal, mstyle)
         for k, (sx, sy) in enumerate([(13, -14), (-13, -12), (16, -6), (-15, -3)]):
             if (i + k) % 3 != 2:
                 sparkle(d, CX + sx, pcy + sy, pal.accent, 1 + (i + k) % 2)
     elif state == "sleeping":
-        eyes(d, face_cx, ey + 1, "closed", pal, own_brows=s.brows)
+        eyes(d, face_cx, ey + 1, "closed", pal, own_brows=s.brows, big=s.big_eyes)
         mouth(d, face_cx, my, "flat", pal, mstyle)
         zzz(d, PROP_X + 2, pcy - 12, pal.line, i)
     elif state == "heart":
-        eyes(d, face_cx, ey, "happy", pal, own_brows=s.brows)
+        eyes(d, face_cx, ey, "happy", pal, own_brows=s.brows, big=s.big_eyes)
         mouth(d, face_cx, my, "smile", pal, mstyle)
         blush(d, s, CX, ey, pal)
         heart(d, PROP_X + 4, pcy - 13 - (i % 2), (236, 84, 116, 255))
@@ -1503,7 +1668,7 @@ def draw_pet(s, state, i, n):
     # Glass goes on last of everything the face has, so a pupil that dilates
     # past the rim in `attention` ends up behind it.
     if s.glasses != "none":
-        spectacles(d, face_cx, ey, pal)
+        spectacles(d, face_cx, ey, pal, s.glasses)
 
     return img
 def build(s: Species):

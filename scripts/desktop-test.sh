@@ -114,9 +114,10 @@ menu=$(field status_menu)
 want "it lists the cat" "$menu" ":>Sanmao"
 want "it lists the girl" "$menu" ">Peach"
 want "it lists the man" "$menu" ">Juanmao"
+want "it lists the boy" "$menu" ">Maomao"
 want "the character in use is ticked" "$menu" ">Sanmao (三毛)[on]"
 
-# Switching needs somewhere to switch to. Three characters ship, so this runs;
+# Switching needs somewhere to switch to. Four characters ship, so this runs;
 # it stays guarded because a build with one pack should skip rather than fail.
 others=$(curl -sS --max-time 5 "$BASE/pets" | python3 -c "
 import sys, json

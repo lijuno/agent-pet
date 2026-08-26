@@ -149,7 +149,7 @@ firing at all.
 
 ```yaml
 pet:
-  active: sanmao        # sanmao, peach, juanmao, or your own pack
+  active: sanmao        # sanmao, peach, juanmao, maomao, or your own pack
   always_on_top: true
   scale: 1.0
   drop_shadow: true     # off if it reads as a halo on a light wallpaper
@@ -558,7 +558,7 @@ hardening applied to untrusted input.
 
 ### Characters
 
-Three built-in packs ship in the binary:
+Four built-in packs ship in the binary:
 
 <p align="center">
   <img src="docs/media/states-sanmao.gif"
@@ -570,6 +570,9 @@ Three built-in packs ship in the binary:
   <img src="docs/media/states-juanmao.gif"
        alt="Juanmao, a man with curly hair and rectangular glasses, cycling through the same ten states: out on his bicycle for working, brows angled for worried, arms up for celebrate."
        width="240">
+  <img src="docs/media/states-maomao.gif"
+       alt="Maomao, a small boy in round clear glasses, cycling through the same ten states: drawing on a sketchpad for working, eyes wide for attention, arms up for celebrate."
+       width="240">
 </p>
 
 <p align="center">
@@ -580,14 +583,15 @@ Three built-in packs ship in the binary:
 | id | | |
 |---|---|---|
 | `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, a bicycle to work on |
+| `maomao` | Maomao (毛毛), a boy of seven | a short crop, round clear glasses, a sketchpad to work on |
 | `peach` | Peach (桃桃), a girl in a white dress | long dark hair over one shoulder, peach bow, gold necklace |
 | `sanmao` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
 
 Pick one from the menu-bar item's **Change Pet** submenu, or with
-`petctl pet peach`. `tools/genpets` carries a fourth species, `byte`, as a
+`petctl pet peach`. `tools/genpets` carries a fifth species, `byte`, as a
 worked example of a species that is none of these; shipping it is one line.
 
-All three provide all ten states as 40×40 pixel-art sprite strips. Regenerate
+All four provide all ten states as 40×40 pixel-art sprite strips. Regenerate
 them with:
 
 ```bash
