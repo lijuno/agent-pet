@@ -101,6 +101,10 @@ class Palette:
     # every bicycle ever made, so they take a literal, the way the lit panel of
     # a screen does.
     bike: tuple = None
+    # What shows at the neck of an open jacket: the shirt under it. Skin there
+    # reads as a jacket worn over nothing at all, which on a boy of fourteen is
+    # a different character.
+    inner: tuple = None
     # think is the colour of the thinking dots. They used to be drawn in
     # `line`, the character's own outline, which made the one state that says
     # "the agent is reasoning" the hardest of all to notice. Props that carry a
@@ -124,14 +128,23 @@ class Species:
     body_w: int = 24
     body_h: int = 22
     markings: str = "none"  # none | tortie
-    hair: str = "none"      # none | side | curly | crop
+    hair: str = "none"      # none | side | curly | crop | tall
     lashes: bool = False
     accessory: str = "none"  # none | bow
     # Eyebrows the character wears in every state, drawn above whatever else
     # the face is doing. Peach has none: her expression is carried by eyes
     # three rows tall, and brows over them leave no forehead. A face with small
     # eyes behind glasses has the opposite problem and needs them.
-    brows: bool = False
+    # Eyebrows the character wears in every state, drawn above whatever else
+    # the face is doing.
+    #
+    # `heavy` is two rows and reaches wide: what a brow has to be to read
+    # through a lens, over eyes three pixels across. `fine` is one row and
+    # stops shorter, for a face with neither. Two rows on a bare face is a
+    # block the size of the eye below it, and he had four eyes; and a brow that
+    # reaches as far as the lensed one does runs into hair on a head carrying
+    # a pile of it, where the mass comes down past the temples.
+    brows: str = "none"      # none | heavy | fine
     glasses: str = "none"    # none | rect | round
     # The eye a child has and an adult does not: the same oval the lashed eye
     # is built on, without the lash line over it. Two switches rather than one,
@@ -143,10 +156,10 @@ class Species:
     soft_blush: bool = False
     # A separate body under the head, rather than one ellipse that is both.
     torso: str = "none"      # none | chibi
-    garment: str = "dress"   # dress | tee
+    garment: str = "dress"   # dress | tee | jacket
     # What the character is doing in `working`. The state means the agent is
     # busy; what busy looks like is the character's own.
-    work: str = "desk"       # desk | bike | write
+    work: str = "desk"       # desk | bike | write | run
     # Where the head sits, and where the face sits inside it. A merged
     # head-and-body puts the eyes near the middle of the one ellipse and lets
     # the chin run into the chest; once the head is only a head, the face has
@@ -258,7 +271,7 @@ JUANMAO = Species(
         think=(140, 202, 255, 255),    # cool, against an amber accent
     ),
     ears="none", face="human", head="square", tail=False, body_w=21, body_h=19,
-    hair="curly", lashes=False, brows=True, glasses="rect",
+    hair="curly", lashes=False, brows="heavy", glasses="rect",
     torso="chibi", garment="tee", work="bike",
     head_dy=-6, eye_dy=4, mouth_dy=4,
 )
@@ -312,6 +325,39 @@ MAOMAO = Species(
 )
 
 
+DAMAO = Species(
+    pid="damao",
+    name="Damao (大毛)",
+    description="A boy of fourteen with a great pile of hair, out running.",
+    palette=Palette(
+        body=(242, 206, 178, 255),
+        body_dark=(208, 168, 142, 255),
+        belly=(248, 222, 200, 255),
+        line=(86, 58, 48, 255),
+        accent=(255, 168, 84, 255),
+        eye=(42, 32, 28, 255),
+        hair=(34, 28, 26, 255),        # the blackest hair in the set, and the most of it
+        hair_light=(94, 80, 74, 255),
+        cloth=(150, 148, 132, 255),    # an olive-grey windbreaker
+        cloth_line=(112, 110, 96, 255),
+        inner=(52, 56, 64, 255),       # the dark shirt under it
+        pants=(104, 112, 128, 255),   # light enough to read against its own shadow
+        shoe=(44, 48, 56, 255),
+        jaw=(224, 188, 162, 255),
+        lip=(190, 118, 108, 255),
+        nose=None,
+        think=(140, 206, 255, 255),
+    ),
+    ears="none", face="human", head="round", tail=False,
+    # Between the child and the adults: a smaller head than either, on the same
+    # ground, which is a longer body. Fourteen is mostly leg.
+    body_w=20, body_h=18,
+    hair="tall", lashes=False, brows="fine", glasses="none",
+    torso="chibi", garment="jacket", work="run",
+    head_dy=-5, eye_dy=3, mouth_dy=3,
+)
+
+
 BYTE = Species(
     pid="byte",
     name="Byte",
@@ -334,7 +380,7 @@ BYTE = Species(
 # antenna instead of ears, a lit screen instead of a face — and the reason the
 # drawing code is parametric at all. Adding it to this list is the whole of
 # shipping it.
-SPECIES = [SANMAO, PEACH, JUANMAO, MAOMAO]
+SPECIES = [SANMAO, PEACH, JUANMAO, MAOMAO, DAMAO]
 
 
 # --------------------------------------------------------------------------
@@ -572,7 +618,7 @@ BROWS = {
 }
 
 
-def eyebrows(d, ex, by, kind, pal):
+def eyebrows(d, ex, by, kind, pal, weight="heavy"):
     """Two thick brows above the frame.
 
     Two rows, not one: a single row of hair over a lens reads as a second rim,
@@ -596,9 +642,10 @@ def eyebrows(d, ex, by, kind, pal):
         "low":     (1, 1),
         "worried": (-1, 1),   # inner up, outer down
     }[kind]
+    reach, rows = (8, (0, 1)) if weight == "heavy" else (7, (0,))
     for sx in (-1, 1):
-        ix, ox_ = ex + sx * 4, ex + sx * 8
-        for row in (0, 1):
+        ix, ox_ = ex + sx * 4, ex + sx * reach
+        for row in rows:
             d.line([(ix, by + inner_dy + row), (ox_, by + outer_dy + row)], fill=c)
 
 
@@ -994,6 +1041,16 @@ def hands_at(state, i, sh, hip, work="desk"):
             # the difference, which is what arms do.
             out.append((CX + sx * 8, BAR_Y))
             continue
+        if state == "working" and work == "run":
+            # Bent, not hanging. Left to the desk pose the hands sit low and
+            # wide and the arm is a straight bar of forearm down each side: he
+            # reads as a boy standing with his arms out. The hand has to come
+            # up near the chest for the elbow to be anywhere at all.
+            #
+            # They swap every frame, opposite the leg on the same side.
+            up = (i + (sx > 0)) % 2 == 0
+            out.append((CX + sx * (7 if up else 6), sh + (-1 if up else 3)))
+            continue
         if state == "working" and work == "write":
             # One hand writes and the other holds the paper down, which is what
             # a hand does while the other one writes. Both tapping out of
@@ -1055,7 +1112,12 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     # On the bike he is lifted clear of the ground to make room for it, so the
     # hem has to follow the shoulders instead of the floor. Left on GROUND the
     # shirt stretched to ten rows and he wore a nightshirt to work.
-    hip = sh + 5 if biking else GROUND - 3
+    running = s.work == "run" and state == "working"
+    # Lifted clear of the ground, so the hem follows the shoulders rather than
+    # the floor — left on GROUND the jacket stretches and he wears a coat. The
+    # runner's is shorter than the rider's by a row, and that row is leg: four
+    # rows is not enough to swing one in, which is what the first attempt had.
+    hip = sh + 5 if biking else sh + 4 if running else GROUND - 3
     skin, dark, line = pal.body, pal.body_dark, pal.line
 
 
@@ -1071,7 +1133,31 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     # poked out below the surface and turned the desk into a shelf she was
     # standing behind.
     leg, foot = pal.pants or skin, pal.shoe or dark
-    if state != "working":
+    if s.work == "run" and state == "working":
+        # One leg under him and one swung forward, swapping with the arm on
+        # that side: a runner's left arm goes with his right leg, and a figure
+        # whose arm and leg rise together on the same side is skipping.
+        for sx in (-1, 1):
+            inner, outer = CX + sx * 2, CX + sx * 3
+            if (i + (sx > 0)) % 2 == 0:
+                # Swung forward, foot well clear of the ground. What reads at
+                # this size is where the two shoes are rather than how the
+                # knees bend: one out and high, one under him and planted.
+                d.line([(inner, hip), (CX + sx * 6, GROUND - 4)], fill=leg, width=3)
+                rect(d, CX + sx * 5, GROUND - 4, CX + sx * 7, GROUND - 3, foot)
+            else:
+                rect(d, inner, hip, outer, GROUND - 1, leg)
+                rect(d, inner, GROUND - 1, outer + sx, GROUND, foot)
+        # Dust off the ground, one puff a frame and alternating sides. Small:
+        # at five pixels across they were two stones he was running between,
+        # and there is no shadow under him in this state for them to sit in —
+        # the legs need every row down there and the shadow was eating them.
+        dust = (186, 180, 172, 255)
+        for k, dx in enumerate((-8, 8)):
+            if (i + k) % 2 == 0:
+                d.line([(CX + dx - 1, GROUND), (CX + dx + 1, GROUND)], fill=dust)
+                px(d, CX + dx, GROUND - 1, dust)
+    elif state != "working":
         for sx in (-1, 1):
             inner, outer = CX + sx * 2, CX + sx * 3
             rect(d, inner, hip, outer, GROUND - 1, leg)
@@ -1098,7 +1184,7 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     # in the frame saying which of the two people this is would be saying the
     # wrong one. It gets width instead: two pixels broader at the shoulder,
     # straight down to a hem that hangs a little loose.
-    if s.garment == "tee":
+    if s.garment in ("tee", "jacket"):
         shirt = [(CX - 6, sh), (CX + 6, sh), (CX + 6, sh + 3), (CX + 6, hip),
                  (CX - 6, hip), (CX - 6, sh + 3)]
     else:
@@ -1109,7 +1195,7 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     d.line(shirt[1:5], fill=edge)
     d.line([shirt[5], shirt[4]], fill=edge)
 
-    if s.garment == "tee":
+    if s.garment in ("tee", "jacket"):
         # Sleeves: the cloth carried a little way down each arm, so the arm
         # starts at an elbow rather than at a shoulder seam. Without them the
         # shirt is a bib with two bare arms pinned to it.
@@ -1121,7 +1207,22 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     # The neck opening. What hangs in it is torso_front's, not this function's.
     # A crew neck is a shallow curve; the V the dress cuts is three rows deep
     # and on a t-shirt it reads as a shirt worn open.
-    if s.garment == "tee":
+    if s.garment == "jacket":
+        # An open jacket over a dark shirt: the opening shows the shirt, not
+        # skin, and the collar stands up either side of it. Those two marks are
+        # the whole difference between a jacket and a t-shirt at this size, and
+        # the difference is worth having — it is the only thing he wears that
+        # a seven-year-old would not.
+        d.polygon([(CX - 3, sh - 1), (CX, sh + 3), (CX + 3, sh - 1)],
+                  fill=pal.inner or dark)
+        edge = pal.cloth_line or line
+        for sx in (-1, 1):
+            d.polygon([(CX + sx * 2, sh - 1), (CX + sx * 5, sh - 2),
+                       (CX + sx * 4, sh + 2)], fill=pal.cloth or skin)
+            d.line([(CX + sx * 2, sh - 1), (CX + sx * 4, sh + 2)], fill=edge)
+        # The zip, down the middle of what the collar leaves.
+        d.line([(CX, sh + 3), (CX, hip - 1)], fill=edge)
+    elif s.garment == "tee":
         d.polygon([(CX - 3, sh - 1), (CX, sh + 1), (CX + 3, sh - 1)], fill=skin)
     else:
         d.polygon([(CX - 4, sh - 1), (CX, sh + 3), (CX + 4, sh - 1)], fill=skin)
@@ -1158,7 +1259,8 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
     if s.torso != "chibi":
         return
     sh = top + bh
-    hip = sh + 5 if (s.work == "bike" and state == "working") else GROUND - 3
+    hip = (sh + 5 if s.work == "bike" else sh + 4) if (
+        state == "working" and s.work in ("bike", "run")) else GROUND - 3
     skin, dark, line = pal.body, pal.body_dark, pal.line
 
     if pal.gold:
@@ -1189,7 +1291,7 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
         # hands[0] is the one on the left of the frame: his right.
         pencil(d, pal, hands[0])
 
-    elif state == "working":
+    elif state == "working" and s.work == "desk":
         desk(d, pal)
 
         # Hands first, then the laptop over them. She is sitting behind it, so
@@ -1242,9 +1344,40 @@ def hair_back(d, s, top, bw, bh, cy, pal):
     Drawn before the body ellipse, so the face lands on top of the half of
     these shapes that crosses it.
     """
-    if s.hair not in ("side", "curly", "crop"):
+    if s.hair not in ("side", "curly", "crop", "tall"):
         return
     x0, x1 = CX - bw // 2, CX + bw // 2
+
+    if s.hair == "tall":
+        # A great pile of it, leaning. This is the whole character at a glance:
+        # everything else about him — no glasses, a jacket, a longer body —
+        # takes a second look, and the silhouette does not.
+        #
+        # Five rows above the skull and no more, which is the ceiling every
+        # character's hair has: `celebrate` lifts him four and the window ends.
+        # So the volume goes sideways instead, and leaning is what stops that
+        # reading as a wide hat — hair with a direction in it is hair.
+        #
+        # It leans left because the right is the prop column. The Z of
+        # `sleeping` is drawn dark and drawn last, and one lost in black hair
+        # this thick leaves the state with no signal at all.
+        # One mass, high and wide, and every lump in it along the top edge.
+        # Lumps out at the sides instead put a bulge either side of the head
+        # with the face between them, and he had a pair of ears rather than a
+        # head of hair.
+        d.ellipse([x0 - 5, top - 5, x1 + 1, top + 8], fill=pal.hair)
+        # The lean: it carries up and to the left, past the head on that side
+        # and nowhere on the other.
+        d.polygon([(x0 - 7, top + 2), (x0 - 5, top - 4), (CX - 1, top - 5),
+                   (CX - 3, top + 2)], fill=pal.hair)
+        for lx_, ly_, r in ((x0 - 4, top - 3, 3), (CX - 5, top - 3, 3),
+                            (CX + 1, top - 3, 3), (x1 - 2, top - 2, 3)):
+            d.ellipse([lx_ - r, ly_ - r, lx_ + r, ly_ + r], fill=pal.hair)
+        # One lit stroke, short, following the lean. Long ones read as a comb
+        # dragged across it, which is the opposite of what this hair is.
+        light = pal.hair_light or pal.hair
+        d.line([(x0 - 3, top - 2), (CX - 5, top - 4)], fill=light)
+        return
 
     if s.hair == "crop":
         # Hair cut close to the head: two rows proud of the skull and no more.
@@ -1321,11 +1454,38 @@ def hairline(img, s, top, bw, bh, cy, pal):
     bottom edge of the hair. `worried` needs the room too: its brows are drawn
     in the outline colour, which on hair this dark is no colour at all.
     """
-    if s.hair not in ("side", "curly", "crop"):
+    if s.hair not in ("side", "curly", "crop", "tall"):
         return
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     o = ImageDraw.Draw(overlay)
     x0, x1 = CX - bw // 2, CX + bw // 2
+
+    if s.hair == "tall":
+        # Swept up off the forehead rather than down over it, which is what
+        # all that height above the skull means: the hair went somewhere, and
+        # the somewhere is up. So the hairline sits high and the temples keep
+        # what the fringe gives up.
+        #
+        # It stops two rows above the brows. He has brows and they are the
+        # loudest thing on the face; hair reaching them fuses the two into one
+        # dark band, which is a scowl he then wears in all ten states.
+        rect(o, x0 - 3, top - 4, x1 + 3, top + 1, pal.hair)
+        # No sideburns. Every other character has them and this one must not:
+        # the hair is swept up and back, so the sides are the one place it is
+        # short, and two columns of it down the temples put hair against the
+        # outer end of each brow.
+
+        # Masked to the head itself and not to the head inset by a pixel, which
+        # is what every other character's fringe uses. That inset exists to
+        # leave the outline unbroken, and along the top of the head there is
+        # nothing for an outline to separate: the hair is the silhouette there.
+        # Left inset, the head's own top arc showed through as a brown line
+        # between the black hair and the forehead.
+        mask = Image.new("L", (W, H), 0)
+        head_shape(ImageDraw.Draw(mask), s, x0, top, x1, top + bh - 1, fill=255)
+        overlay.putalpha(ImageChops.multiply(overlay.getchannel("A"), mask))
+        img.alpha_composite(overlay)
+        return
 
     if s.hair == "crop":
         # The fringe, and it comes down low. He has no brows to keep clear of —
@@ -1463,7 +1623,11 @@ def draw_pet(s, state, i, n):
     # And he stops bobbing on it. The bob is a body bouncing on its own; on a
     # saddle the bouncing is done by the legs, and the frame the bob carried an
     # extra row upward was the one that lost a quarter of his hair.
-    lift = 4 if (s.work == "bike" and state == "working") else 0
+    # A rider sits above his bicycle and a runner is off the ground more often
+    # than on it, so both lift. Three rows and no more: at four the hair on top
+    # of a head is trimmed by the top of the window, and `working` is the state
+    # they spend the day in.
+    lift = 4 if (state == "working" and s.work in ("bike", "run")) else 0
     if lift:
         bob = 0
     cy = 23 + bob + s.head_dy - lift
@@ -1621,20 +1785,20 @@ def draw_pet(s, state, i, n):
     # Brows first: every eye kind below is drawn inside the lens, and the brows
     # are outside and above it, so nothing overlaps and the order is free. They
     # go first because that is the order a face is built in.
-    if s.brows:
-        eyebrows(d, face_cx, ey - 5, BROWS.get(state, "flat"), pal)
+    if s.brows != "none":
+        eyebrows(d, face_cx, ey - 5, BROWS.get(state, "flat"), pal, s.brows)
 
     if state == "idle":
         eyes(d, face_cx, ey, "closed" if blink else "dot", pal,
-             lashes=s.lashes, own_brows=s.brows, big=s.big_eyes)
+             lashes=s.lashes, own_brows=s.brows != "none", big=s.big_eyes)
         mouth(d, face_cx, my, "cat", pal, mstyle)
     elif state == "thinking":
         eyes(d, face_cx, ey, "closed" if blink else "dot", pal, look=(-1, -1),
-             lashes=s.lashes, own_brows=s.brows, big=s.big_eyes)
+             lashes=s.lashes, own_brows=s.brows != "none", big=s.big_eyes)
         mouth(d, face_cx, my, "flat", pal, mstyle)
         dots(d, PROP_X + 1, pcy - 10, pal.think or pal.accent, pal.line, i)
     elif state == "working":
-        eyes(d, face_cx, ey, "squint", pal, lashes=s.lashes, own_brows=s.brows, big=s.big_eyes)
+        eyes(d, face_cx, ey, "squint", pal, lashes=s.lashes, own_brows=s.brows != "none", big=s.big_eyes)
         mouth(d, face_cx, my, "flat", pal, mstyle)
         if s.work == "bike":
             # Sweat, and no sparkles.
@@ -1663,33 +1827,33 @@ def draw_pet(s, state, i, n):
                 if (i + k) % 2 == 0:
                     sparkle(d, PROP_X + 3 + k * 5, pcy - 9 + k * 4, pal.accent, 1)
     elif state == "attention":
-        eyes(d, face_cx, ey, "wide", pal, lashes=s.lashes, own_brows=s.brows, big=s.big_eyes)
+        eyes(d, face_cx, ey, "wide", pal, lashes=s.lashes, own_brows=s.brows != "none", big=s.big_eyes)
         mouth(d, face_cx, my, "o", pal, mstyle)
         bang(d, PROP_X + 4, pcy - 16 + i % 2, (236, 78, 78, 255))
     elif state == "confused":
-        eyes(d, face_cx, ey, "confused", pal, own_brows=s.brows, big=s.big_eyes)
+        eyes(d, face_cx, ey, "confused", pal, own_brows=s.brows != "none", big=s.big_eyes)
         mouth(d, face_cx, my, "wobble", pal, mstyle)
         question(d, PROP_X + 4, pcy - 14 - (i % 2), pal.line)
     elif state == "worried":
-        eyes(d, face_cx, ey, "worried", pal, own_brows=s.brows, big=s.big_eyes)
+        eyes(d, face_cx, ey, "worried", pal, own_brows=s.brows != "none", big=s.big_eyes)
         mouth(d, face_cx, my, "wobble", pal, mstyle)
         sweat(d, PROP_X + 2, pcy - 9 + (i % 2) * 2, (118, 190, 236, 255))
     elif state == "happy":
-        eyes(d, face_cx, ey, "happy", pal, own_brows=s.brows, big=s.big_eyes)
+        eyes(d, face_cx, ey, "happy", pal, own_brows=s.brows != "none", big=s.big_eyes)
         mouth(d, face_cx, my, "wide_smile", pal, mstyle)
         blush(d, s, CX, ey, pal)
     elif state == "celebrate":
-        eyes(d, face_cx, ey, "sparkle", pal, own_brows=s.brows, big=s.big_eyes)
+        eyes(d, face_cx, ey, "sparkle", pal, own_brows=s.brows != "none", big=s.big_eyes)
         mouth(d, face_cx, my, "wide_smile", pal, mstyle)
         for k, (sx, sy) in enumerate([(13, -14), (-13, -12), (16, -6), (-15, -3)]):
             if (i + k) % 3 != 2:
                 sparkle(d, CX + sx, pcy + sy, pal.accent, 1 + (i + k) % 2)
     elif state == "sleeping":
-        eyes(d, face_cx, ey + 1, "closed", pal, own_brows=s.brows, big=s.big_eyes)
+        eyes(d, face_cx, ey + 1, "closed", pal, own_brows=s.brows != "none", big=s.big_eyes)
         mouth(d, face_cx, my, "flat", pal, mstyle)
         zzz(d, PROP_X + 2, pcy - 12, pal.line, i)
     elif state == "heart":
-        eyes(d, face_cx, ey, "happy", pal, own_brows=s.brows, big=s.big_eyes)
+        eyes(d, face_cx, ey, "happy", pal, own_brows=s.brows != "none", big=s.big_eyes)
         mouth(d, face_cx, my, "smile", pal, mstyle)
         blush(d, s, CX, ey, pal)
         heart(d, PROP_X + 4, pcy - 13 - (i % 2), (236, 84, 116, 255))

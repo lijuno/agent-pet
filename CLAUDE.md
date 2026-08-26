@@ -11,10 +11,10 @@ working on it.
 ## Where it stands
 
 Milestones 1 and 2 are in: the engine, the loopback event API, `petctl`, the
-window, the menu-bar item, and the Claude Code adapter. Four characters ship —
-Sanmao (`sanmao`), Peach (`peach`), Juanmao (`juanmao`) and Maomao (`maomao`) —
-and a fifth stays defined but unshipped in `tools/genpets` as the worked
-example; see the README's Characters section.
+window, the menu-bar item, and the Claude Code adapter. Five characters ship —
+Sanmao (`sanmao`), Peach (`peach`), Juanmao (`juanmao`), Maomao (`maomao`) and
+Damao (`damao`) — and a sixth stays defined but unshipped in `tools/genpets` as
+the worked example; see the README's Characters section.
 
 Over-the-air updates are in too. Three things about them are load-bearing and
 none is obvious from the code: the updater lives in `petctl` rather than `petd`
