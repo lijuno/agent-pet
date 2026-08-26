@@ -821,8 +821,13 @@ def blush(d, s, cx, ey, pal, soft=False):
     # bottom rim of a pair of glasses lands on the cheek at exactly the height
     # the plain blush wants. Both push it down by the same two rows.
     dy = 5 if (s.lashes or s.glasses != "none") else 3
-    d.ellipse([cx - 10, ey + dy, cx - 7, ey + dy + 2], fill=c)
-    d.ellipse([cx + 7, ey + dy, cx + 10, ey + dy + 2], fill=c)
+    # A pixel in from where they were. Out at ten they reached the edge of the
+    # head and painted over its own outline, so the dark line round the face
+    # broke into pink for three rows and the silhouette came out lumpy. A blush
+    # is on a cheek; the outline is the edge of the head, and nothing that is
+    # on the face may be drawn on it.
+    d.ellipse([cx - 9, ey + dy, cx - 6, ey + dy + 2], fill=c)
+    d.ellipse([cx + 6, ey + dy, cx + 9, ey + dy + 2], fill=c)
 
 
 def markings(img, s, top, bw, bh, cy, pal):
