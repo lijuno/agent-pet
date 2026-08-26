@@ -1460,9 +1460,17 @@ def hair_back(d, s, top, bw, bh, cy, pal):
         # out to 24 at the bottom. Measured per row it flared. Removing both
         # leaves the profile falling all the way down, which is what tucking
         # in means and what the ellipse was doing before either was added.
-        light = pal.hair_light or pal.hair
-        for x in (x0h + 1, x1h - 1):
-            d.line([(x, top + 3), (x, top + 9)], fill=light)
+        # A little of the width put back low down, so it tucks without coming
+        # to a point. The ellipse alone falls from 26 across at the cheek to 8
+        # at the neck, which is a tuck taken too far; this sets a floor under
+        # the bottom rows and nowhere else, because it is narrower than the
+        # ellipse everywhere above them.
+        d.polygon([(CX - 9, top + bh - 5), (CX - 8, top + bh + 2),
+                   (CX + 8, top + bh + 2), (CX + 9, top + bh - 5)], fill=pal.hair)
+        # No lit strand down the sides. It was a straight line at the very edge
+        # of the mass, which is not a sheen on hair but a bar beside it — the
+        # highlight that reads is the one on the fringe, where there is hair on
+        # both sides of it to be a highlight on.
         return
 
     if s.hair == "tall":
@@ -1813,10 +1821,17 @@ def draw_pet(s, state, i, n):
 
     # --- the body, then the hair over it: she wears her hair forward, so it
     #     falls across the shoulder rather than behind it
-    torso(img, s, state, i, top, bw, bh, cy, pal)
-
-    # --- hair, behind the head: it is the silhouette, so it goes down first
-    hair_back(d, s, top, bw, bh, cy, pal)
+    # Peach wears her hair forward, over the shoulder, so hers goes down after
+    # the body. A bob does not: its foot reaches the shoulders, and drawn after
+    # them it lies on top of the collar and wraps round the neck. Behind the
+    # body, the shoulders cover it and it falls where hair falls.
+    if s.hair == "bob":
+        hair_back(d, s, top, bw, bh, cy, pal)
+        torso(img, s, state, i, top, bw, bh, cy, pal)
+    else:
+        torso(img, s, state, i, top, bw, bh, cy, pal)
+        # --- hair, behind the head: it is the silhouette, so it goes down first
+        hair_back(d, s, top, bw, bh, cy, pal)
 
     # --- tail, behind the body, bottom-left so it never hits the prop column
     if s.tail:
