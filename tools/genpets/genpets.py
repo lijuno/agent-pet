@@ -1449,7 +1449,14 @@ def hair_back(d, s, top, bw, bh, cy, pal):
         # skin-coloured triangle sitting in her hair with no face behind it.
         # Drawn properly it was still one side shorter than the other, and a
         # bob is a cut that is meant to match.
-        rect(d, x0h, top + bh - 6, x1h, top + bh + 1, pal.hair)
+        # The foot of it curves inward rather than being cut straight across.
+        # A bob is widest at the cheek and comes back in under the jaw, and
+        # squared off at full width the whole way down it hangs like a curtain
+        # off the sides of her head. Tapered, it tucks to the neck.
+        d.polygon([(x0h, top + bh - 8), (x0h + 3, top + bh + 2),
+                   (x1h - 3, top + bh + 2), (x1h, top + bh - 8)], fill=pal.hair)
+        for sx_ in (x0h + 3, x1h - 3):
+            d.ellipse([sx_ - 2, top + bh - 1, sx_ + 2, top + bh + 3], fill=pal.hair)
         light = pal.hair_light or pal.hair
         for x in (x0h + 1, x1h - 1):
             d.line([(x, top + 3), (x, top + 9)], fill=light)
