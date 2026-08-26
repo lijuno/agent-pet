@@ -146,7 +146,7 @@ class Species:
     garment: str = "dress"   # dress | tee
     # What the character is doing in `working`. The state means the agent is
     # busy; what busy looks like is the character's own.
-    work: str = "desk"       # desk | bike | draw
+    work: str = "desk"       # desk | bike | write
     # Where the head sits, and where the face sits inside it. A merged
     # head-and-body puts the eyes near the middle of the one ellipse and lets
     # the chin run into the chest; once the head is only a head, the face has
@@ -267,7 +267,7 @@ JUANMAO = Species(
 MAOMAO = Species(
     pid="maomao",
     name="Maomao (毛毛)",
-    description="A seven-year-old boy in clear round glasses, drawing at his desk.",
+    description="A seven-year-old boy in clear round glasses, writing at his desk.",
     palette=Palette(
         # Lighter and pinker than either adult. Children are drawn lighter than
         # they photograph for the same reason everything else here is pushed
@@ -277,7 +277,7 @@ MAOMAO = Species(
         body_dark=(214, 176, 150, 255),
         belly=(252, 230, 210, 255),
         line=(88, 60, 50, 255),
-        accent=(122, 196, 255, 255),   # sky blue: his sparkles, and his crayon
+        accent=(122, 196, 255, 255),   # sky blue, for the sparkles of `working`
         eye=(44, 34, 30, 255),
         eye_light=(120, 84, 66, 255),  # a warm rim at the foot of the pupil
         blush=(244, 158, 150, 160),
@@ -304,7 +304,7 @@ MAOMAO = Species(
     body_w=21, body_h=20,
     hair="crop", lashes=False, big_eyes=True, glasses="round",
     soft_blush=True,
-    torso="chibi", garment="tee", work="draw",
+    torso="chibi", garment="tee", work="write",
     # Sat five rows lower than the adults and given a rounder head: a short
     # body under a big round head is the whole of what says child here, and it
     # says it before any feature on the face is legible.
@@ -909,57 +909,57 @@ def feet(i):
     return HUB_Y + 1 + rise[i % 4], HUB_Y + 1 + rise[(i + 2) % 4]
 
 
-def drawing(d, i, pal):
-    """A sketchpad stood up on the desk, and the scribble growing on it.
+def writing(d, i, pal):
+    """A sheet of paper lying on the desk, and the writing appearing on it.
 
     What `working` means for a seven-year-old. The laptop belongs to the two
     adults and the bicycle to one of them; the state says the agent is busy,
     and what busy looks like is the character's own.
 
-    Stood up, not lying flat. A sheet on the desk seen from the front is a
-    three-pixel strip with a child's body across the middle of it, which is how
-    this was drawn first and it read as a napkin. Upright it has the same six
-    rows the laptop has, and those six rows are the only ones there are: his
-    chin is on row 28 and the desk is on 35.
+    It was a sketchpad stood upright first, which was a mistake of exactly the
+    kind this file keeps making: an upright rectangle with a border, lit
+    lighter than its surroundings, sitting on a desk in front of somebody is a
+    screen. It does not matter what is drawn on it — the silhouette had already
+    said laptop before the scribble said crayon.
 
-    The scribble is the animation. His hands tap out of phase like everybody
-    else's at this desk, but a child drawing is the line appearing, not the
-    hand moving — so a stroke is added each frame and the page starts over on
-    the fifth, which is one drawing finished and another begun.
+    So it lies flat, and it is a trapezoid rather than a rectangle: wider along
+    the near edge than the far one, which is what a sheet on a table looks like
+    from where the viewer is standing and what no screen ever looks like.
     """
     edge = pal.shell or pal.body_dark
-    base = GROUND - 1
-    top = base - 5
-    # As wide as Peach's laptop lid and no wider, so the outer edge of each
-    # hand still shows past it. Wider, and he holds a page with no hands.
-    #
-    # A row lower than the chin rather than against it: a white rectangle
-    # touching the jaw stops being a thing he is holding and becomes a bib.
-    d.rectangle([CX - 6, top, CX + 6, base], fill=pal.white, outline=edge)
-    # Crayon, not pencil: at three rows of scribble on a white sheet a grey
-    # line is a smudge and a coloured one is a drawing.
-    #
-    # One zigzag that grows rather than separate marks: separate ones read as
-    # writing, and a child of seven at a sketchpad is not writing. Two rows
-    # thick, because one row of anything on white is a crease.
-    # The zigzag grows in the number of its corners, never in how far it
-    # reaches: it ran off the right-hand edge of the page and out over the desk
-    # when the length was what grew, which is a child drawing on the furniture.
-    corners = [(CX - 4 + k * 2, top + (1 if k % 2 else 3)) for k in range(5)]
-    for dy in (0, 1):
-        d.line([(x, y + dy) for x, y in corners[:i % 4 + 2]], fill=pal.accent)
+    far, near = GROUND - 4, GROUND - 1
+    # Wider than he is. A sheet no broader than his shoulders is hidden behind
+    # them and his hands: all that showed was a white band across his middle,
+    # which reads as an apron. Running out past him on both sides is what makes
+    # it a surface he is leaning over rather than a thing he is wearing.
+    d.polygon([(CX - 8, far), (CX + 8, far), (CX + 11, near), (CX - 11, near)],
+              fill=pal.white, outline=edge)
+    # Marks between his hands, one more each frame. Not lines of text: his
+    # hands take everything either side of centre and what is left is five
+    # pixels across, which is room for a word and not a sentence.
+    for k in range(i % 4 + 1):
+        y = far + 1 + k % 2
+        x = CX - 2 + (k // 2) * 3
+        d.line([(x, y), (x + 1, y)], fill=pal.line)
 
 
-def crayon(d, i, pal):
-    """The crayon, on the page rather than beside it.
+def pencil(d, i, pal):
+    """The pencil, held over the page.
 
-    Drawn after the pad and not in a hand: at this size a hand holding a stick
-    is four pixels of skin with one coloured pixel inside it, and the stick is
-    the half worth keeping. On the white it has something to contrast with;
-    out over the desk beside the pad it was a blue mark floating in the air.
+    Drawn last and not in a hand: at this size a hand holding a stick is four
+    pixels of skin with one coloured pixel inside it, and the stick is the half
+    worth keeping. It crosses down to the paper from the upper right, which is
+    where his hand already is, so the hand reads as holding it.
+
+    Yellow is a literal here, the way black rubber is on the bicycle: it is
+    what a pencil is, in any palette, and a pencil in a character's accent
+    colour is a stick.
     """
-    d.line([(CX + 6, GROUND - 5), (CX + 4, GROUND - 2)], fill=pal.accent)
-    px(d, CX + 4, GROUND - 1, pal.line)
+    body, rubber = (240, 194, 92, 255), (232, 140, 140, 255)
+    tip_x, tip_y = CX + 4, GROUND - 2
+    d.line([(CX + 9, GROUND - 7), (tip_x, tip_y)], fill=body, width=2)
+    px(d, CX + 9, GROUND - 7, rubber)
+    px(d, tip_x, tip_y, pal.line)
 
 
 def hand(d, x, y, pal):
@@ -1149,14 +1149,14 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
         for hx, hy in hands_at(state, i, sh, hip, True):
             hand(d, hx, hy, pal)
 
-    elif state == "working" and s.work == "draw":
+    elif state == "working" and s.work == "write":
         desk(d, pal)
-        drawing(d, i, pal)
-        # Hands after the paper and before the crayon: they rest on the sheet,
-        # and the crayon is in one of them.
+        writing(d, i, pal)
+        # Hands after the paper and before the pencil: they rest on the sheet,
+        # and the pencil is in one of them.
         for hx, hy in hands_at(state, i, sh, hip):
             hand(d, hx, hy, pal)
-        crayon(d, i, pal)
+        pencil(d, i, pal)
 
     elif state == "working":
         desk(d, pal)

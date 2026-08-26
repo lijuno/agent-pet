@@ -571,7 +571,7 @@ Four built-in packs ship in the binary:
        alt="Juanmao, a man with curly hair and rectangular glasses, cycling through the same ten states: out on his bicycle for working, brows angled for worried, arms up for celebrate."
        width="240">
   <img src="docs/media/states-maomao.gif"
-       alt="Maomao, a small boy in round clear glasses, cycling through the same ten states: drawing on a sketchpad for working, eyes wide for attention, arms up for celebrate."
+       alt="Maomao, a small boy in round clear glasses, cycling through the same ten states: writing at a desk for working, eyes wide for attention, arms up for celebrate."
        width="240">
 </p>
 
@@ -583,7 +583,7 @@ Four built-in packs ship in the binary:
 | id | | |
 |---|---|---|
 | `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, a bicycle to work on |
-| `maomao` | Maomao (毛毛), a boy of seven | a short crop, round clear glasses, a sketchpad to work on |
+| `maomao` | Maomao (毛毛), a boy of seven | a short crop, round clear glasses, a pencil to work with |
 | `peach` | Peach (桃桃), a girl in a white dress | long dark hair over one shoulder, peach bow, gold necklace |
 | `sanmao` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
 
