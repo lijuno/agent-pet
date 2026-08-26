@@ -1099,31 +1099,75 @@ def swing(i):
     A short stroke, not a full swing. Everything here has to stay below the
     chin and left of the face, and a pick raised over the shoulder does
     neither — swung from up there it came down across her own eyes, because
-    this is drawn in front of the head rather than behind it. So the head stays
-    in the seam and the handle works it: what moves is the angle, an inch of
-    it, and the gold that comes off.
+    this is drawn in front of the head rather than behind it. The ceiling is
+    not the chin either but the hair, which at this size is wider than she is:
+    a head lifted to `sh - 1` at the far left of its travel still crosses the
+    outer edge of the bob, and a pickaxe passing in front of somebody's hair is
+    a pickaxe growing out of it.
     """
-    return ((-2, 2, -7, 2),
-            (-2, 1, -7, 3),
-            (-2, 2, -7, 2),
-            (-3, 2, -8, 3))[i % 4]
+    # The shaft has to run at an angle, and getting one out of eight rows took
+    # moving her hands: a fist under each shoulder puts the grip seven pixels
+    # from the rock and three above it, which is a bar laid flat — a plank, or
+    # the edge of a table. Both hands go left of her centre instead, the far
+    # arm across her chest, which is how anybody swings anything two-handed at
+    # something beside them, and the same tool becomes a diagonal.
+    #      grip       head        what it is
+    return ((-6, 0, -11, 3),   # raised clear of the rock: the frame that has
+                               # to carry the shape of the tool on its own
+            (-6, 1, -11, 5),   # falling
+            (-6, 1, -10, 6),   # landed, the head in the face of the rock
+            (-6, 0, -11, 4))[i % 4]  # lifting away again
 
 
 def orebody(d, pal):
     """The rock she is working, and the gold in it.
 
     Beside her rather than under her: the swing comes down to the left, and a
-    seam directly below would be behind her own legs. Two greys and no more —
-    a rock with any more colour in it than that competes with the gold, which
-    is the only thing in this state worth looking at.
+    seam directly below would be behind her own legs.
+
+    Two stones and no more — a rock with any more colour in it than that
+    competes with the gold, which is the only thing in this state worth looking
+    at. But *which* two matters more than how many. Drawn dark they were the
+    whole of the lower left of the frame and a person saw one thing: a black
+    lump, which is coal. The stone here is light and warm enough that the gold
+    is the brightest thing in the frame rather than the only thing that is not
+    black, and the seam is a seam — a band running through the rock and out the
+    side of it — instead of three specks lost in a shadow.
     """
-    rock, edge = (108, 106, 114, 255), (72, 70, 78, 255)
-    d.polygon([(3, GROUND), (6, GROUND - 6), (12, GROUND - 7),
-               (16, GROUND - 3), (16, GROUND)], fill=rock, outline=edge)
-    g, gl = pal.gold or rock, pal.gold_light or rock
-    for x, y in ((7, GROUND - 4), (10, GROUND - 5), (12, GROUND - 3)):
-        px(d, x, y, g)
-    px(d, 10, GROUND - 6, gl)
+    rock, edge = (146, 138, 128, 255), (94, 88, 80, 255)
+    g = pal.gold or rock
+    gl = pal.gold_light or rock
+    gd = pal.gold_dark or edge
+
+    # Off the left edge of the frame rather than sitting inside it. A stone with
+    # air all round it is a pebble somebody has put down; one that runs out of
+    # the picture is the ground she is standing on. Tall and narrow rather than
+    # low and wide, too: spread across the bottom of the frame it was a ridge
+    # she was tapping at, and the seam in it had to spread with it until the
+    # gold was scattered rather than seamed.
+    d.polygon([(-1, GROUND), (-1, GROUND - 5), (1, GROUND - 7), (4, GROUND - 7),
+               (6, GROUND - 5), (8, GROUND - 3), (9, GROUND - 1), (10, GROUND)],
+              fill=rock, outline=edge)
+
+    # The seam: one band, unbroken, climbing across the rock to the place the
+    # pick is working. A vein reads as metal in rock because it is continuous
+    # and the rock is not; the same pixels scattered read as dirt, which is
+    # what the first pass of this looked like.
+    for x, y in ((0, 2), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4), (4, 4), (5, 4),
+                 (5, 5), (6, 5)):
+        px(d, x, GROUND - y, g)
+    # Lit along the top of the band and shaded under it: that is what sets the
+    # seam into the rock rather than painting it on top.
+    for x, y in ((1, 4), (3, 5), (5, 6)):
+        px(d, x, GROUND - y, gl)
+    for x, y in ((2, 2), (4, 3), (6, 4)):
+        px(d, x, GROUND - y, gd)
+
+    # What she has already got out, at the foot of the rock. Two pixels, and
+    # they are the difference between a woman hitting a stone and a woman
+    # getting something for it.
+    px(d, 11, GROUND, gl)
+    px(d, 12, GROUND, g)
 
 
 def pickaxe(d, i, sh, pal):
@@ -1131,30 +1175,70 @@ def pickaxe(d, i, sh, pal):
 
     Drawn after the hands, so it passes in front of the grip: a handle behind
     two fists is a stick somebody happens to be standing near.
+
+    The tool has to say pickaxe on its own, because nothing else in the frame
+    will say it for her. Two things do that at this size and the first version
+    had neither. One is length: a handle of five pixels held level is a stick,
+    and what makes a pick is a long shaft running down and away from the body
+    to a head well clear of the fists. The other is the head's profile — a bar
+    across the shaft with the ends swept back towards the hands, which is the
+    silhouette of a pick and of nothing else. A straight bar is a hammer and a
+    blob is a stone on a stick.
     """
-    # A pale steel of its own rather than the shell grey. The head bites at
-    # the top of the rock, and the rock is grey: at the same value the one
-    # thing doing the work was invisible against the thing it was working.
-    wood, steel = (146, 102, 62, 255), (216, 222, 232, 255)
+    # Dark steel with the light along its back, rather than the near-white the
+    # head used to be. That was chosen to stand off a dark rock; against a
+    # light one it disappeared, and it was the only thing in the picture
+    # actually doing the work.
+    wood, wood_dark = (150, 104, 58, 255), (104, 68, 36, 255)
+    steel, steel_light = (86, 96, 112, 255), (206, 216, 232, 255)
     gx, gy, hx, hy = swing(i)
     grip = (CX + gx, sh + gy)
     head = (CX + hx, sh + hy)
-    d.line([grip, head], fill=wood, width=2)
-    # The head: a bar across the end of the handle with a point on each side,
-    # which is what tells a pickaxe from a hammer at four pixels across.
-    dx = 1 if hx < gx else -1
-    d.line([(head[0] - 2, head[1] - 1), (head[0] + 2, head[1] + 1)], fill=steel)
-    px(d, head[0] + dx * 2, head[1] - 1, steel)
-    px(d, head[0] - dx, head[1] + 2, steel)
 
-    if i % 2 == 1:
-        # Gold coming off the seam, on every other frame. On all four it is a
-        # character standing in a permanent shower of it, which is a different
-        # picture: this one is working for it.
-        gl = pal.gold_light or steel
-        for sx_, sy_ in ((-2, -3), (2, -4), (4, 0), (0, -6)):
-            px(d, head[0] + sx_, head[1] + sy_, gl)
-        px(d, head[0] + 1, head[1] - 2, pal.gold or gl)
+    # From past the far fist to the head, so both hands hold wood: drawn from
+    # the grip instead, the upper hand sat on the end of nothing.
+    #
+    # One pixel of wood with one of shadow under it, and no more. At two pixels
+    # and a shadow the shaft was a plank — the widest single thing in the lower
+    # half of the frame, laid across her at the angle a table edge sits at.
+    butt = (grip[0] + 3, grip[1])
+    d.line([butt, head], fill=wood)
+    d.line([(butt[0], butt[1] + 1), (head[0], head[1] + 1)], fill=wood_dark)
+
+    # The head: a bar across the end of the shaft with both ends swept back
+    # towards the hands, which is the silhouette of a pick and of nothing else.
+    # Two columns rather than one — a single column of steel is a nail, and it
+    # was read as one.
+    # A crescent, hollow side to the shaft: the head is a curve with both ends
+    # swept back at her hands, and the shaft meets it in the middle. Squared
+    # off it was a fence post, and a straight bar across the shaft was a knife.
+    # The curve is the whole of what says pickaxe at five pixels.
+    hxp, hyp = head
+    dark = (46, 52, 64, 255)
+    for dx, dy in ((0, -2), (-1, -1), (-1, 0), (-1, 1), (0, 2)):
+        px(d, hxp + dx, hyp + dy, steel)
+    for dy in (-1, 0, 1):
+        px(d, hxp - 2, hyp + dy, steel_light)   # the light along its back
+    # Outlined, like everything else in the frame. Bare steel against a pale
+    # rock is the same trick as bare steel against a dark one, in the other
+    # direction: it vanished into the thing it was hitting.
+    for dx, dy in ((1, -3), (0, -3), (1, 3), (0, 3), (-3, 0)):
+        px(d, hxp + dx, hyp + dy, dark)
+
+    if i % 4 in (2, 3):
+        # Gold off the seam on the frame it lands and the one after, and not on
+        # the two while the pick is coming back up. On all four she stands in a
+        # permanent shower of it, which is a different picture: this one is
+        # working for it.
+        #
+        # Up and away over the rock, never up and to the right. Thrown along
+        # the shaft they landed on her blouse, and gold on a red blouse is not
+        # a spark off a rock, it is a stain.
+        g = pal.gold or steel_light
+        gl = pal.gold_light or steel_light
+        for sx_, sy_ in ((-1, -4), (-4, -3)):
+            px(d, hxp + sx_, hyp + sy_, gl)
+        px(d, hxp - 3, hyp - 6, g)
 
 
 def hand(d, x, y, pal):
@@ -1179,11 +1263,13 @@ def hands_at(state, i, sh, hip, work="desk"):
             out.append((CX + sx * 8, BAR_Y))
             continue
         if state == "working" and work == "mine":
-            # Both hands on the handle, one above the other. A pickaxe held in
-            # one hand is a hammer, and at this size the difference between the
-            # two is entirely in how it is being held.
+            # Both hands on the handle, one below the other, and both on the
+            # part of it that exists: the upper fist used to sit two pixels
+            # past the end of the shaft, holding air. A pickaxe held in one
+            # hand is a hammer, and at this size the difference between the two
+            # is entirely in how it is being held.
             gx, gy, _, _ = swing(i)
-            out.append((CX + gx + (0 if sx < 0 else 2), sh + gy + (0 if sx < 0 else 2)))
+            out.append((CX + gx + (0 if sx < 0 else 2), sh + gy))
             continue
         if state == "working" and work == "run":
             # Bent, not hanging. Left to the desk pose the hands sit low and
