@@ -938,11 +938,13 @@ def writing(d, i, pal):
     # always the one nearest the point. Marks scattered over two rows read as a
     # stain; on one row, appearing left to right, they read as writing, and
     # they are the only thing that says which way the hand is travelling.
-    # Starting two pixels left of centre and not three: at three the first mark
-    # of every cycle lands under his left hand, so the line appeared to start
-    # empty and the count of what showed was one behind the count drawn.
+    # They begin at the left-hand edge of the page and stop where the hand
+    # has got to, because the hand writing them starts there too. Each is far
+    # enough behind the point to clear the hand itself: what he has just
+    # written is under his own knuckles, which is true of writing and useless
+    # in a picture of it.
     for k in range(i % 4 + 1):
-        px(d, CX - 2 + k * 2, GROUND - 2, pal.line)
+        px(d, CX - 9 + k * 2, GROUND - 2, pal.line)
 
 
 def pencil(d, pal, hand_at):
@@ -963,9 +965,11 @@ def pencil(d, pal, hand_at):
     """
     body, rubber = (240, 194, 92, 255), (232, 140, 140, 255)
     hx, hy = hand_at
-    tip_x, tip_y = hx - 1, hy + 1
-    d.line([(tip_x + 5, tip_y - 5), (tip_x, tip_y)], fill=body, width=2)
-    px(d, tip_x + 5, tip_y - 5, rubber)
+    # The point sits down and to the right of the hand and the shaft runs back
+    # up to the left over it, which is the way round a right hand holds one.
+    tip_x, tip_y = hx + 1, hy + 1
+    d.line([(tip_x - 5, tip_y - 5), (tip_x, tip_y)], fill=body, width=2)
+    px(d, tip_x - 5, tip_y - 5, rubber)
     px(d, tip_x, tip_y, pal.line)
 
 
@@ -996,13 +1000,17 @@ def hands_at(state, i, sh, hip, work="desk"):
             # phase, the way they do at a keyboard, made him look like he was
             # playing the page rather than writing on it.
             #
-            # The moving one travels across the line rather than up and down: a
-            # pencil goes sideways, and the marks it leaves behind it are what
-            # says which direction.
+            # The writing one is the one on the left of the frame, because he
+            # is drawn facing the viewer and that is the side his right hand is
+            # on. Putting the pencil in the hand that looks right-hand-side
+            # from out here makes him left-handed, which he is not.
+            #
+            # It travels along the line rather than up and down: a pencil goes
+            # sideways, and the marks left behind it are what says which way.
             if sx < 0:
-                out.append((CX - 5, GROUND - 2))
+                out.append((CX - 6 + (i % 4) * 2, GROUND - 2))
             else:
-                out.append((CX + 1 + (i % 4) * 2, GROUND - 2))
+                out.append((CX + 7, GROUND - 2))
             continue
         if state == "celebrate":
             hx, hy = CX + sx * 9, sh - 2
@@ -1178,7 +1186,8 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
         hands = hands_at(state, i, sh, hip, s.work)
         for hx, hy in hands:
             hand(d, hx, hy, pal)
-        pencil(d, pal, hands[1])
+        # hands[0] is the one on the left of the frame: his right.
+        pencil(d, pal, hands[0])
 
     elif state == "working":
         desk(d, pal)
