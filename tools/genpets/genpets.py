@@ -1443,12 +1443,15 @@ def hair_back(d, s, top, bw, bh, cy, pal):
         # rules caught the moment she was drawn — a bob has no volume up there
         # to lose anyway.
         d.ellipse([x0h, top - 2, x1h, top + bh + 2], fill=pal.hair)
-        rect(d, x0h, top + bh - 6, x1h, top + bh + 1, pal.hair)
-        # Tucked behind the ear on one side: the corner comes off there and
-        # stays on the other. Both corners square is a bob on a mannequin, and
-        # the asymmetry is the only thing in her that is meant to be there.
-        d.polygon([(x0h, top + bh - 3), (x0h + 4, top + bh + 1),
-                   (x0h, top + bh + 1)], fill=pal.body)
+        # Squared off along the bottom on one side only. That is the ear it is
+        # tucked behind: the other side keeps the curve of the ellipse and so
+        # ends higher, and both corners square is a bob on a mannequin.
+        #
+        # The tuck was cut by painting a wedge of skin over the corner, which
+        # is not a tuck — it is a skin-coloured triangle sitting in her hair
+        # with no face behind it, because out there the head has already ended.
+        # Hair that should not be there is hair not drawn.
+        rect(d, x0h + 4, top + bh - 6, x1h, top + bh + 1, pal.hair)
         light = pal.hair_light or pal.hair
         d.line([(x1h - 1, top + 3), (x1h - 1, top + 9)], fill=light)
         return
