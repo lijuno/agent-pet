@@ -39,6 +39,85 @@ move_to() {
 	done
 	return 1
 }
+# park asks for a position and waits for the window to stop moving, then says
+# where it actually ended up.
+#
+# macOS does not have to honour a position. A window asked to hang off an edge
+# may be put back, and whether it is depends on the machine: with a second
+# display beside this one, "off the left" is not off anything, it is the other
+# screen. move_to insists on the exact coordinate, which is right for parking
+# somewhere reachable and wrong for these — every one of them failed on a
+# docked laptop, which is a test that only works on the machine it was written
+# on. What these checks are about is what the program does with the position it
+# ends up at, so that is what they are given.
+park() {
+	want="$1,$2"
+	before=$(field window)
+	post "{\"x\":$1,\"y\":$2}"
+	last=""
+	stable=0
+	i=0
+	while [ "$i" -lt 40 ]; do
+		now=$(field window)
+		case "$now" in
+		*"at $want")
+			echo "$now"
+			return
+			;;
+		esac
+		# Settled somewhere else. Two conditions before believing that, both
+		# of them paid for by a check that passed from a position nobody asked
+		# about: it has to have moved at all — two reads taken before the main
+		# thread applies the move are equal to each other — and it has to have
+		# held still for half a second. Closing the overlay from the previous
+		# spot gives the window's room back, which is itself a move, and a
+		# park posted into the middle of it settles wherever that lands.
+		if [ "$now" = "$last" ]; then
+			stable=$((stable + 1))
+		else
+			stable=0
+		fi
+		if [ "$now" != "$before" ] && [ "$stable" -ge 4 ]; then
+			echo "$now"
+			return
+		fi
+		last=$now
+		sleep 0.12
+		i=$((i + 1))
+	done
+	echo "$last"
+}
+# settle waits for the window to stop moving on its own.
+#
+# Closing an overlay gives the window's room back, and that is a move the app
+# makes after the request returns. A park posted while it is still in flight is
+# applied and then overridden by it, so the next check runs from wherever the
+# reflow finished — which is how "menu at top-right" spent a while passing from
+# the middle of the screen.
+settle() {
+	last=""
+	stable=0
+	i=0
+	while [ "$i" -lt 30 ]; do
+		now=$(field window)
+		if [ "$now" = "$last" ]; then
+			stable=$((stable + 1))
+		else
+			stable=0
+		fi
+		if [ "$stable" -ge 3 ]; then
+			return
+		fi
+		last=$now
+		sleep 0.1
+		i=$((i + 1))
+	done
+}
+
+# xy_of pulls the coordinates out of "300x184 at 40,40".
+x_of() { echo "$1" | sed 's/.* at //; s/,.*//'; }
+y_of() { echo "$1" | sed 's/.*,//'; }
+
 ok()   { printf '  \033[32mok\033[0m   %s\n' "$1"; }
 bad()  { printf '  \033[31mFAIL\033[0m %s\n     %s\n' "$1" "$2"; fails=$((fails + 1)); }
 want() { # want <name> <haystack> <needle>
@@ -47,6 +126,7 @@ want() { # want <name> <haystack> <needle>
 	*) bad "$1" "expected '$3' in: $2" ;;
 	esac
 }
+skip() { printf '  \033[33mskip\033[0m %s\n     %s\n' "$1" "$2"; }
 gone() { # gone <name> <haystack> <needle>
 	case "$2" in
 	*"$3"*) bad "$1" "did not expect '$3' in: $2" ;;
@@ -294,14 +374,24 @@ for spot in "$((uw - 40)),300 off the right" "-250,300 off the left" \
 	"300,$((uh - 40)) off the bottom"; do
 	pos=${spot%% *}
 	name=${spot#* }
-	move_to "${pos%,*}" "${pos#*,}" || bad "$name" "the window never reached ${pos}"
+	parked=$(park "${pos%,*}" "${pos#*,}")
+	px=$(x_of "$parked")
+	py=$(y_of "$parked")
+	# If the window is still inside the usable area, the system declined to put
+	# it out of reach and there is nothing for Show Pet to rescue. That is a
+	# fact about this desktop, not a fault in the pet.
+	if [ "$px" -ge 0 ] && [ "$py" -ge 0 ] &&
+		[ "$px" -le "$((uw - ww))" ] && [ "$py" -le "$((uh - wh))" ]; then
+		skip "recovered from $name" "the system kept the window on screen ($parked); nothing was out of reach"
+		continue
+	fi
 	# Showing, not toggling: the toggle would hide a pet that is already shown,
 	# which the section above covers.
 	post '{"shown":true}'
 	sleep 0.8
 	win=$(field window)
-	x=$(echo "$win" | sed 's/.* at //; s/,.*//')
-	y=$(echo "$win" | sed 's/.*,//')
+	x=$(x_of "$win")
+	y=$(y_of "$win")
 	if [ "$x" -ge 0 ] && [ "$y" -ge 0 ] && [ "$x" -le "$((uw - ww))" ] && [ "$y" -le "$((uh - wh))" ]; then
 		ok "recovered from $name ($win)"
 	else
@@ -317,16 +407,29 @@ for corner in "0,0 top-left" "$((uw - ww)),0 top-right" \
 	pos=${corner%% *}
 	name=${corner#* }
 	for kind in menu status; do
-		move_to "${pos%,*}" "${pos#*,}" || bad "$kind at $name" "the window never reached ${pos}"
+		# Wherever it settles. An overlay has to stay on screen from the
+		# position the window is actually in, and asking for one the system
+		# will not give is not a way to find that out.
+		parked=$(park "${pos%,*}" "${pos#*,}")
+		# Say so when the window is not where it was asked to be. The check is
+		# still worth making from wherever it ended up — an overlay has to stay
+		# on screen from any position — but a line reading "top-right" while
+		# the window sat in the middle of the screen is a check nobody can
+		# trust, and this happens often enough to name.
+		where=""
+		case "$parked" in
+		*"at ${pos%,*},${pos#*,}") ;;
+		*) where=" — the system put it at ${parked#* at }, not ${pos}" ;;
+		esac
 		post "{\"panel\":\"$kind\"}"
 		sleep 1
 		got=$(field overlay)
 		case "$got" in
-		*"fully on screen"*) ok "$kind at $name" ;;
-		*) bad "$kind at $name" "$got" ;;
+		*"fully on screen"*) ok "$kind at $name$where" ;;
+		*) bad "$kind at $name" "at $parked: $got" ;;
 		esac
 		post '{"panel":"close"}'
-		sleep 0.3
+		settle
 	done
 done
 
