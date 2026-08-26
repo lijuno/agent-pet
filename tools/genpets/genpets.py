@@ -1449,14 +1449,17 @@ def hair_back(d, s, top, bw, bh, cy, pal):
         # skin-coloured triangle sitting in her hair with no face behind it.
         # Drawn properly it was still one side shorter than the other, and a
         # bob is a cut that is meant to match.
-        # The foot of it curves inward rather than being cut straight across.
-        # A bob is widest at the cheek and comes back in under the jaw, and
-        # squared off at full width the whole way down it hangs like a curtain
-        # off the sides of her head. Tapered, it tucks to the neck.
-        d.polygon([(x0h, top + bh - 8), (x0h + 3, top + bh + 2),
-                   (x1h - 3, top + bh + 2), (x1h, top + bh - 8)], fill=pal.hair)
-        for sx_ in (x0h + 3, x1h - 3):
-            d.ellipse([sx_ - 2, top + bh - 1, sx_ + 2, top + bh + 3], fill=pal.hair)
+        # Nothing under the ellipse. It is already the shape a bob is — widest
+        # at the cheek, narrowing under the jaw, tucked in by the neck — and
+        # everything added below it was filling that curve back out.
+        #
+        # It was squared off across the foot first, which hung it off the sides
+        # of her head like a curtain, and then tapered, which was worse: the
+        # taper was wider than the ellipse it was drawn over, so the silhouette
+        # went 26 pixels across at the cheek, in to 22 under the jaw, and back
+        # out to 24 at the bottom. Measured per row it flared. Removing both
+        # leaves the profile falling all the way down, which is what tucking
+        # in means and what the ellipse was doing before either was added.
         light = pal.hair_light or pal.hair
         for x in (x0h + 1, x1h - 1):
             d.line([(x, top + 3), (x, top + 9)], fill=light)
