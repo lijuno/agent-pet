@@ -328,7 +328,7 @@ MAOMAO = Species(
 AMIAO = Species(
     pid="amiao",
     name="Amiao (阿喵)",
-    description="A woman with a dark bob and a red blouse, at her laptop.",
+    description="A woman with a dark bob, a red blouse and a gold necklace, at her laptop.",
     palette=Palette(
         # Peach grown up, and the palette says so before the haircut does: the
         # same face warmed and lightened a shade, and hair that is brown rather
@@ -348,6 +348,13 @@ AMIAO = Species(
         inner=(250, 246, 244, 255),    # a pale collar over it
         jaw=(230, 192, 172, 255),
         lip=(198, 76, 84, 255),
+        # The same necklace Peach wears, and the same three values: it is the
+        # step down from the skin that makes jewellery read at this size, not
+        # the hue. Setting them is the whole of putting it on her — the chain
+        # is drawn for anybody whose palette has gold in it.
+        gold=(222, 168, 58, 255),
+        gold_light=(255, 228, 140, 255),
+        gold_dark=(160, 114, 36, 255),
         desk=(198, 166, 132, 255),
         desk_edge=(232, 204, 172, 255),
         shell=(196, 200, 212, 255),
