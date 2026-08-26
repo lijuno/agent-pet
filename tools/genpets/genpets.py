@@ -391,6 +391,24 @@ SPECIES = [SANMAO, PEACH, JUANMAO, MAOMAO, DAMAO]
 # hearts) so a prop never collides with an ear or a tail.
 # --------------------------------------------------------------------------
 
+def over(src, dst):
+    """`src` composited onto `dst`, as an opaque colour.
+
+    ImageDraw replaces pixels; it does not composite. So a colour carrying an
+    alpha does not tint what is under it — it punches a hole that deep in the
+    sprite, and this window is transparent, so what shows through the hole is
+    the wallpaper. A blush drawn that way is not pink on a cheek, it is a
+    cheek-shaped piece of desktop: brown on a dark one, white on a light one.
+    Every character shipped with two of them under the eyes.
+
+    Anything meant to be seen through — the shadow on the floor, the faint
+    second heart — still carries its alpha, because there the thing behind it
+    really is the wallpaper.
+    """
+    a = src[3] / 255
+    return tuple(round(src[i] * a + dst[i] * (1 - a)) for i in range(3)) + (255,)
+
+
 def px(d, x, y, c):
     if 0 <= x < W and 0 <= y < H:
         d.point((x, y), fill=c)
@@ -518,7 +536,7 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0), lashes=False, own_brows=False, big=F
             # out there it reads as both eyes glancing the same way, in every
             # state, which is a squint she never recovers from.
             rect(d, x0 + 1 + ox, ey + 1 + oy, x0 + 2 + ox, ey + 1 + oy, white)
-            px(d, x0 + 1 + ox, ey + 2 + oy, (255, 255, 255, 190))
+            px(d, x0 + 1 + ox, ey + 2 + oy, over((255, 255, 255, 190), c))
     elif kind == "dot":
         for x in (lx, rx):
             if pal.iris:
@@ -534,7 +552,7 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0), lashes=False, own_brows=False, big=F
                 rect(d, x + 1 + ox, ey + oy, x + 1 + ox, ey + 2 + oy, c)
             else:
                 rect(d, x + ox, ey + oy, x + 2 + ox, ey + 2 + oy, c)
-                px(d, x + ox, ey + oy, (255, 255, 255, 170))
+                px(d, x + ox, ey + oy, over((255, 255, 255, 170), c))
     elif kind == "wide":
         if lashes:
             for x in (lx, rx):
@@ -564,7 +582,7 @@ def eyes(d, ex, ey, kind, pal, look=(0, 0), lashes=False, own_brows=False, big=F
             # on top of it: a bar joined to a pupil reads as a heavy brow, and
             # she spends her working hours looking cross.
             d.ellipse([x0, ey + 1, x0 + 3, ey + 3], fill=c)
-            px(d, x0 + 1, ey + 1, (255, 255, 255, 210))
+            px(d, x0 + 1, ey + 1, over((255, 255, 255, 210), c))
     elif kind == "squint":
         # A brow with a pupil under it. A bare bar would be indistinguishable
         # from the closed eyes of `sleeping` at this size.
@@ -761,6 +779,7 @@ def blush(d, s, cx, ey, pal, soft=False):
     c = pal.blush
     if soft:
         c = c[:3] + (max(1, c[3] // 3),)
+    c = over(c, pal.body)
     # A lashed eye is five rows tall against the plain eye's three, and the
     # bottom rim of a pair of glasses lands on the cheek at exactly the height
     # the plain blush wants. Both push it down by the same two rows.
@@ -1174,7 +1193,11 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     # is drawn after the dress for reasons of its own.
     for sx, (hx, hy) in zip((-1, 1), hands_at(state, i, sh, hip, s.work)):
         d.line([(CX + sx * 4, sh + 1), (hx, hy)], fill=skin, width=3)
-        if state != "working":
+        # Not at a desk or on a bike: there the hand is drawn again in
+        # torso_front, over the laptop or the handlebar it rests on. Running
+        # puts nothing in front of them, and left in that same branch they were
+        # never drawn at all — his arms ended in nothing.
+        if state != "working" or running:
             hand(d, hx, hy, pal)
 
     # The garment: shoulders, then either a waist and a flare or neither.
