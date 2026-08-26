@@ -934,16 +934,18 @@ def writing(d, i, pal):
     # it a surface he is leaning over rather than a thing he is wearing.
     d.polygon([(CX - 8, far), (CX + 8, far), (CX + 11, near), (CX - 11, near)],
               fill=pal.white, outline=edge)
-    # Marks between his hands, one more each frame. Not lines of text: his
-    # hands take everything either side of centre and what is left is five
-    # pixels across, which is room for a word and not a sentence.
+    # One line of marks, left behind by the pencil as it goes: the newest is
+    # always the one nearest the point. Marks scattered over two rows read as a
+    # stain; on one row, appearing left to right, they read as writing, and
+    # they are the only thing that says which way the hand is travelling.
+    # Starting two pixels left of centre and not three: at three the first mark
+    # of every cycle lands under his left hand, so the line appeared to start
+    # empty and the count of what showed was one behind the count drawn.
     for k in range(i % 4 + 1):
-        y = far + 1 + k % 2
-        x = CX - 2 + (k // 2) * 3
-        d.line([(x, y), (x + 1, y)], fill=pal.line)
+        px(d, CX - 2 + k * 2, GROUND - 2, pal.line)
 
 
-def pencil(d, i, pal):
+def pencil(d, pal, hand_at):
     """The pencil, held over the page.
 
     Drawn last and not in a hand: at this size a hand holding a stick is four
@@ -954,11 +956,16 @@ def pencil(d, i, pal):
     Yellow is a literal here, the way black rubber is on the bicycle: it is
     what a pencil is, in any palette, and a pencil in a character's accent
     colour is a stick.
+
+    Its position comes from the hand rather than from the frame number: the
+    hand moves along the line as he writes, and a pencil that keeps its own
+    place while the hand holding it travels is a pencil lying on the desk.
     """
     body, rubber = (240, 194, 92, 255), (232, 140, 140, 255)
-    tip_x, tip_y = CX + 4, GROUND - 2
-    d.line([(CX + 9, GROUND - 7), (tip_x, tip_y)], fill=body, width=2)
-    px(d, CX + 9, GROUND - 7, rubber)
+    hx, hy = hand_at
+    tip_x, tip_y = hx - 1, hy + 1
+    d.line([(tip_x + 5, tip_y - 5), (tip_x, tip_y)], fill=body, width=2)
+    px(d, tip_x + 5, tip_y - 5, rubber)
     px(d, tip_x, tip_y, pal.line)
 
 
@@ -968,7 +975,7 @@ def hand(d, x, y, pal):
     d.ellipse([x - 2, y - 2, x + 2, y + 2], fill=pal.body, outline=pal.body_dark)
 
 
-def hands_at(state, i, sh, hip, bike=False):
+def hands_at(state, i, sh, hip, work="desk"):
     """Where the two hands are this frame.
 
     Shared, because the arm and the hand on the end of it are drawn at
@@ -977,11 +984,25 @@ def hands_at(state, i, sh, hip, bike=False):
     """
     out = []
     for sx in (-1, 1):
-        if bike and state == "working":
+        if state == "working" and work == "bike":
             # Anchored to the bar, which is anchored to the ground. His
             # shoulders rise and fall a pixel on the bob and the arms take up
             # the difference, which is what arms do.
             out.append((CX + sx * 8, BAR_Y))
+            continue
+        if state == "working" and work == "write":
+            # One hand writes and the other holds the paper down, which is what
+            # a hand does while the other one writes. Both tapping out of
+            # phase, the way they do at a keyboard, made him look like he was
+            # playing the page rather than writing on it.
+            #
+            # The moving one travels across the line rather than up and down: a
+            # pencil goes sideways, and the marks it leaves behind it are what
+            # says which direction.
+            if sx < 0:
+                out.append((CX - 5, GROUND - 2))
+            else:
+                out.append((CX + 1 + (i % 4) * 2, GROUND - 2))
             continue
         if state == "celebrate":
             hx, hy = CX + sx * 9, sh - 2
@@ -1057,7 +1078,7 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     # end of a sleeve and becomes a disc pasted on top of her. `working` is the
     # exception because there the hand has to sit on the laptop, and the laptop
     # is drawn after the dress for reasons of its own.
-    for sx, (hx, hy) in zip((-1, 1), hands_at(state, i, sh, hip, biking)):
+    for sx, (hx, hy) in zip((-1, 1), hands_at(state, i, sh, hip, s.work)):
         d.line([(CX + sx * 4, sh + 1), (hx, hy)], fill=skin, width=3)
         if state != "working":
             hand(d, hx, hy, pal)
@@ -1146,7 +1167,7 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
         d.line([(CX - 10, BAR_Y), (CX + 10, BAR_Y)], fill=metal)
         for sx in (-1, 1):
             rect(d, CX + sx * 10, BAR_Y - 1, CX + sx * 9, BAR_Y + 1, (46, 44, 48, 255))
-        for hx, hy in hands_at(state, i, sh, hip, True):
+        for hx, hy in hands_at(state, i, sh, hip, s.work):
             hand(d, hx, hy, pal)
 
     elif state == "working" and s.work == "write":
@@ -1154,9 +1175,10 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
         writing(d, i, pal)
         # Hands after the paper and before the pencil: they rest on the sheet,
         # and the pencil is in one of them.
-        for hx, hy in hands_at(state, i, sh, hip):
+        hands = hands_at(state, i, sh, hip, s.work)
+        for hx, hy in hands:
             hand(d, hx, hy, pal)
-        pencil(d, i, pal)
+        pencil(d, pal, hands[1])
 
     elif state == "working":
         desk(d, pal)
