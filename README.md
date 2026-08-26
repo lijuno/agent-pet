@@ -149,7 +149,7 @@ firing at all.
 
 ```yaml
 pet:
-  active: sanmao        # sanmao, peach, juanmao, maomao, damao, or your own pack
+  active: sanmao        # sanmao, peach, juanmao, maomao, damao, amiao, or your own pack
   disabled: []          # ids to keep out of the Change Pet menu
   always_on_top: true
   scale: 1.0
@@ -559,7 +559,7 @@ hardening applied to untrusted input.
 
 ### Characters
 
-Five built-in packs ship in the binary:
+Six built-in packs ship in the binary:
 
 <p align="center">
   <img src="docs/media/states-sanmao.gif"
@@ -577,6 +577,9 @@ Five built-in packs ship in the binary:
   <img src="docs/media/states-damao.gif"
        alt="Damao, a teenager with a great pile of hair, cycling through the same ten states: out running for working, brows angled for worried, arms up for celebrate."
        width="240">
+  <img src="docs/media/states-amiao.gif"
+       alt="Amiao, a woman with a dark bob and a red blouse, cycling through the same ten states: at her laptop for working, eyes closed for sleeping, arms up for celebrate."
+       width="240">
 </p>
 
 <p align="center">
@@ -586,6 +589,7 @@ Five built-in packs ship in the binary:
 
 | id | | |
 |---|---|---|
+| `amiao` | Amiao (阿喵), a woman in a red blouse | a dark bob tucked behind one ear, at her laptop |
 | `damao` | Damao (大毛), a boy of fourteen | a great pile of hair, an olive windbreaker, out running |
 | `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, a bicycle to work on |
 | `maomao` | Maomao (毛毛), a boy of seven | a short crop, round clear glasses, a pencil to work with |
@@ -593,10 +597,10 @@ Five built-in packs ship in the binary:
 | `sanmao` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
 
 Pick one from the menu-bar item's **Change Pet** submenu, or with
-`petctl pet peach`. `tools/genpets` carries a sixth species, `byte`, as a
+`petctl pet peach`. `tools/genpets` carries a seventh species, `byte`, as a
 worked example of a species that is none of these; shipping it is one line.
 
-All five provide all ten states as 40×40 pixel-art sprite strips. Regenerate
+All six provide all ten states as 40×40 pixel-art sprite strips. Regenerate
 them with:
 
 ```bash

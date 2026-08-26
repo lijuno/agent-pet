@@ -128,7 +128,7 @@ class Species:
     body_w: int = 24
     body_h: int = 22
     markings: str = "none"  # none | tortie
-    hair: str = "none"      # none | side | curly | crop | tall
+    hair: str = "none"      # none | side | curly | crop | tall | bob
     lashes: bool = False
     accessory: str = "none"  # none | bow
     # Eyebrows the character wears in every state, drawn above whatever else
@@ -156,7 +156,7 @@ class Species:
     soft_blush: bool = False
     # A separate body under the head, rather than one ellipse that is both.
     torso: str = "none"      # none | chibi
-    garment: str = "dress"   # dress | tee | jacket
+    garment: str = "dress"   # dress | tee | jacket | blouse
     # What the character is doing in `working`. The state means the agent is
     # busy; what busy looks like is the character's own.
     work: str = "desk"       # desk | bike | write | run
@@ -325,6 +325,43 @@ MAOMAO = Species(
 )
 
 
+AMIAO = Species(
+    pid="amiao",
+    name="Amiao (阿喵)",
+    description="A woman with a dark bob and a red blouse, at her laptop.",
+    palette=Palette(
+        # Peach grown up, and the palette says so before the haircut does: the
+        # same face warmed and lightened a shade, and hair that is brown rather
+        # than the flat black a girl's is drawn with.
+        body=(246, 214, 194, 255),
+        body_dark=(214, 176, 156, 255),
+        belly=(250, 228, 212, 255),
+        line=(92, 60, 54, 255),
+        accent=(236, 172, 180, 255),
+        eye=(46, 32, 30, 255),
+        eye_light=(128, 86, 64, 255),
+        blush=(238, 150, 150, 150),
+        hair=(58, 38, 34, 255),
+        hair_light=(122, 84, 72, 255),
+        cloth=(176, 46, 62, 255),      # the red top from the photograph
+        cloth_line=(130, 30, 44, 255),
+        inner=(250, 246, 244, 255),    # a pale collar over it
+        jaw=(230, 192, 172, 255),
+        lip=(198, 76, 84, 255),
+        desk=(198, 166, 132, 255),
+        desk_edge=(232, 204, 172, 255),
+        shell=(196, 200, 212, 255),
+        nose=None,
+        think=(140, 202, 255, 255),
+    ),
+    ears="none", face="human", head="round", tail=False,
+    body_w=21, body_h=19,
+    hair="bob", lashes=True, soft_blush=True,
+    torso="chibi", garment="blouse", work="desk",
+    head_dy=-6, eye_dy=3, mouth_dy=3,
+)
+
+
 DAMAO = Species(
     pid="damao",
     name="Damao (大毛)",
@@ -380,7 +417,7 @@ BYTE = Species(
 # antenna instead of ears, a lit screen instead of a face — and the reason the
 # drawing code is parametric at all. Adding it to this list is the whole of
 # shipping it.
-SPECIES = [SANMAO, PEACH, JUANMAO, MAOMAO, DAMAO]
+SPECIES = [SANMAO, PEACH, JUANMAO, MAOMAO, DAMAO, AMIAO]
 
 
 # --------------------------------------------------------------------------
@@ -1207,7 +1244,7 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     # in the frame saying which of the two people this is would be saying the
     # wrong one. It gets width instead: two pixels broader at the shoulder,
     # straight down to a hem that hangs a little loose.
-    if s.garment in ("tee", "jacket"):
+    if s.garment in ("tee", "jacket", "blouse"):
         shirt = [(CX - 5, sh), (CX + 5, sh), (CX + 5, sh + 3), (CX + 5, hip),
                  (CX - 5, hip), (CX - 5, sh + 3)]
     else:
@@ -1218,7 +1255,7 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     d.line(shirt[1:5], fill=edge)
     d.line([shirt[5], shirt[4]], fill=edge)
 
-    if s.garment in ("tee", "jacket"):
+    if s.garment in ("tee", "jacket", "blouse"):
         # Sleeves: the cloth carried a little way down each arm, so the arm
         # starts at an elbow rather than at a shoulder seam. Without them the
         # shirt is a bib with two bare arms pinned to it.
@@ -1238,7 +1275,18 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     # The neck opening. What hangs in it is torso_front's, not this function's.
     # A crew neck is a shallow curve; the V the dress cuts is three rows deep
     # and on a t-shirt it reads as a shirt worn open.
-    if s.garment == "jacket":
+    if s.garment == "blouse":
+        # An open collar over a pale one. Two marks, and they are what makes
+        # this a blouse rather than a t-shirt in red — at this size a garment
+        # is its neckline and nothing else.
+        d.polygon([(CX - 3, sh - 1), (CX, sh + 3), (CX + 3, sh - 1)],
+                  fill=pal.inner or skin)
+        for sx in (-1, 1):
+            d.polygon([(CX + sx * 2, sh - 1), (CX + sx * 5, sh - 1),
+                       (CX + sx * 3, sh + 3)], fill=pal.cloth or skin)
+            d.line([(CX + sx * 2, sh - 1), (CX + sx * 3, sh + 3)],
+                   fill=pal.cloth_line or line)
+    elif s.garment == "jacket":
         # An open jacket over a dark shirt: the opening shows the shirt, not
         # skin, and the collar stands up either side of it. Those two marks are
         # the whole difference between a jacket and a t-shirt at this size, and
@@ -1375,9 +1423,35 @@ def hair_back(d, s, top, bw, bh, cy, pal):
     Drawn before the body ellipse, so the face lands on top of the half of
     these shapes that crosses it.
     """
-    if s.hair not in ("side", "curly", "crop", "tall"):
+    if s.hair not in ("side", "curly", "crop", "tall", "bob"):
         return
     x0, x1 = CX - bw // 2, CX + bw // 2
+
+    if s.hair == "bob":
+        # Chin length, and that length is the whole of what separates her from
+        # Peach at a glance: the same face under hair that stops at the jaw
+        # instead of running to the waist. Short hair reads as older here for
+        # the same reason long hair reads as younger, which is that at 40px a
+        # silhouette is all anyone gets.
+        #
+        # Wider than the head and squared off at the bottom, because a bob is
+        # cut rather than grown — an ellipse all the way round is a helmet, and
+        # the flat foot is what makes it a haircut.
+        x0h, x1h = x0 - 3, x1 + 2
+        # Two rows above the skull and no more. At four it was sheared off by
+        # the top of the window when `celebrate` lifts her, which the sprite
+        # rules caught the moment she was drawn — a bob has no volume up there
+        # to lose anyway.
+        d.ellipse([x0h, top - 2, x1h, top + bh + 2], fill=pal.hair)
+        rect(d, x0h, top + bh - 6, x1h, top + bh + 1, pal.hair)
+        # Tucked behind the ear on one side: the corner comes off there and
+        # stays on the other. Both corners square is a bob on a mannequin, and
+        # the asymmetry is the only thing in her that is meant to be there.
+        d.polygon([(x0h, top + bh - 3), (x0h + 4, top + bh + 1),
+                   (x0h, top + bh + 1)], fill=pal.body)
+        light = pal.hair_light or pal.hair
+        d.line([(x1h - 1, top + 3), (x1h - 1, top + 9)], fill=light)
+        return
 
     if s.hair == "tall":
         # A great pile of it, leaning. This is the whole character at a glance:
@@ -1485,11 +1559,31 @@ def hairline(img, s, top, bw, bh, cy, pal):
     bottom edge of the hair. `worried` needs the room too: its brows are drawn
     in the outline colour, which on hair this dark is no colour at all.
     """
-    if s.hair not in ("side", "curly", "crop", "tall"):
+    if s.hair not in ("side", "curly", "crop", "tall", "bob"):
         return
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     o = ImageDraw.Draw(overlay)
     x0, x1 = CX - bw // 2, CX + bw // 2
+
+    if s.hair == "bob":
+        # A fringe with a parting in it, swept to one side. Straight across, a
+        # bob is a bowl cut and she is a child again.
+        rect(o, x0 - 3, top - 4, x1 + 3, top + 2, pal.hair)
+        o.polygon([(x0 - 3, top + 2), (CX - 3, top + 2), (x0 - 3, top + 7)],
+                  fill=pal.hair)
+        o.polygon([(x1 + 3, top + 2), (CX + 1, top + 2), (x1 + 3, top + 9)],
+                  fill=pal.hair)
+        light = pal.hair_light or pal.hair
+        o.line([(CX - 6, top + 1), (CX - 2, top)], fill=light)
+        # Down the cheeks, and further on the side the parting sends it.
+        rect(o, x0, top + 2, x0 + 1, top + bh - 8, pal.hair)
+        rect(o, x1 - 2, top + 2, x1, top + bh - 5, pal.hair)
+
+        mask = Image.new("L", (W, H), 0)
+        head_shape(ImageDraw.Draw(mask), s, x0 + 1, top + 1, x1 - 1, top + bh - 1, fill=255)
+        overlay.putalpha(ImageChops.multiply(overlay.getchannel("A"), mask))
+        img.alpha_composite(overlay)
+        return
 
     if s.hair == "tall":
         # Swept up off the forehead rather than down over it, which is what
