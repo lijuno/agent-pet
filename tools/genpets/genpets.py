@@ -222,8 +222,8 @@ PEACH = Species(
         lip=(206, 116, 116, 255),
         ribbon=(255, 172, 142, 255),   # peach, for the girl called Peach
         ribbon_dark=(226, 124, 104, 255),
-        desk=(198, 166, 132, 255),        # warm wood, against the cool laptop
-        desk_edge=(232, 204, 172, 255),
+        desk=(158, 118, 82, 255),        # warm wood, against the cool laptop
+        desk_edge=(196, 154, 112, 255),
         gold=(222, 168, 58, 255),
         gold_light=(255, 228, 140, 255),
         gold_dark=(160, 114, 36, 255),
@@ -263,8 +263,8 @@ JUANMAO = Species(
         lip=(152, 98, 86, 255),
         # The same wood Peach sits at. They are two people in one room, not two
         # drawings that happen to ship together.
-        desk=(198, 166, 132, 255),
-        desk_edge=(232, 204, 172, 255),
+        desk=(158, 118, 82, 255),
+        desk_edge=(196, 154, 112, 255),
         shell=(186, 192, 204, 255),   # handlebars, and the hub of a wheel
         bike=(228, 108, 76, 255),     # the frame, in a red he would pick
         nose=None,
@@ -307,8 +307,8 @@ MAOMAO = Species(
         jaw=(228, 194, 170, 255),
         lip=(196, 118, 108, 255),
         # The same wood Peach and Juanmao's world is furnished with.
-        desk=(198, 166, 132, 255),
-        desk_edge=(232, 204, 172, 255),
+        desk=(158, 118, 82, 255),
+        desk_edge=(196, 154, 112, 255),
         shell=(206, 212, 222, 255),    # the edge of a sheet of paper
         nose=None,
         think=(255, 190, 110, 255),    # warm, against all that blue
@@ -355,8 +355,8 @@ AMIAO = Species(
         gold=(222, 168, 58, 255),
         gold_light=(255, 228, 140, 255),
         gold_dark=(160, 114, 36, 255),
-        desk=(198, 166, 132, 255),
-        desk_edge=(232, 204, 172, 255),
+        desk=(158, 118, 82, 255),
+        desk_edge=(196, 154, 112, 255),
         shell=(196, 200, 212, 255),
         nose=None,
         think=(140, 202, 255, 255),
@@ -1355,7 +1355,7 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
     skin, dark, line = pal.body, pal.body_dark, pal.line
 
     if pal.gold:
-        necklace(d, CX, sh + 1, pal)
+        necklace(d, CX, sh, pal)
 
     if state == "working" and s.work == "bike":
         bicycle(d, i, pal)
@@ -1751,7 +1751,10 @@ def necklace(d, cx, y, pal):
     # says round at this size is a curve that dips in the middle and rises at
     # both ends. The drop is one lit pixel at the bottom of the dip, so it
     # catches the light without being a shape anybody has to name.
-    d.arc([cx - 4, y - 3, cx + 4, y + 3], 25, 155, fill=g)
+    # Shallow, and high. A deep curve low on the chest is a long chain with
+    # something hanging off it; this one sits in the opening of the collar,
+    # which is where a short one goes.
+    d.arc([cx - 4, y - 1, cx + 4, y + 3], 20, 160, fill=g)
     px(d, cx, y + 3, gl)
     px(d, cx - 1, y + 3, gd)
 
