@@ -1741,14 +1741,19 @@ def necklace(d, cx, y, pal):
     g = pal.gold
     gl = pal.gold_light or g
     gd = pal.gold_dark or g
-    for k in range(2):
-        px(d, cx - 2 + k, y + k, g)
-        px(d, cx + 2 - k, y + k, g)
-    # A lit top, a wide middle, a shaded foot. Two pixels of drop is one more
-    # link of chain; three with a highlight is a pendant.
-    px(d, cx, y + 2, gl)
-    d.line([(cx - 1, y + 3), (cx + 1, y + 3)], fill=g)
-    px(d, cx, y + 4, gd)
+
+    # The chain is the necklace, and the drop is a bead on it. It used to be
+    # the other way round — four pixels of chain and a pendant with a crossbar
+    # and a stem under the crossbar, which is a crucifix and read as one on
+    # both of them.
+    #
+    # An arc rather than two diagonals: a chain goes round a neck, and what
+    # says round at this size is a curve that dips in the middle and rises at
+    # both ends. The drop is one lit pixel at the bottom of the dip, so it
+    # catches the light without being a shape anybody has to name.
+    d.arc([cx - 4, y - 3, cx + 4, y + 3], 25, 155, fill=g)
+    px(d, cx, y + 3, gl)
+    px(d, cx - 1, y + 3, gd)
 
 
 BOB = {
