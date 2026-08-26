@@ -1208,8 +1208,8 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
     # wrong one. It gets width instead: two pixels broader at the shoulder,
     # straight down to a hem that hangs a little loose.
     if s.garment in ("tee", "jacket"):
-        shirt = [(CX - 6, sh), (CX + 6, sh), (CX + 6, sh + 3), (CX + 6, hip),
-                 (CX - 6, hip), (CX - 6, sh + 3)]
+        shirt = [(CX - 5, sh), (CX + 5, sh), (CX + 5, sh + 3), (CX + 5, hip),
+                 (CX - 5, hip), (CX - 5, sh + 3)]
     else:
         shirt = [(CX - 5, sh), (CX + 5, sh), (CX + 4, sh + 3), (CX + 6, hip),
                  (CX - 6, hip), (CX - 4, sh + 3)]
@@ -1222,9 +1222,17 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
         # Sleeves: the cloth carried a little way down each arm, so the arm
         # starts at an elbow rather than at a shoulder seam. Without them the
         # shirt is a bib with two bare arms pinned to it.
+        #
+        # They stop two pixels short of the hand. Run out to where the hand is
+        # — which is where they were — and there is no arm between the two:
+        # the sleeve meets the fist, and the character has hands growing out of
+        # his shirt. The shirt itself lost a pixel each side for the same
+        # reason. It is still wider at the shoulder than the dress, which is
+        # what makes it a shirt rather than a dress; it is no longer wider than
+        # the shoulders it is on.
         for sx in (-1, 1):
-            d.polygon([(CX + sx * 4, sh), (CX + sx * 8, sh + 1),
-                       (CX + sx * 7, sh + 4), (CX + sx * 3, sh + 3)],
+            d.polygon([(CX + sx * 4, sh), (CX + sx * 6, sh + 1),
+                       (CX + sx * 5, sh + 4), (CX + sx * 3, sh + 3)],
                       fill=pal.cloth or skin)
 
     # The neck opening. What hangs in it is torso_front's, not this function's.
