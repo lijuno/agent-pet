@@ -20,6 +20,7 @@ enum {
   PET_UPDATE = 7,
   PET_QUIT = 8,
   PET_ABOUT = 9,
+  PET_RELOAD = 10,
   // Items in the Change Pet submenu are PET_PICK_BASE + the pet's index in the
   // list the Go side last sent.
   PET_PICK_BASE = 100,

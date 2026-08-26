@@ -94,6 +94,10 @@ void petStatusInstall(const void *png, int len, int onTop, int shown) {
     // Always present. It reports the last check rather than appearing only
     // when there is something to install, so the menu can answer "have I got
     // the latest?" as well as "there is a new one".
+    // Next to About rather than beside Change Pet: it is about the whole
+    // program rather than about the character, and it is not something
+    // anybody reaches for often.
+    addItem(menu, @"Reload Config", PET_RELOAD);
     addItem(menu, @"About", PET_ABOUT);
     petUpdateItem = addItem(menu, @"No update check yet", PET_UPDATE);
     [petUpdateItem setEnabled:NO];

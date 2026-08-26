@@ -238,3 +238,46 @@ func TestDisabledPacksAreHiddenButStillLoad(t *testing.T) {
 		t.Fatalf("naming a disabled pack as active should still find it, got %v/%v", p.ID, ok)
 	}
 }
+
+// TestHideKeepsTheMenuHonest covers the two guards on pet.disabled. Both exist
+// because a menu has to agree with the window, and both are now applied in one
+// place because there are two callers: startup, and reloading on the fly.
+func TestHideKeepsTheMenuHonest(t *testing.T) {
+	pack := func(id string) string {
+		return `{"id": "` + id + `", "name": "` + id + `", "animations": {"idle": "idle.png"}}`
+	}
+	load := func() *Library {
+		fsys := fstest.MapFS{
+			"pets/a/manifest.json": {Data: []byte(pack("alpha"))},
+			"pets/b/manifest.json": {Data: []byte(pack("bravo"))},
+		}
+		l := NewLibrary()
+		if err := l.LoadBuiltin(fsys, "pets", "/pets"); err != nil {
+			t.Fatalf("load: %v", err)
+		}
+		return l
+	}
+	ids := func(l *Library) []string {
+		var out []string
+		for _, p := range l.List() {
+			out = append(out, p.ID)
+		}
+		return out
+	}
+
+	l := load()
+	if ignored := l.Hide([]string{"alpha"}, "alpha"); ignored {
+		return
+	}
+	if got := ids(l); len(got) != 2 {
+		t.Fatalf("the active character must stay in the list, got %v", got)
+	}
+
+	l = load()
+	if ignored := l.Hide([]string{"alpha", "bravo"}, "charlie"); !ignored {
+		t.Fatal("a list that hides every character should be reported as ignored")
+	}
+	if got := ids(l); len(got) != 2 {
+		t.Fatalf("and dropped whole, got %v", got)
+	}
+}

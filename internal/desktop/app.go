@@ -310,6 +310,15 @@ func (a *App) SetScale(scale float64) {
 		a.log.Warn("could not save config", "err", err)
 	}
 
+	a.resizeTo(scale)
+	a.push()
+}
+
+// resizeTo resizes the window for a scale and keeps the character's feet where
+// they were. Split out of SetScale so reloading the config can use it: SetScale
+// also writes the config back, which is right when a menu changed the scale and
+// wrong when the file is where the scale came from.
+func (a *App) resizeTo(scale float64) {
 	if a.ctx == nil {
 		return
 	}
@@ -323,8 +332,6 @@ func (a *App) SetScale(scale float64) {
 	petBottom := y + oldH
 	wruntime.WindowSetSize(a.ctx, a.baseW, a.baseH)
 	wruntime.WindowSetPosition(a.ctx, petCX-a.baseW/2, petBottom-a.baseH)
-
-	a.push()
 }
 
 // push re-sends the current view, so a change made here reaches the window
@@ -576,6 +583,52 @@ func (a *App) SetPet(id string) bool {
 		_ = config.Save(a.cfgPath, cfg)
 	}
 	return ok
+}
+
+// ReloadConfig re-reads config.yaml and applies what can be applied without a
+// restart. It is on the menu because the alternative is quitting the pet to
+// change a setting in a file the pet rewrites when it quits — which is a
+// circle somebody hits the first time they edit it by hand.
+//
+// What it cannot do is move the listener. server.addr is bound once at
+// startup; a new one takes a restart, and saying so is better than appearing
+// to accept it.
+func (a *App) ReloadConfig() string {
+	cfg, err := config.Load(a.cfgPath)
+	if err != nil {
+		// Load returns a usable config even when it could not parse the file.
+		// Applying it anyway would quietly replace the user's settings with
+		// defaults, which is the opposite of what they asked for.
+		a.log.Warn("reload", "err", err)
+		return "could not read the config: " + err.Error()
+	}
+
+	old := a.eng.Config()
+	if lib := a.eng.Library(); lib.Hide(cfg.Pet.Disabled, cfg.Pet.Active) {
+		a.log.Warn("pet.disabled would hide every character; ignoring it",
+			"disabled", cfg.Pet.Disabled)
+	}
+	a.eng.SetConfig(cfg)
+	if p, ok := a.eng.ActivePet(); !ok || p.ID != cfg.Pet.Active {
+		a.eng.SetPet(cfg.Pet.Active)
+	}
+	a.refreshPetMenu()
+
+	if cfg.Pet.AlwaysOnTop != a.alwaysOnTop {
+		a.SetAlwaysOnTop(cfg.Pet.AlwaysOnTop)
+		setOnTopCheck(cfg.Pet.AlwaysOnTop)
+	}
+	// SetScale saves the config back, which is right when a menu changes the
+	// scale and wrong here: the file is what we just read. Resize by hand.
+	if cfg.Pet.Scale != old.Pet.Scale && cfg.Pet.Scale > 0 {
+		a.resizeTo(cfg.Pet.Scale)
+	}
+	a.push()
+
+	if cfg.Server.Addr != old.Server.Addr {
+		return "reloaded — but server.addr needs a restart to take effect"
+	}
+	return "reloaded " + a.cfgPath
 }
 
 // Interact is the double-click reaction (§14).

@@ -12,6 +12,8 @@ import (
 // The status-bar item is macOS-only. See statusitem_darwin.go.
 func (a *App) startTray(context.Context) {}
 
+func setOnTopCheck(bool) {}
+
 func statusItemReport() string { return "not supported on this platform" }
 
 func dockReport() string { return "not supported on this platform" }

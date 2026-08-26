@@ -136,7 +136,9 @@ Each of these cost an hour or more to find.
   run after a failed build tested the old binary and means nothing. Check the
   build said `Built '...'` before believing a result.
 - **`config.yaml` is rewritten from memory on shutdown.** Editing it while the
-  app runs loses the edit. Close the app first.
+  app runs loses the edit — unless you finish with **Reload Config** in the
+  menu, which re-reads the file and makes what is on screen the thing that gets
+  written back. Without that, close the app first.
 - **Changing a default in `config.go` does not touch an existing
   `config.yaml`.** Your machine keeps the old value; test on a fresh config or
   edit both.

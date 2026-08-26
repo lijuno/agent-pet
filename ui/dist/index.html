@@ -631,6 +631,14 @@ function openMenu() {
     separator(),
     // A real window, not a panel: it opens centred on screen with a close
     // button, and does not shove the pet's own window about to make room.
+    // Re-reads config.yaml without a restart. The badge is the whole of the
+    // feedback: a reload that worked has nothing to say, and the badge is
+    // already how this menu says it did something.
+    item("Reload Config", () => {
+      el.menu.classList.add("hidden");
+      call("ReloadConfig");
+      flashBadge("Config reloaded");
+    }),
     item("About", () => { el.menu.classList.add("hidden"); call("ShowAbout"); }),
     item("Quit", () => call("Quit")),
   );

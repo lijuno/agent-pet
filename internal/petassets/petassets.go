@@ -118,6 +118,33 @@ func NewLibrary() *Library {
 	return &Library{pets: map[string]Pet{}, hidden: map[string]bool{}}
 }
 
+// Hide applies pet.disabled with the two guards that go with it, and reports
+// whether the list had to be ignored. Both guards exist for one reason — a
+// menu has to agree with the window:
+//
+//   - Whatever is active stays in the list, ticked, however the config names
+//     it. Hiding the character on screen leaves the submenu with nothing
+//     ticked and no way to tell what is running.
+//   - A list that empties the library is dropped whole. An empty Change Pet
+//     submenu is a bug report, not a preference.
+//
+// It lives here rather than at the call site because there are two of those
+// now: startup, and reloading the config on the fly.
+func (l *Library) Hide(disabled []string, active string) (ignored bool) {
+	keep := make([]string, 0, len(disabled))
+	for _, id := range disabled {
+		if id != active {
+			keep = append(keep, id)
+		}
+	}
+	l.Disable(keep)
+	if len(l.List()) == 0 {
+		l.Disable(nil)
+		return true
+	}
+	return false
+}
+
 // Disable keeps packs out of List, which is what every picker is built from.
 // Get still finds them: hiding a character from the menu is not the same as
 // unloading it, and the one a config names as active has to draw whether it is

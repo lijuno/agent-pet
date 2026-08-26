@@ -607,6 +607,11 @@ them with:
 make pets     # python3 tools/genpets/genpets.py
 ```
 
+**Reload Config** in either menu re-reads this file without a restart, which is
+what makes editing it by hand practical: the app rewrites the file from memory
+when it quits, so an edit made while it runs is otherwise lost. Everything here
+takes effect except `server.addr`, which is bound once at startup and says so.
+
 Characters you never use can be kept out of the **Change Pet** submenu and the
 panel beside it with `pet.disabled` in the config, which takes a list of ids. It
 hides rather than unloads, so one named in `pet.active` is still drawn — and it

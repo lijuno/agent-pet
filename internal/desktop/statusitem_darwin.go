@@ -169,6 +169,7 @@ func (a *App) ClickStatusItem(name string) error {
 		"show": C.PET_SHOW, "status": C.PET_STATUS,
 		"change": C.PET_CHANGE, "ontop": C.PET_ONTOP,
 		"quit": C.PET_QUIT, "update": C.PET_UPDATE, "about": C.PET_ABOUT,
+		"reload": C.PET_RELOAD,
 	}
 	tag, ok := tags[name]
 	if !ok {
@@ -294,6 +295,10 @@ func openURL(raw string) {
 	C.petOpenURL(c)
 }
 
+// setOnTopCheck ticks the Always on Top box. Named so app.go can keep the
+// checkbox in step without importing a C constant it cannot see.
+func setOnTopCheck(on bool) { setStatusCheck(C.PET_ONTOP, on) }
+
 func setStatusCheck(tag C.int, on bool) {
 	v := C.int(0)
 	if on {
@@ -376,6 +381,11 @@ func (a *App) handleStatusClick(tag C.int) {
 		a.emitPanel("status")
 	case C.PET_ABOUT:
 		a.ShowAbout()
+	case C.PET_RELOAD:
+		// The result goes to the log rather than to a dialog. A reload that
+		// worked has nothing to say, and one that did not is a line in the
+		// file the user is already editing.
+		a.log.Info("reload", "result", a.ReloadConfig())
 	case C.PET_CHANGE:
 		// Nothing: the submenu is the picker. AppKit opens it on hover, and an
 		// item with a submenu does not fire its action anyway.
