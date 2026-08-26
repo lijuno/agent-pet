@@ -57,6 +57,20 @@ Run all three before committing anything that touches the window or the menu
 bar. The Go suite alone will not catch a crash in a menu handler — one shipped
 that way.
 
+`internal/petassets/sprite_rules_test.go` is the one that guards the art. Every
+character so far has arrived with a fault only a pair of eyes caught, and two
+of them shipped: a blush drawn with an alpha punched translucent holes in every
+face for months, and a running character's hands were never drawn at all. The
+rules there are the faults that can be stated as a property of the pixels —
+no holes in the sprite, every strip animates, every frame has a character in
+it, and nothing of the character is cut off by the top of the window.
+
+That last one carries an allowance table of what each state loses today. None
+of it is deliberate; it is hair sheared flat by the frame when a bob lifts the
+character, and it was found by writing the rule rather than by looking. The
+table exists to stop the list growing — a new character starts at zero. Do not
+raise an entry to make a test pass; lower the character or shorten the hair.
+
 `make test-ui` serves the repo and opens `ui/test/index.html`, which loads the
 real UI into an iframe per test. `make test-desktop` drives a running app
 through `POST /window` — the only way to check a menu is not clipped in the

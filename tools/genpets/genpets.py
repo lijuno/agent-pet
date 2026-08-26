@@ -1650,7 +1650,12 @@ def draw_pet(s, state, i, n):
     # than on it, so both lift. Three rows and no more: at four the hair on top
     # of a head is trimmed by the top of the window, and `working` is the state
     # they spend the day in.
-    lift = 4 if (state == "working" and s.work in ("bike", "run")) else 0
+    # The rider needs four rows for his bicycle. The runner needs fewer — two
+    # is enough to swing a leg in — and must not take four: a head of hair this
+    # tall is sheared off by the top of the window at that height, which the
+    # sprite rules now catch and which is how it was found.
+    lift = 4 if (state == "working" and s.work == "bike") else (
+        2 if (state == "working" and s.work == "run") else 0)
     if lift:
         bob = 0
     cy = 23 + bob + s.head_dy - lift
@@ -1881,7 +1886,11 @@ def draw_pet(s, state, i, n):
         blush(d, s, CX, ey, pal)
         heart(d, PROP_X + 4, pcy - 13 - (i % 2), (236, 84, 116, 255))
         if i % 2 == 0:
-            heart(d, PROP_X - 1, pcy - 7, (236, 132, 152, 210), big=False)
+            # Opaque, and faint by being lighter rather than by being
+            # see-through. It overlaps the head, and an alpha there is a hole
+            # in his cheek with the desktop behind it — the same fault the
+            # blush had, found by the rule written for the blush.
+            heart(d, PROP_X - 1, pcy - 7, (246, 182, 196, 255), big=False)
 
     # Glass goes on last of everything the face has, so a pupil that dilates
     # past the rim in `attention` ends up behind it.
