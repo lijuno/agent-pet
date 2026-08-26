@@ -589,7 +589,7 @@ Six built-in packs ship in the binary:
 
 | id | | |
 |---|---|---|
-| `amiao` | Amiao (阿喵), a woman in a red blouse | a dark bob tucked behind one ear, at her laptop |
+| `amiao` | Amiao (阿喵), a woman in a red blouse | a dark bob cut level, at her laptop |
 | `damao` | Damao (大毛), a boy of fourteen | a great pile of hair, an olive windbreaker, out running |
 | `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, a bicycle to work on |
 | `maomao` | Maomao (毛毛), a boy of seven | a short crop, round clear glasses, a pencil to work with |

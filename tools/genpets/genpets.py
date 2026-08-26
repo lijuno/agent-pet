@@ -1443,17 +1443,16 @@ def hair_back(d, s, top, bw, bh, cy, pal):
         # rules caught the moment she was drawn — a bob has no volume up there
         # to lose anyway.
         d.ellipse([x0h, top - 2, x1h, top + bh + 2], fill=pal.hair)
-        # Squared off along the bottom on one side only. That is the ear it is
-        # tucked behind: the other side keeps the curve of the ellipse and so
-        # ends higher, and both corners square is a bob on a mannequin.
-        #
-        # The tuck was cut by painting a wedge of skin over the corner, which
-        # is not a tuck — it is a skin-coloured triangle sitting in her hair
-        # with no face behind it, because out there the head has already ended.
-        # Hair that should not be there is hair not drawn.
-        rect(d, x0h + 4, top + bh - 6, x1h, top + bh + 1, pal.hair)
+        # Squared off along the bottom on both sides, and the same length on
+        # each. She had one corner tucked behind an ear for a while — cut, at
+        # first, by painting a wedge of skin over it, which is not a tuck but a
+        # skin-coloured triangle sitting in her hair with no face behind it.
+        # Drawn properly it was still one side shorter than the other, and a
+        # bob is a cut that is meant to match.
+        rect(d, x0h, top + bh - 6, x1h, top + bh + 1, pal.hair)
         light = pal.hair_light or pal.hair
-        d.line([(x1h - 1, top + 3), (x1h - 1, top + 9)], fill=light)
+        for x in (x0h + 1, x1h - 1):
+            d.line([(x, top + 3), (x, top + 9)], fill=light)
         return
 
     if s.hair == "tall":
@@ -1572,15 +1571,17 @@ def hairline(img, s, top, bw, bh, cy, pal):
         # A fringe with a parting in it, swept to one side. Straight across, a
         # bob is a bowl cut and she is a child again.
         rect(o, x0 - 3, top - 4, x1 + 3, top + 2, pal.hair)
-        o.polygon([(x0 - 3, top + 2), (CX - 3, top + 2), (x0 - 3, top + 7)],
-                  fill=pal.hair)
-        o.polygon([(x1 + 3, top + 2), (CX + 1, top + 2), (x1 + 3, top + 9)],
-                  fill=pal.hair)
+        # A parting down the middle rather than off to one side: the two sweeps
+        # mirror each other, which is what makes the cut match.
+        for sx, edge in ((-1, x0 - 3), (1, x1 + 3)):
+            o.polygon([(edge, top + 2), (CX + sx * 2, top + 2), (edge, top + 8)],
+                      fill=pal.hair)
         light = pal.hair_light or pal.hair
-        o.line([(CX - 6, top + 1), (CX - 2, top)], fill=light)
-        # Down the cheeks, and further on the side the parting sends it.
-        rect(o, x0, top + 2, x0 + 1, top + bh - 8, pal.hair)
-        rect(o, x1 - 2, top + 2, x1, top + bh - 5, pal.hair)
+        for sx in (-1, 1):
+            o.line([(CX + sx * 6, top + 1), (CX + sx * 2, top)], fill=light)
+        # Down the cheeks, the same length on each.
+        rect(o, x0, top + 2, x0 + 1, top + bh - 7, pal.hair)
+        rect(o, x1 - 1, top + 2, x1, top + bh - 7, pal.hair)
 
         mask = Image.new("L", (W, H), 0)
         head_shape(ImageDraw.Draw(mask), s, x0 + 1, top + 1, x1 - 1, top + bh - 1, fill=255)
