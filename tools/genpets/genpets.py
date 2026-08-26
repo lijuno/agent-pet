@@ -162,7 +162,7 @@ class Species:
     garment: str = "dress"   # dress | tee | jacket | blouse
     # What the character is doing in `working`. The state means the agent is
     # busy; what busy looks like is the character's own.
-    work: str = "desk"       # desk | bike | write | run
+    work: str = "desk"       # desk | bike | write | run | mine
     # Where the head sits, and where the face sits inside it. A merged
     # head-and-body puts the eyes near the middle of the one ellipse and lets
     # the chin run into the chest; once the head is only a head, the face has
@@ -332,7 +332,7 @@ MAOMAO = Species(
 AMIAO = Species(
     pid="amiao",
     name="Amiao (阿喵)",
-    description="A woman with a dark bob, a red blouse and a gold necklace, at her laptop.",
+    description="A woman with a dark bob and a red blouse, mining gold.",
     palette=Palette(
         # Peach grown up, and the palette says so before the haircut does: the
         # same face warmed and lightened a shade, and hair that is brown rather
@@ -368,7 +368,7 @@ AMIAO = Species(
     ears="none", face="human", head="round", tail=False,
     body_w=21, body_h=19,
     hair="bob", lashes=True, soft_blush=True,
-    torso="chibi", garment="blouse", work="desk",
+    torso="chibi", garment="blouse", work="mine",
     head_dy=-6, eye_dy=3, mouth_dy=3,
 )
 
@@ -1092,6 +1092,71 @@ def pencil(d, pal, hand_at):
     px(d, tip_x, tip_y, pal.line)
 
 
+def swing(i):
+    """The grip and the head of the pickaxe this frame, as offsets from the
+    shoulder line.
+
+    A short stroke, not a full swing. Everything here has to stay below the
+    chin and left of the face, and a pick raised over the shoulder does
+    neither — swung from up there it came down across her own eyes, because
+    this is drawn in front of the head rather than behind it. So the head stays
+    in the seam and the handle works it: what moves is the angle, an inch of
+    it, and the gold that comes off.
+    """
+    return ((-2, 2, -7, 2),
+            (-2, 1, -7, 3),
+            (-2, 2, -7, 2),
+            (-3, 2, -8, 3))[i % 4]
+
+
+def orebody(d, pal):
+    """The rock she is working, and the gold in it.
+
+    Beside her rather than under her: the swing comes down to the left, and a
+    seam directly below would be behind her own legs. Two greys and no more —
+    a rock with any more colour in it than that competes with the gold, which
+    is the only thing in this state worth looking at.
+    """
+    rock, edge = (108, 106, 114, 255), (72, 70, 78, 255)
+    d.polygon([(3, GROUND), (6, GROUND - 6), (12, GROUND - 7),
+               (16, GROUND - 3), (16, GROUND)], fill=rock, outline=edge)
+    g, gl = pal.gold or rock, pal.gold_light or rock
+    for x, y in ((7, GROUND - 4), (10, GROUND - 5), (12, GROUND - 3)):
+        px(d, x, y, g)
+    px(d, 10, GROUND - 6, gl)
+
+
+def pickaxe(d, i, sh, pal):
+    """The pick, and what comes off the rock when it lands.
+
+    Drawn after the hands, so it passes in front of the grip: a handle behind
+    two fists is a stick somebody happens to be standing near.
+    """
+    # A pale steel of its own rather than the shell grey. The head bites at
+    # the top of the rock, and the rock is grey: at the same value the one
+    # thing doing the work was invisible against the thing it was working.
+    wood, steel = (146, 102, 62, 255), (216, 222, 232, 255)
+    gx, gy, hx, hy = swing(i)
+    grip = (CX + gx, sh + gy)
+    head = (CX + hx, sh + hy)
+    d.line([grip, head], fill=wood, width=2)
+    # The head: a bar across the end of the handle with a point on each side,
+    # which is what tells a pickaxe from a hammer at four pixels across.
+    dx = 1 if hx < gx else -1
+    d.line([(head[0] - 2, head[1] - 1), (head[0] + 2, head[1] + 1)], fill=steel)
+    px(d, head[0] + dx * 2, head[1] - 1, steel)
+    px(d, head[0] - dx, head[1] + 2, steel)
+
+    if i % 2 == 1:
+        # Gold coming off the seam, on every other frame. On all four it is a
+        # character standing in a permanent shower of it, which is a different
+        # picture: this one is working for it.
+        gl = pal.gold_light or steel
+        for sx_, sy_ in ((-2, -3), (2, -4), (4, 0), (0, -6)):
+            px(d, head[0] + sx_, head[1] + sy_, gl)
+        px(d, head[0] + 1, head[1] - 2, pal.gold or gl)
+
+
 def hand(d, x, y, pal):
     """One hand. Outlined in `line` it is a dark blot at four pixels across, so
     it takes the shadow tone instead."""
@@ -1112,6 +1177,13 @@ def hands_at(state, i, sh, hip, work="desk"):
             # shoulders rise and fall a pixel on the bob and the arms take up
             # the difference, which is what arms do.
             out.append((CX + sx * 8, BAR_Y))
+            continue
+        if state == "working" and work == "mine":
+            # Both hands on the handle, one above the other. A pickaxe held in
+            # one hand is a hammer, and at this size the difference between the
+            # two is entirely in how it is being held.
+            gx, gy, _, _ = swing(i)
+            out.append((CX + gx + (0 if sx < 0 else 2), sh + gy + (0 if sx < 0 else 2)))
             continue
         if state == "working" and work == "run":
             # Bent, not hanging. Left to the desk pose the hands sit low and
@@ -1384,6 +1456,12 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
             rect(d, CX + sx * 10, BAR_Y - 1, CX + sx * 9, BAR_Y + 1, (46, 44, 48, 255))
         for hx, hy in hands_at(state, i, sh, hip, s.work):
             hand(d, hx, hy, pal)
+
+    elif state == "working" and s.work == "mine":
+        orebody(d, pal)
+        for hx_, hy_ in hands_at(state, i, sh, hip, s.work):
+            hand(d, hx_, hy_, pal)
+        pickaxe(d, i, sh, pal)
 
     elif state == "working" and s.work == "write":
         desk(d, pal)
@@ -1846,7 +1924,10 @@ def draw_pet(s, state, i, n):
     #
     # None at the desk: the floor it would fall on is behind the desk and out of
     # sight, so it read as her hovering just in front of the surface.
-    if not (s.torso == "chibi" and state == "working"):
+    # No shadow behind a desk or under a bicycle: the floor it would fall on is
+    # out of sight, or the wheels are already on it. Standing at a rock face
+    # she is on the ground like anybody else.
+    if not (s.torso == "chibi" and state == "working" and s.work != "mine"):
         shadow_w = (12 if s.torso == "chibi" else bw - 2) + bob
         d.ellipse([CX - shadow_w // 2, GROUND, CX + shadow_w // 2, GROUND + 3],
                   fill=(0, 0, 0, 60))

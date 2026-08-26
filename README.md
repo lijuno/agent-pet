@@ -578,7 +578,7 @@ Six built-in packs ship in the binary:
        alt="Damao, a teenager with a great pile of hair, cycling through the same ten states: out running for working, brows angled for worried, arms up for celebrate."
        width="240">
   <img src="docs/media/states-amiao.gif"
-       alt="Amiao, a woman with a dark bob and a red blouse, cycling through the same ten states: at her laptop for working, eyes closed for sleeping, arms up for celebrate."
+       alt="Amiao, a woman with a dark bob and a red blouse, cycling through the same ten states: swinging a pickaxe at a gold seam for working, eyes closed for sleeping, arms up for celebrate."
        width="240">
 </p>
 
@@ -589,7 +589,7 @@ Six built-in packs ship in the binary:
 
 | id | | |
 |---|---|---|
-| `amiao` | Amiao (阿喵), a woman in a red blouse | a dark bob cut level, Peach's gold necklace, at her laptop |
+| `amiao` | Amiao (阿喵), a woman in a red blouse | a dark bob cut level, Peach's gold necklace, mining gold |
 | `damao` | Damao (大毛), a boy of fourteen | a great pile of hair, an olive windbreaker, out running |
 | `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, a bicycle to work on |
 | `maomao` | Maomao (毛毛), a boy of seven | a short crop, round clear glasses, a pencil to work with |
