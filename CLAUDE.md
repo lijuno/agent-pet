@@ -60,9 +60,15 @@ What runs there is most of the project:
 ```bash
 go test ./...          # all of it, including internal/desktop
 go vet ./... && gofmt -l .
+make vet-min           # the same vet under the Go version go.mod claims
 make pets              # deterministic, and the sprite rules test guards it
 make test-ui-headless  # the whole UI suite, 63 tests, no window
 ```
+
+`make vet-min` is not optional before pushing Go. The container ships a newer
+toolchain than `go.mod` declares, and a stdlib function added after that minimum
+compiles here without a word — `t.Chdir` did, and the first thing that said so
+was CI failing on the matrix leg that pins the declared version.
 
 What cannot, and cannot be made to: `make build`, because the app is
 darwin/universal and the menu-bar item is Objective-C through cgo, and

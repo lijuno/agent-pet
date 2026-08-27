@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -12,7 +13,16 @@ import (
 // somebody installed the pet. --local is the answer, and it is only an answer
 // if it is a different file.
 func TestEachScopeIsItsOwnFile(t *testing.T) {
-	t.Chdir(t.TempDir())
+	// Not t.Chdir: that is Go 1.24, and go.mod claims 1.23. CI tests the
+	// version it claims, so a newer toolchain here is not the one that decides.
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(wd) })
 
 	seen := map[string]installScope{}
 	for _, s := range []installScope{scopeProject, scopeLocal, scopeGlobal} {
