@@ -72,7 +72,9 @@ case "$summary" in
 	# One tag per line first: the whole dump arrives as a single line, and two
 	# substitutions against one line means the second never sees the tag the
 	# first replaced — which is how this printed the names without the reasons.
-	printf '%s' "$dom" | sed 's/</\n</g' |
+	# awk rather than sed: \n in a replacement is a GNU extension, and the sed
+	# on the Mac this project is built on writes a literal "n" instead.
+	printf '%s' "$dom" | awk '{gsub(/</, "\n<")}1' |
 		sed -n 's|^<li class="fail">\(.*\)|  ✗ \1|p;s|^<div class="err">\(.*\)|    \1|p' >&2
 	exit 1
 	;;

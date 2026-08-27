@@ -217,6 +217,14 @@ Each of these cost an hour or more to find.
   did not create is probably you. Not `settings.json`: that one is tracked now
   and carries the SessionStart hook, and the pet's hooks name an absolute path
   to petctl on your machine.
+- **The checkout that made `settings.json` tracked took your copy with it.**
+  It was git-ignored before, and git treats an ignored file as expendable — so
+  a `.claude/settings.json` holding an existing `petctl install claude` was
+  overwritten silently: no error, no prompt, no `.bak`. The pet then reacts to
+  nothing and the file it used to be configured in looks fine. `petctl doctor`
+  reports all three scopes empty; `petctl install claude --local` puts it back,
+  in the file this cannot happen to again. One time only, on the machine that
+  had the hooks installed before the change.
 - **Signing a release does not offer it to anybody.** `make release` leaves
   `updates/<channel>.json` uncommitted on purpose; the commit is the release.
   Expect `petctl update --check` to report nothing published until then, and do
