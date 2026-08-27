@@ -137,10 +137,11 @@ func apply(c *client, m update.Manifest, o updateOpts) error {
 // installedStatus is what to tell the daemon after an update has landed.
 //
 // Current and Latest are equal, Available is false and CheckedAt is now: those
-// three together are what the menu bar reads as "Up to date". Getting any of
-// them wrong leaves the menu saying something else — CheckedAt in particular,
-// because a zero time there means "nobody has ever checked", which is what the
-// menu said after an update until this existed.
+// three together are what the Pet Status panel reads as "up to date", and what
+// keeps the menu bar from offering the version that was just installed. Getting
+// any of them wrong puts a phantom update in the menu — CheckedAt in
+// particular, because a zero time there means "nobody has ever checked", which
+// is what the panel said after an update until this existed.
 func installedStatus(m update.Manifest, installed string) update.Status {
 	return update.Status{
 		Channel:   update.Channel(m.Channel),
