@@ -56,26 +56,33 @@ dom=$("$chrome" \
 	--virtual-time-budget=60000 \
 	--dump-dom "http://127.0.0.1:$port/ui/test/index.html" 2>/dev/null)
 
-summary=$(printf '%s' "$dom" | sed -n 's/.*<div id="summary"[^>]*>\([^<]*\)<.*/\1/p')
+# Parsed in python3, not sed or awk. This script already needs python3 for the
+# server, the dump arrives as one 50KB line with no trailing newline, and the
+# line-length limits and backslash dialects of the BSD tools differ from the GNU
+# ones — a difference that would surface only on the Mac, only on a red suite,
+# which is the worst possible time to find out. Exit 0 green, 1 otherwise.
+printf '%s' "$dom" | python3 -c '
+import re, sys
 
-case "$summary" in
-"all "*" tests passed")
-	echo "$summary"
-	;;
-"")
-	echo "the page said nothing — chromium rendered no summary at all" >&2
-	exit 1
-	;;
-*)
-	echo "$summary" >&2
-	# The failing names and their messages, in the order the page listed them.
-	# One tag per line first: the whole dump arrives as a single line, and two
-	# substitutions against one line means the second never sees the tag the
-	# first replaced — which is how this printed the names without the reasons.
-	# awk rather than sed: \n in a replacement is a GNU extension, and the sed
-	# on the Mac this project is built on writes a literal "n" instead.
-	printf '%s' "$dom" | awk '{gsub(/</, "\n<")}1' |
-		sed -n 's|^<li class="fail">\(.*\)|  ✗ \1|p;s|^<div class="err">\(.*\)|    \1|p' >&2
-	exit 1
-	;;
-esac
+dom = sys.stdin.read()
+m = re.search(r"<div id=\"summary\"[^>]*>([^<]*)", dom)
+summary = m.group(1).strip() if m else ""
+
+if not summary or summary == "running…":
+    print("the page never finished: summary is %r" % summary, file=sys.stderr)
+    sys.exit(1)
+
+if re.fullmatch(r"all \d+ tests passed", summary):
+    print(summary)
+    sys.exit(0)
+
+print(summary, file=sys.stderr)
+# Names and reasons in the order the page listed them: a .fail li, each
+# followed by its .err div when the failure carried a message.
+for tag, text in re.findall(r"<li class=\"fail\">([^<]*)|<div class=\"err\">([^<]*)", dom):
+    if tag:
+        print("  \u2717 " + tag.strip(), file=sys.stderr)
+    elif text:
+        print("    " + text.strip(), file=sys.stderr)
+sys.exit(1)
+'
