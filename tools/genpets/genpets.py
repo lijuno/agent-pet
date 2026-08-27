@@ -1134,21 +1134,35 @@ def swing(i):
 # before the next blow has a single straggler dropping back. Read in a loop it
 # is a spray that never stops, which is what continuous work looks like.
 #
-# All of it goes up and to the left, over the rock. Thrown up the shaft it
-# lands on her blouse, and gold on red is not a chip off a rock, it is a stain.
+# Every chip is two pixels: the light one is the leading edge and the darker one
+# behind it is where it has come from. Two are twice as easy to see, and a chip
+# with a tail has a direction — the difference between gold coming off a rock
+# and a speck of dust that happens to be yellow.
 #
-# Each chip is two pixels, not one: the light one is the leading edge and the
-# darker one behind it is where it has come from. Two pixels are twice as easy
-# to see, and a chip with a tail has a direction — the difference between gold
-# flying off a rock and a speck of dust that happens to be yellow.
+# The tail is not a fixed offset. It is one step back towards GOLD_IMPACT, the
+# point where the head of the pick meets the stone, so every chip in the frame
+# points at the place it was struck from and the burst reads as one blow rather
+# than as weather. That is also why they go in every direction out of it and
+# not only up: gold comes off the ground and off the face of the rock as well
+# as over the top of it, and a spray that only ever climbs is a fountain.
 #
-# Nothing here may land on the rock. A chip drawn over stone is a chip that has
-# not left it, which is the picture this replaced.
+# They may be drawn over the rock, and some are on purpose. An early version
+# banned it, on the reasoning that a chip on stone has not left the stone —
+# true of a seam, which holds still, and false of a chip, which has a tail and
+# a new position every frame. What it costs is depth: the chips crossing the
+# face are in front of it, the rock is behind them, and the frame stops being
+# flat.
+#
+# What they may not do is land on her. Thrown up the shaft they end up on the
+# blouse, and gold on red is not a chip off a rock, it is a stain.
+GOLD_IMPACT = (8, 33)
 GOLD_CHIPS = (
-    ((4, 21), (2, 22), (3, 18), (0, 25)),                       # topping out
-    ((1, 24), (3, 27), (0, 20)),                                # the last ones down
-    ((9, 28), (7, 28), (5, 29), (3, 28), (1, 27), (10, 27)),    # the blow lands
-    ((8, 25), (6, 24), (4, 26), (2, 24), (0, 28)),              # up and spreading
+    ((3, 20), (1, 23), (4, 18), (0, 26)),                        # topping out
+    ((2, 25), (0, 29), (4, 30)),                                 # the last ones down
+    ((6, 29), (9, 28), (11, 29), (4, 34), (3, 32), (1, 30),      # the blow lands:
+     (2, 34)),                                                   # out of the face
+                                                                 # and off the floor
+    ((5, 26), (2, 28), (10, 27), (6, 23), (0, 32)),              # spreading
 )
 
 
@@ -1260,12 +1274,15 @@ def pickaxe(d, i, sh, pal, hands):
     px(d, hxp, hyp - 3, dark)
     px(d, hxp, hyp + 3, dark)
 
-    # The gold, last, so nothing is drawn over it.
+    # The gold, last, so nothing is drawn over it — including the rock and the
+    # pick, which is what puts the chips in front of both.
     g = pal.gold or steel_light
     gl = pal.gold_light or steel_light
+    ix, iy = GOLD_IMPACT
     for cx_, cy_ in GOLD_CHIPS[i % 4]:
         px(d, cx_, cy_, gl)
-        px(d, cx_ + 1, cy_ + 1, g)
+        # One step back towards the point it was struck from.
+        px(d, cx_ + (ix > cx_) - (ix < cx_), cy_ + (iy > cy_) - (iy < cy_), g)
 
 
 def hand(d, x, y, pal):
