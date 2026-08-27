@@ -217,3 +217,67 @@ func TestSpritesStayInTheWindow(t *testing.T) {
 		}
 	}
 }
+
+// TestWorkingCharactersReachTheirShadow is the missing-feet rule.
+//
+// The shadow on the floor is drawn only for a character standing on the floor:
+// a pet at a desk or on a bicycle has none, because the floor it would fall on
+// is out of sight. So the shadow is a claim, and the claim is that this one is
+// standing there.
+//
+// Amiao was not. `working` skips the legs — under a desk they are behind it,
+// on a bicycle they are behind that — and she works at a rock face in the
+// open, so she hovered three rows above her own shadow with nothing between
+// her hem and the floor. It is the running character's hands again: a branch
+// that is right for every other character in the state, and wrong for the one
+// that stands up in it.
+//
+// Only `working`, and that is not a hedge. It is the state nobody leaves the
+// ground in; `happy` and `celebrate` lift the character clear of the floor on
+// purpose and keep the shadow under them, which is the whole trick of a hop.
+func TestWorkingCharactersReachTheirShadow(t *testing.T) {
+	for _, s := range loadStrips(t) {
+		if s.state != "working" {
+			continue
+		}
+		for i := 0; i < s.n; i++ {
+			// The shadow is the only thing drawn part-transparent down here.
+			top, lo, hi := -1, s.w, -1
+			for y := s.h * 3 / 4; y < s.h; y++ {
+				for x := 0; x < s.w; x++ {
+					if a := s.alphaAt(i, x, y); a > 0 && a < 255 {
+						if top < 0 {
+							top = y
+						}
+						if x < lo {
+							lo = x
+						}
+						if x > hi {
+							hi = x
+						}
+					}
+				}
+			}
+			if top < 0 {
+				continue // no shadow: nothing is claiming to stand anywhere
+			}
+			// The lowest solid pixel in the shadow's own columns. Taken from
+			// the whole frame the answer would be the prop: Amiao's rock
+			// reaches the floor whether or not she does.
+			bottom := -1
+			for y := 0; y < s.h; y++ {
+				for x := lo; x <= hi; x++ {
+					if s.alphaAt(i, x, y) == 255 && y > bottom {
+						bottom = y
+					}
+				}
+			}
+			if bottom < top-1 {
+				t.Errorf("%s/%s frame %d: the character stops at row %d and its shadow "+
+					"starts at row %d — it is floating. A shadow on the floor says the "+
+					"character is standing on it, so give the pose its legs or take the "+
+					"shadow away.", s.pet, s.state, i, bottom, top)
+			}
+		}
+	}
+}

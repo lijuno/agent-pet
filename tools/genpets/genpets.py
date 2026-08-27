@@ -1387,7 +1387,16 @@ def torso(img, s, state, i, top, bw, bh, cy, pal):
             if (i + k) % 2 == 0:
                 d.line([(CX + dx - 1, GROUND), (CX + dx + 1, GROUND)], fill=dust)
                 px(d, CX + dx, GROUND - 1, dust)
-    elif state != "working":
+    elif state != "working" or s.work == "mine":
+        # `working` drops the legs because at a desk they are under it, behind
+        # a bicycle they are behind it, and in both cases drawing them puts
+        # shins through the furniture. At a rock face there is no furniture:
+        # she stands on the ground in the open, and the rule left her hovering
+        # over her own shadow with nothing between her hem and the floor.
+        #
+        # The shadow already had this exception — "standing at a rock face she
+        # is on the ground like anybody else" — and it should have been the
+        # tell that the legs needed it too.
         for sx in (-1, 1):
             inner, outer = CX + sx * 2, CX + sx * 3
             rect(d, inner, hip, outer, GROUND - 1, leg)
