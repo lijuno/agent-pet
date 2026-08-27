@@ -25,7 +25,7 @@ func (a *App) usableArea() rect {
 
 func (a *App) displayInset() (int, int) { return 0, menuBarInset }
 func (a *App) activate()                {}
-func (a *App) syncShownCheck(bool)      {}
+func (a *App) syncHideCheck(bool)       {}
 func (a *App) refreshPetMenu()          {}
 func setUpdateItem(update.Status)       {}
 func showAbout(string, string)          {}

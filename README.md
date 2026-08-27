@@ -98,9 +98,9 @@ flavour it is, where its config lives, and whether the hooks are installed.
 | Menu bar | The same commands under the `Pet` menu while the app is frontmost. |
 
 The pet also lives in the macOS menu bar. Its icon shows the current state and
-carries the same commands. **Show Pet** is a checkbox there: it puts the pet
-away and brings it back, and bringing it back also retrieves one that has been
-dragged off the edge of the screen. **Change Character** is a submenu listing the
+carries the same commands. **Hide** is a checkbox there: it puts the pet away,
+and unticking it brings the pet back — including one that has been dragged off
+the edge of the screen. **Change Character** is a submenu listing the
 characters, so switching happens in the menu bar rather than in a panel beside
 the pet. **File a Bug** opens a window with three buttons and a reason for
 each. **Report on GitHub** opens a new issue with the version, the paths and
@@ -299,7 +299,7 @@ the order the causes actually occur:
   pkill -f 'MacOS/petd'; sleep 1; open /Applications/agent-pet.app
   ```
 
-- **Invisible, but reacting?** It may be off-screen or hidden; **Show Pet** in
+- **Invisible, but reacting?** It may be off-screen or hidden; unticking **Hide** in
   the menu bar retrieves it. The window is deliberately transparent and
   click-through in places, so "I cannot click it" is expected.
 

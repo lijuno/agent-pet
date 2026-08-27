@@ -52,7 +52,7 @@ type App struct {
 	overlay    rect
 	hasOverlay bool
 
-	// hidden mirrors the window's visibility, so the Show Pet checkbox can
+	// hidden mirrors the window's visibility, so the Hide checkbox can
 	// report it. Wails has no "is the window visible" call to ask.
 	hidden bool
 
@@ -1120,9 +1120,9 @@ func (a *App) Quit() { wruntime.Quit(a.ctx) }
 
 // showWindow and emitPanel exist for the optional status-bar menu, which has to
 // reach into the window from outside the webview.
-// SetShown puts the pet on screen or takes it away. It backs the Show Pet
-// checkbox in the menu-bar menu, which is the only surface that can offer it:
-// a hidden pet cannot be clicked to bring itself back.
+// SetShown puts the pet on screen or takes it away. It backs the Hide checkbox
+// in the menu-bar menu, which is the only surface that can offer it: a hidden
+// pet cannot be clicked to bring itself back.
 func (a *App) SetShown(shown bool) {
 	if a.ctx == nil {
 		return
@@ -1138,20 +1138,21 @@ func (a *App) SetShown(shown bool) {
 	// Tick the box here rather than at the call site: visibility changes from
 	// the menu, from the API and from startup, and a checkbox that only tracks
 	// one of those is lying the rest of the time.
-	a.syncShownCheck(!a.hidden)
+	a.syncHideCheck(a.hidden)
 }
 
 // Shown reports whether the pet is on screen.
 func (a *App) Shown() bool { return !a.hidden }
 
-// showWindow is "Show Pet". Three things have to be true for that to mean
+// showWindow is what unticking Hide does. Three things have to be true for
+// that to mean
 // anything, and only the first was being done:
 //
 //   - the window is shown and un-minimised;
 //   - the application is frontmost, or the window is shown behind whatever the
 //     user is actually looking at;
 //   - the window is somewhere on the screen. The pet can be dragged almost
-//     entirely off an edge, and "Show Pet" is exactly what someone reaches for
+//     entirely off an edge, and Hide is exactly what someone reaches for
 //     when they have lost it — so if it is outside the usable area, bring it
 //     back to the nearest point inside.
 func (a *App) showWindow() {
@@ -1209,7 +1210,7 @@ func (a *App) appMenu() *menu.Menu {
 	m.Append(menu.AppMenu())
 
 	pet := m.AddSubmenu("Pet")
-	pet.AddText("Pet Status", keys.CmdOrCtrl("i"), func(*menu.CallbackData) {
+	pet.AddText("Status", keys.CmdOrCtrl("i"), func(*menu.CallbackData) {
 		wruntime.EventsEmit(a.ctx, "pet:panel", "status")
 	})
 	pet.AddSeparator()

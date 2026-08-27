@@ -13,7 +13,7 @@
 
 // Menu item identifiers, shared with the Go side.
 enum {
-  PET_SHOW = 1,
+  PET_HIDE = 1,
   PET_STATUS = 2,
   PET_CHANGE = 4,
   PET_ONTOP = 5,
@@ -36,7 +36,7 @@ enum {
 // petStatusInstall adds the status item. png is a template icon. Safe to call
 // from any goroutine: the work is dispatched to the main thread, which is the
 // only place AppKit will accept it.
-void petStatusInstall(const void *png, int len, int onTop, int shown);
+void petStatusInstall(const void *png, int len, int onTop, int hidden);
 
 // petStatusSetState updates the disabled first line, so the pet's state is
 // readable without opening anything.

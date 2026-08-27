@@ -72,16 +72,16 @@ func (a *App) startTray(ctx context.Context) {
 		// Wails overrides it at launch — see petHideFromDock.
 		C.petHideFromDock()
 
-		onTop, shown := 0, 0
+		onTop, hidden := 0, 0
 		if a.alwaysOnTop {
 			onTop = 1
 		}
-		if !a.hidden {
-			shown = 1
+		if a.hidden {
+			hidden = 1
 		}
 		icon := trayIconBytes()
 		C.petStatusInstall(unsafe.Pointer(&icon[0]), C.int(len(icon)),
-			C.int(onTop), C.int(shown))
+			C.int(onTop), C.int(hidden))
 
 		// The menu is built with a placeholder first line. Set it now rather
 		// than waiting for the first event, so the dev app says which app it
@@ -166,7 +166,7 @@ func (a *App) StatusMenu() string {
 // action, so a test drives the same path as a click rather than a copy of it.
 func (a *App) ClickStatusItem(name string) error {
 	tags := map[string]C.int{
-		"show": C.PET_SHOW, "status": C.PET_STATUS,
+		"hide": C.PET_HIDE, "status": C.PET_STATUS,
 		"change": C.PET_CHANGE, "ontop": C.PET_ONTOP,
 		"quit": C.PET_QUIT, "update": C.PET_UPDATE, "about": C.PET_ABOUT,
 		"reload": C.PET_RELOAD, "bug": C.PET_REPORT,
@@ -268,8 +268,9 @@ func (a *App) refreshPetMenu() {
 	statusMu.Unlock()
 }
 
-// syncShownCheck keeps the Show Pet tick in step with the window.
-func (a *App) syncShownCheck(on bool) { setStatusCheck(C.PET_SHOW, on) }
+// syncHideCheck keeps the Hide tick in step with the window. Ticked when the
+// pet is away, which is the state the item names.
+func (a *App) syncHideCheck(hidden bool) { setStatusCheck(C.PET_HIDE, hidden) }
 
 // setUpdateItem retitles the update item and says whether it belongs in the
 // menu at all. The version has already been through update.Status.Validate, so
@@ -437,9 +438,9 @@ func (a *App) handleStatusClick(tag C.int) {
 		return
 	}
 	switch tag {
-	case C.PET_SHOW:
-		// A toggle, so the same item both fetches the pet and puts it away.
-		// SetShown ticks the box itself.
+	case C.PET_HIDE:
+		// A toggle, so the same item both puts the pet away and fetches it
+		// back. SetShown ticks the box itself.
 		a.SetShown(a.hidden)
 	case C.PET_STATUS:
 		a.emitPanel("status")

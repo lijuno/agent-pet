@@ -147,20 +147,28 @@ want "the status item is installed" "$(field menu_bar)" "installed"
 # Dock icon nobody notices in review.
 want "the app keeps out of the Dock" "$(field dock)" "menu bar only"
 menu=$(field status_menu)
-for item in "Show Pet" "Pet Status" "Change Character" "Always on Top" "Reload" "File a Bug" "About" "Quit"; do
+for item in "Status" "Change Character" "Always on Top" "Hide" "Reload" "File a Bug" "About" "Quit"; do
 	want "the menu offers $item" "$menu" "$item"
 done
 # Counters nobody asked for. They live on in `petctl status`, where somebody
 # curious can go and look, rather than in a menu everybody has to read past.
 gone "the menu no longer offers Statistics" "$menu" "Statistics"
+# The order, by tag rather than by title: 0 is the state line, then Status,
+# Change Character, Always on Top, Hide, Reload, File a Bug, About, the update
+# item and Quit. Tags because they do not move when a title is reworded, and
+# because the state line's title is a state and the update item's is empty.
+# Submenu entries — the characters, which come after their parent — are the
+# ':>' lines, and are not part of this.
+order=$(echo "$menu" | tr '|' '\n' | grep -v ':>' | grep . | cut -d: -f1 | tr '\n' ' ')
+want "the menu is in the order somebody chose" "$order" "0 2 4 5 1 10 11 9 7 8"
 
 echo
 echo "Every menu item survives being clicked"
-# The suite used to click only Show Pet. Three of the others emitted an event
+# The suite used to click only the visibility toggle. Three of the others emitted an event
 # from the main thread and killed the process, and nothing here noticed.
 # bug-open is deliberately absent: it opens the issue tracker in a browser, and
 # a test suite that launches a browser window is a test suite nobody runs twice.
-for item in show show status about change ontop ontop pet:sanmao reload update bug bug-copy; do
+for item in hide hide status about change ontop ontop pet:sanmao reload update bug bug-copy; do
 	if ! curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
 		bad "clicking $item" "petd is gone — an earlier item killed it"
 		break
@@ -383,39 +391,45 @@ sleep 0.5
 want "and closes again" "$(field bug_report)" "closed"
 
 echo
-echo "Show Pet is a toggle"
+echo "Hide is a toggle, ticked for the state it names"
 # Start from a known state. Asserting on whatever the last run left behind
 # makes the first check depend on the previous one, across invocations.
 post '{"shown":true}'
 sleep 0.5
-want "it is ticked while the pet is on screen" "$(field status_menu)" "Show Pet[on]"
-post '{"status_item":"show"}'
+# Empty while the pet is on screen, which is nearly always: a box ticked
+# whenever nothing is unusual tells nobody anything.
+menu=$(field status_menu)
+case "$menu" in
+*"Hide[on]"*) bad "it is empty while the pet is on screen" "ticked: $menu" ;;
+*"Hide"*) ok "it is empty while the pet is on screen" ;;
+*) bad "it is empty while the pet is on screen" "no Hide item: $menu" ;;
+esac
+post '{"status_item":"hide"}'
+sleep 0.8
+want "clicking it hides the pet" "$(field status_menu)" "Hide[on]"
+want "and the pet reports itself hidden" "$(field visible)" "no"
+post '{"status_item":"hide"}'
 sleep 0.8
 menu=$(field status_menu)
 case "$menu" in
-*"Show Pet[on]"*) bad "clicking it hides the pet" "still ticked: $menu" ;;
-*"Show Pet"*) ok "clicking it hides the pet" ;;
-*) bad "clicking it hides the pet" "no Show Pet item: $menu" ;;
+*"Hide[on]"*) bad "clicking it again brings the pet back" "still ticked: $menu" ;;
+*) ok "clicking it again brings the pet back" ;;
 esac
-want "and the pet reports itself hidden" "$(field visible)" "no"
-post '{"status_item":"show"}'
-sleep 0.8
-want "clicking it again brings the pet back" "$(field status_menu)" "Show Pet[on]"
 want "and the pet reports itself visible" "$(field visible)" "yes"
 # Hiding by any route must move the tick, not just clicking the item.
 post '{"shown":false}'
 sleep 0.6
-menu=$(field status_menu)
-case "$menu" in
-*"Show Pet[on]"*) bad "hiding from elsewhere clears the tick" "still ticked: $menu" ;;
-*) ok "hiding from elsewhere clears the tick" ;;
-esac
+want "hiding from elsewhere sets the tick" "$(field status_menu)" "Hide[on]"
 post '{"shown":true}'
 sleep 0.6
-want "showing from elsewhere sets it again" "$(field status_menu)" "Show Pet[on]"
+menu=$(field status_menu)
+case "$menu" in
+*"Hide[on]"*) bad "showing from elsewhere clears it again" "still ticked: $menu" ;;
+*) ok "showing from elsewhere clears it again" ;;
+esac
 
 echo
-echo "Show Pet finds a character parked off screen"
+echo "Hide finds a character parked off screen"
 usable=$(field usable)
 uw=$(echo "$usable" | sed 's/x.*//')
 uh=$(echo "$usable" | sed 's/^[0-9]*x//; s/ .*//')
@@ -433,7 +447,7 @@ for spot in "$((uw - 40)),300 off the right" "-250,300 off the left" \
 	px=$(x_of "$parked")
 	py=$(y_of "$parked")
 	# If the window is still inside the usable area, the system declined to put
-	# it out of reach and there is nothing for Show Pet to rescue. That is a
+	# it out of reach and there is nothing for Hide to rescue. That is a
 	# fact about this desktop, not a fault in the pet.
 	if [ "$px" -ge 0 ] && [ "$py" -ge 0 ] &&
 		[ "$px" -le "$((uw - ww))" ] && [ "$py" -le "$((uh - wh))" ]; then

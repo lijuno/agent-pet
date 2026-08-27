@@ -49,7 +49,7 @@ static void onMain(void (^block)(void)) {
   }
 }
 
-void petStatusInstall(const void *png, int len, int onTop, int shown) {
+void petStatusInstall(const void *png, int len, int onTop, int hidden) {
   NSData *data = [NSData dataWithBytes:png length:len];
   onMain(^{
     if (petItem != nil) {
@@ -78,11 +78,7 @@ void petStatusInstall(const void *png, int len, int onTop, int shown) {
     [petStateItem setEnabled:NO];
     [menu addItem:[NSMenuItem separatorItem]];
 
-    // A checkbox, like Always on Top: it reports whether the pet is on screen
-    // and toggles it, rather than being a one-way door.
-    NSMenuItem *show = addItem(menu, @"Show Pet", PET_SHOW);
-    [show setState:shown ? NSControlStateValueOn : NSControlStateValueOff];
-    addItem(menu, @"Pet Status", PET_STATUS);
+    addItem(menu, @"Status", PET_STATUS);
     // A submenu, so the characters appear beside the menu bar menu rather
     // than in a panel next to the pet. An item with a submenu opens it instead
     // of firing its action, which is what we want here.
@@ -93,6 +89,17 @@ void petStatusInstall(const void *png, int len, int onTop, int shown) {
 
     NSMenuItem *top = addItem(menu, @"Always on Top", PET_ONTOP);
     [top setState:onTop ? NSControlStateValueOn : NSControlStateValueOff];
+
+    // A checkbox, like Always on Top, and ticked for the state it names: the
+    // pet is on screen almost always, so the box is empty almost always. It
+    // was "Show Pet", ticked while the pet was visible — a box that is on
+    // whenever nothing is unusual says nothing, and the item somebody hunts
+    // for in the menu bar is the one that puts the pet away.
+    //
+    // Still a toggle rather than a one-way door: it is also how a pet dragged
+    // off the edge of the screen comes back.
+    NSMenuItem *hide = addItem(menu, @"Hide", PET_HIDE);
+    [hide setState:hidden ? NSControlStateValueOn : NSControlStateValueOff];
 
     addItem(menu, @"Reload", PET_RELOAD);
     // Beside About rather than at the bottom: both answer questions about the
