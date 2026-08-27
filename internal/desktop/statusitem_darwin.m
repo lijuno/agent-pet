@@ -78,7 +78,10 @@ void petStatusInstall(const void *png, int len, int onTop, int hidden) {
     [petStateItem setEnabled:NO];
     [menu addItem:[NSMenuItem separatorItem]];
 
-    addItem(menu, @"Status", PET_STATUS);
+    // "Show Status" rather than "Status": every other item in this menu is
+    // something to do, and a bare noun among verbs reads as a heading for the
+    // items under it.
+    addItem(menu, @"Show Status", PET_STATUS);
     // A submenu, so the characters appear beside the menu bar menu rather
     // than in a panel next to the pet. An item with a submenu opens it instead
     // of firing its action, which is what we want here.

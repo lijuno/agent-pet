@@ -147,7 +147,7 @@ want "the status item is installed" "$(field menu_bar)" "installed"
 # Dock icon nobody notices in review.
 want "the app keeps out of the Dock" "$(field dock)" "menu bar only"
 menu=$(field status_menu)
-for item in "Status" "Change Character" "Always on Top" "Hide" "Reload" "File a Bug" "About" "Quit"; do
+for item in "Show Status" "Change Character" "Always on Top" "Hide" "Reload" "File a Bug" "About" "Quit"; do
 	want "the menu offers $item" "$menu" "$item"
 done
 # Counters nobody asked for. They live on in `petctl status`, where somebody

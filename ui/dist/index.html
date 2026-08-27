@@ -608,7 +608,7 @@ function openMenu() {
   el.menu.replaceChildren();
 
   el.menu.append(
-    item("Status", () => { el.menu.classList.add("hidden"); togglePanel("status"); }),
+    item("Show Status", () => { el.menu.classList.add("hidden"); togglePanel("status"); }),
     item("Change Character…", () => { el.menu.classList.add("hidden"); togglePanel("pets"); }),
     separator(),
     ...sizeItems(),

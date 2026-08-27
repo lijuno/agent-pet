@@ -1210,7 +1210,7 @@ func (a *App) appMenu() *menu.Menu {
 	m.Append(menu.AppMenu())
 
 	pet := m.AddSubmenu("Pet")
-	pet.AddText("Status", keys.CmdOrCtrl("i"), func(*menu.CallbackData) {
+	pet.AddText("Show Status", keys.CmdOrCtrl("i"), func(*menu.CallbackData) {
 		wruntime.EventsEmit(a.ctx, "pet:panel", "status")
 	})
 	pet.AddSeparator()
