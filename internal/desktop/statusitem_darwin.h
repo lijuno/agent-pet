@@ -21,6 +21,12 @@ enum {
   PET_QUIT = 8,
   PET_ABOUT = 9,
   PET_RELOAD = 10,
+  PET_REPORT = 11,
+  // The two buttons in the Report a Bug window. They carry tags and share the
+  // menu's target and action, so a button press arrives in Go by the same path
+  // a menu click does — one callback, not two.
+  PET_REPORT_COPY = 12,
+  PET_REPORT_OPEN = 13,
   // Items in the Change Pet submenu are PET_PICK_BASE + the pet's index in the
   // list the Go side last sent.
   PET_PICK_BASE = 100,
@@ -114,6 +120,33 @@ void petAboutShow(const char *title, const char *body);
 
 // petAboutClose hides it again. For tests, and for Quit.
 void petAboutClose(void);
+
+// petReportShow opens the Report a Bug window: the same kind of window as
+// About, plus two buttons. It is where the answer to "how do I report this?"
+// lives, because the menu item that opens it is the only part of the program
+// somebody with a bug will think to look at.
+void petReportShow(const char *title, const char *body);
+
+// petReportClose hides it again.
+void petReportClose(void);
+
+// petReportCopied flips the copy button's title for a moment. A button that
+// puts something on the clipboard changes nothing anybody can see, and there
+// is no badge in a native window to say it happened.
+void petReportCopied(void);
+
+// petReportReport describes the window for the diagnostics endpoint: where it
+// is, what its buttons say, and whether its text fits. A test cannot see a
+// native window — the button titles are where the copy feedback shows up, and
+// a path cut off by the edge of the field shows up nowhere else at all.
+int petReportReport(char *buf, int cap);
+
+// petCopyToPasteboard puts text on the general pasteboard.
+void petCopyToPasteboard(const char *text);
+
+// petOSVersion is the macOS version, for the bug report. Asked of the system
+// rather than shelled out to `sw_vers`: petd spawns no processes.
+int petOSVersion(char *buf, int cap);
 
 // petAboutReport describes the window — whether it is on screen, its size and
 // where it sits relative to the centre of the display it is on. A test cannot

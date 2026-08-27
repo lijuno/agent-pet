@@ -94,7 +94,7 @@ flavour it is, where its config lives, and whether the hooks are installed.
 |---|---|
 | Drag | Move the pet. Its position is remembered. |
 | Double-click | Pet it. |
-| Right-click | Menu: status, change pet, size, always on top, drop shadow, about, quit. |
+| Right-click | Menu: status, change pet, size, always on top, drop shadow, report a bug, about, quit. |
 | Menu bar | The same commands under the `Pet` menu while the app is frontmost. |
 
 The pet also lives in the macOS menu bar. Its icon shows the current state and
@@ -102,7 +102,11 @@ carries the same commands. **Show Pet** is a checkbox there: it puts the pet
 away and brings it back, and bringing it back also retrieves one that has been
 dragged off the edge of the screen. **Change Pet** is a submenu listing the
 characters, so switching happens in the menu bar rather than in a panel beside
-the pet. See [ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
+the pet. **Report a Bug** opens a window saying where a report goes and what to
+put in it, with a button that copies the version, the paths and the log
+location onto the clipboard — the pet has no crash reporter and sends nothing
+anywhere, so the details have to travel by hand. See
+[ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
 
 The character comes in three sizes — small, medium and large — from the
 right-click menu or the `pet.scale` setting.

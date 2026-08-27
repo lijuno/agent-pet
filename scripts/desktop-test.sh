@@ -147,7 +147,7 @@ want "the status item is installed" "$(field menu_bar)" "installed"
 # Dock icon nobody notices in review.
 want "the app keeps out of the Dock" "$(field dock)" "menu bar only"
 menu=$(field status_menu)
-for item in "Show Pet" "Pet Status" "Change Pet" "Always on Top" "Reload Config" "About" "Quit"; do
+for item in "Show Pet" "Pet Status" "Change Pet" "Always on Top" "Reload Config" "Report a Bug" "About" "Quit"; do
 	want "the menu offers $item" "$menu" "$item"
 done
 # Counters nobody asked for. They live on in `petctl status`, where somebody
@@ -158,7 +158,9 @@ echo
 echo "Every menu item survives being clicked"
 # The suite used to click only Show Pet. Three of the others emitted an event
 # from the main thread and killed the process, and nothing here noticed.
-for item in show show status about change ontop ontop pet:sanmao reload update; do
+# bug-open is deliberately absent: it opens the issue tracker in a browser, and
+# a test suite that launches a browser window is a test suite nobody runs twice.
+for item in show show status about change ontop ontop pet:sanmao reload update bug bug-copy; do
 	if ! curl -sS --max-time 5 "$BASE/healthz" >/dev/null 2>&1; then
 		bad "clicking $item" "petd is gone — an earlier item killed it"
 		break
@@ -177,6 +179,7 @@ done
 # and leaving one on screen after a test run is the same wart as leaving a fake
 # update in the menu bar.
 post '{"panel":"about-close"}'
+post '{"panel":"bug-close"}'
 
 # Leave the toggles as they were found.
 post '{"shown":true}'
@@ -323,9 +326,46 @@ case "$got" in
 *) bad "About opens in the middle of the screen" "$got" ;;
 esac
 want "and leaves the pet where it was" "$(field window)" "at 40,40"
+# The rows here are this machine's config and pets paths, and they are as long
+# as somebody's home directory makes them. Truncated, the end goes missing —
+# and the end is the half that says which of the two apps this is.
+want "nothing is cut off" "$got" "text fits"
 post '{"panel":"about-close"}'
 sleep 0.5
 want "and closes again" "$(field about)" "closed"
+
+echo
+echo "Report a Bug says how to report one"
+post '{"panel":"bug"}'
+sleep 1
+got=$(field bug_report)
+case "$got" in
+*"0,0 from centre"*) ok "it opens in the middle of the screen" ;;
+*) bad "it opens in the middle of the screen" "$got" ;;
+esac
+want "it offers the details" "$got" "Copy Details"
+# The paths in here are as long as this machine's home directory makes them,
+# and the log path is the reason somebody opens this window at all.
+want "nothing is cut off" "$got" "text fits"
+want "and the tracker" "$got" "Open Issue Tracker"
+# This puts the details on the clipboard, over whatever was there. Nothing else
+# in this suite touches anything outside the app, so it is worth saying: the
+# button exists to write the clipboard, and a check that would not let it do
+# that cannot tell whether it works.
+#
+# Copying changes nothing anybody can see except the button, which is the whole
+# reason the button says so. A press with no visible answer reads as a button
+# that does nothing, and there is no badge in a native window to say otherwise.
+post '{"status_item":"bug-copy"}'
+sleep 0.5
+want "copying says so on the button" "$(field bug_report)" "Copied"
+# And goes back: "Copied" is the answer to the press that just happened, not a
+# permanent label.
+sleep 1.6
+gone "the button goes back to itself" "$(field bug_report)" "Copied"
+post '{"panel":"bug-close"}'
+sleep 0.5
+want "and closes again" "$(field bug_report)" "closed"
 
 echo
 echo "Show Pet is a toggle"

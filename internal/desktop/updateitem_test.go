@@ -236,3 +236,67 @@ func save(t *testing.T) *App {
 	t.Helper()
 	return &App{log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 }
+
+// The Report a Bug window has to answer the question somebody opened it with:
+// where does this go, and what do I put in it. A window that only said "please
+// file an issue" would leave them exactly where they started.
+func TestBugReportTextSaysWhereAndWhat(t *testing.T) {
+	in := Info{
+		AppName: "Agent Pet (dev)", Version: "0.2.0-dev.3", Channel: "dev",
+		Addr: "127.0.0.1:9877", ConfigPath: "/c/config.yaml",
+	}
+	title, body := bugReportText(in, "Version 14.5 (Build 23F79)", "/d/logs/petd.log")
+	if !strings.Contains(title, "Agent Pet (dev)") {
+		t.Errorf("title = %q, want the application named — two of these run at once", title)
+	}
+	for _, want := range []string{
+		update.IssuesURL,     // where it goes
+		"/d/logs/petd.log",   // what to attach
+		"0.2.0-dev.3", "dev", // which build
+		"Version 14.5 (Build 23F79)", // which system
+		"/c/config.yaml",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the bug report is missing %q:\n%s", want, body)
+		}
+	}
+	// Steps, not a link on its own: an issue saying "the pet froze" costs a
+	// round trip that these lines are here to save.
+	if !strings.Contains(body, "what you expected") {
+		t.Errorf("the window should ask for what was expected:\n%s", body)
+	}
+}
+
+// Copy Details puts a block on the clipboard, and the window shows one. If
+// those two could differ, the details somebody pasted into an issue would not
+// be the details they were looking at.
+func TestCopiedDetailsAreTheOnesOnShow(t *testing.T) {
+	in := Info{AppName: "Agent Pet", Version: "0.2.1", Channel: "release"}
+	_, body := bugReportText(in, "Version 14.5", "/d/logs/petd.log")
+	details := bugReportDetails(in, "Version 14.5", "/d/logs/petd.log")
+	if !strings.Contains(body, details) {
+		t.Errorf("the copied details are not what the window shows:\ncopied:\n%s\n\nshown:\n%s",
+			details, body)
+	}
+}
+
+// An empty field must say so rather than leaving a blank where a value goes.
+// Off macOS there is no OS version to report, and "macOS" followed by nothing
+// reads as a broken window rather than a missing fact.
+func TestBugReportMarksEmptyFields(t *testing.T) {
+	title, body := bugReportText(Info{}, "", "")
+	if !strings.Contains(title, "Agent Pet") {
+		t.Errorf("title = %q, want a fallback name", title)
+	}
+	if !strings.Contains(body, "macOS      —") {
+		t.Errorf("an unknown OS version should be marked:\n%s", body)
+	}
+	// Counted in the details alone: the instructions above them have an em
+	// dash of their own, so counting the whole window would pass on the wrong
+	// six.
+	details := bugReportDetails(Info{}, "", "")
+	// Everything but the issue URL, which is a constant and cannot be empty.
+	if got := strings.Count(details, "—"); got != 6 {
+		t.Errorf("every empty field should be marked, got %d:\n%s", got, details)
+	}
+}

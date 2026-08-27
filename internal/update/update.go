@@ -29,6 +29,11 @@ import (
 // controls that URL — cannot redirect the download somewhere else.
 const Repo = "lijuno/agent-pet"
 
+// IssuesURL is where a bug report goes. Built from Repo so the tracker cannot
+// drift away from the repository the updates come from, and so it satisfies
+// ValidateNotesURL — the pet opens no URL that has not been through that.
+const IssuesURL = "https://github.com/" + Repo + "/issues"
+
 // MaxAssetSize bounds a download. The bundle is around 30 MB; this is loose
 // enough never to bite and tight enough that a hostile manifest cannot ask the
 // updater to fill the disk.

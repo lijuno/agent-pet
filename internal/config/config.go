@@ -245,6 +245,11 @@ func DataDir() string {
 func PetsDir() string { return filepath.Join(DataDir(), "pets") }
 func LogsDir() string { return filepath.Join(DataDir(), "logs") }
 
+// LogFile is the file the daemon logs to. Here rather than at the one place
+// that opens it, because the bug-report window has to tell somebody where the
+// log is and a second literal would go stale the first time this moved.
+func LogFile() string { return filepath.Join(LogsDir(), "petd.log") }
+
 // UpdateStamp is when the automatic update check last ran, recorded as a file's
 // modification time.
 //

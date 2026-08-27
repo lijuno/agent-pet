@@ -31,6 +31,14 @@ func setUpdateItem(update.Status)       {}
 func showAbout(string, string)          {}
 func closeAbout()                       {}
 func aboutReport() string               { return "closed" }
+func showBugReport(string, string)      {}
+func closeBugReport()                   {}
+func bugReportReport() string           { return "closed" }
+func copyToClipboard(string)            {}
+
+// osVersion is empty off macOS. The bug report marks a field it does not know
+// rather than guessing at one.
+func osVersion() string { return "" }
 
 // Alert is a no-op off macOS.
 func Alert(string, string)        {}

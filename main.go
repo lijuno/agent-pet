@@ -245,7 +245,7 @@ func newLogger(cfg config.Config) (*slog.Logger, func()) {
 	var w io.Writer = os.Stderr
 	closer := func() {}
 	if err := os.MkdirAll(config.LogsDir(), 0o755); err == nil {
-		path := filepath.Join(config.LogsDir(), "petd.log")
+		path := config.LogFile()
 		// Keep the log small; this is a pet, not an audit trail.
 		if st, err := os.Stat(path); err == nil && st.Size() > 1<<20 {
 			_ = os.Rename(path, path+".1")

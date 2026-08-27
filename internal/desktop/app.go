@@ -352,15 +352,20 @@ func (a *App) OpenPanel(kind string) error {
 		return fmt.Errorf("no window")
 	}
 	switch kind {
-	case "about", "about-close":
-		// Not panels: About is a native window, not an overlay in the webview.
-		// Handled here anyway because OpenPanel is the only door the loopback
-		// API has into the window, and a test needs to open and close it the
-		// same way it does everything else it cannot click.
-		if kind == "about" {
+	case "about", "about-close", "bug", "bug-close":
+		// Not panels: About and Report a Bug are native windows, not overlays
+		// in the webview. Handled here anyway because OpenPanel is the only
+		// door the loopback API has into the window, and a test needs to open
+		// and close them the same way it does everything else it cannot click.
+		switch kind {
+		case "about":
 			a.ShowAbout()
-		} else {
+		case "about-close":
 			closeAbout()
+		case "bug":
+			a.ShowBugReport()
+		case "bug-close":
+			closeBugReport()
 		}
 		return nil
 	case "status", "pets", "menu", "close":
@@ -447,6 +452,7 @@ func (a *App) DesktopDiagnostics() map[string]string {
 	// webview and nothing may read a real menu or window without accessibility
 	// access, which this project does not have.
 	out["about"] = aboutReport()
+	out["bug_report"] = bugReportReport()
 	if a.hidden {
 		out["visible"] = "no — hidden from the menu bar"
 	} else {
@@ -860,6 +866,76 @@ func (a *App) ShowAbout() { showAbout(aboutText(a.GetInfo())) }
 
 // CloseAbout hides it again.
 func (a *App) CloseAbout() { closeAbout() }
+
+// bugReportText is what the Report a Bug window says: what to do, and then the
+// details to do it with.
+//
+// The window exists because the menu is the only part of this program somebody
+// with a bug will think to look at, and "where do I report this?" had no answer
+// anywhere in it. It answers with steps rather than a link alone: an issue
+// saying "the pet froze" costs a round trip that the version and the log path
+// would have saved.
+//
+// Kept out of the cgo file, and split from the details, so both can be tested
+// without a screen — and so the button that copies the details cannot drift
+// from the details on show.
+func bugReportText(in Info, osVer, logPath string) (string, string) {
+	var b strings.Builder
+	b.WriteString("Something not working? Please open an issue.\n\n")
+	b.WriteString("1. Copy the details below — they say which build this is.\n")
+	b.WriteString("2. Open the issue tracker and say what the pet did, and\n")
+	b.WriteString("   what you expected instead.\n")
+	b.WriteString("3. Attach the log if you can. It records events and\n")
+	b.WriteString("   errors, never the contents of your files.\n\n")
+	b.WriteString(bugReportDetails(in, osVer, logPath))
+	name := in.AppName
+	if name == "" {
+		name = "Agent Pet"
+	}
+	return "Report a Bug — " + name, b.String()
+}
+
+// bugReportDetails is the block the Copy Details button puts on the clipboard,
+// and the tail of what the window shows. Everything here is a fact about the
+// build or about where its files are; nothing an agent reported is in it, so
+// there is nothing to sanitise (§26).
+func bugReportDetails(in Info, osVer, logPath string) string {
+	var b strings.Builder
+	for _, r := range [][2]string{
+		{"Version", in.Version},
+		{"Channel", in.Channel},
+		{"macOS", osVer},
+		{"Event API", in.Addr},
+		{"Config", in.ConfigPath},
+		{"Log", logPath},
+		{"Issues", update.IssuesURL},
+	} {
+		v := r[1]
+		if v == "" {
+			// An empty column is indistinguishable from a broken one.
+			v = "—"
+		}
+		fmt.Fprintf(&b, "%-10s %s\n", r[0], v)
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// ShowBugReport opens the Report a Bug window. Bound to the frontend as well
+// as reached from the status item, so the pet's own menu and the menu bar open
+// the same one window.
+func (a *App) ShowBugReport() {
+	showBugReport(bugReportText(a.GetInfo(), osVersion(), config.LogFile()))
+}
+
+// CloseBugReport hides it again.
+func (a *App) CloseBugReport() { closeBugReport() }
+
+// CopyBugReportDetails backs the Copy Details button. Rebuilt rather than
+// remembered from the window: the version cannot change under a running
+// process, but the config path can — Reload Config is a menu item.
+func (a *App) CopyBugReportDetails() {
+	copyToClipboard(bugReportDetails(a.GetInfo(), osVersion(), config.LogFile()))
+}
 
 func (a *App) Quit() { wruntime.Quit(a.ctx) }
 

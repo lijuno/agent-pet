@@ -169,7 +169,10 @@ func (a *App) ClickStatusItem(name string) error {
 		"show": C.PET_SHOW, "status": C.PET_STATUS,
 		"change": C.PET_CHANGE, "ontop": C.PET_ONTOP,
 		"quit": C.PET_QUIT, "update": C.PET_UPDATE, "about": C.PET_ABOUT,
-		"reload": C.PET_RELOAD,
+		"reload": C.PET_RELOAD, "bug": C.PET_REPORT,
+		// The two buttons in the bug-report window. Reachable by name for the
+		// same reason the menu items are: nothing in a test has a mouse.
+		"bug-copy": C.PET_REPORT_COPY, "bug-open": C.PET_REPORT_OPEN,
 	}
 	tag, ok := tags[name]
 	if !ok {
@@ -318,6 +321,42 @@ func showAbout(title, body string) {
 
 func closeAbout() { C.petAboutClose() }
 
+// showBugReport opens the Report a Bug window. Same two strings as About: what
+// it says is decided in Go, and the cgo side owns nothing but the window.
+func showBugReport(title, body string) {
+	t, b := C.CString(title), C.CString(body)
+	defer C.free(unsafe.Pointer(t))
+	defer C.free(unsafe.Pointer(b))
+	C.petReportShow(t, b)
+}
+
+func closeBugReport() { C.petReportClose() }
+
+// copyToClipboard puts the details on the pasteboard and says so on the
+// button. The two belong together — a copy nobody can see happen reads as a
+// button that does nothing.
+func copyToClipboard(s string) {
+	c := C.CString(s)
+	defer C.free(unsafe.Pointer(c))
+	C.petCopyToPasteboard(c)
+	C.petReportCopied()
+}
+
+// osVersion is the macOS version for the report. Empty is a fine answer: the
+// report marks a field it does not know rather than guessing at one.
+func osVersion() string {
+	buf := make([]C.char, 128)
+	n := C.petOSVersion(&buf[0], C.int(len(buf)))
+	return C.GoStringN(&buf[0], n)
+}
+
+// bugReportReport describes the window for the diagnostics endpoint.
+func bugReportReport() string {
+	buf := make([]C.char, 256)
+	n := C.petReportReport(&buf[0], C.int(len(buf)))
+	return C.GoStringN(&buf[0], n)
+}
+
 // Alert shows a modal message. It exists for failures that happen before the
 // window does, where the only other channel is stderr — which nothing launched
 // from the Finder has anywhere to show.
@@ -381,6 +420,15 @@ func (a *App) handleStatusClick(tag C.int) {
 		a.emitPanel("status")
 	case C.PET_ABOUT:
 		a.ShowAbout()
+	case C.PET_REPORT:
+		a.ShowBugReport()
+	case C.PET_REPORT_COPY:
+		a.CopyBugReportDetails()
+	case C.PET_REPORT_OPEN:
+		// The tracker, not a prefilled issue. A URL carrying the details would
+		// have to be built out of paths and a state name, and §26 says nothing
+		// the agent touches becomes a URL — Copy Details is how they travel.
+		openURL(update.IssuesURL)
 	case C.PET_RELOAD:
 		// The result goes to the log rather than to a dialog. A reload that
 		// worked has nothing to say, and one that did not is a line in the
