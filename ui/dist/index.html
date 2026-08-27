@@ -520,7 +520,7 @@ async function loadInfo() {
 
 async function buildPets(p) {
   const h = document.createElement("h2");
-  h.textContent = "Change pet";
+  h.textContent = "Change character";
   const sub = document.createElement("div");
   sub.className = "sub";
   sub.textContent = "Switches immediately. No restart.";
@@ -609,7 +609,7 @@ function openMenu() {
 
   el.menu.append(
     item("Pet Status", () => { el.menu.classList.add("hidden"); togglePanel("status"); }),
-    item("Change Pet…", () => { el.menu.classList.add("hidden"); togglePanel("pets"); }),
+    item("Change Character…", () => { el.menu.classList.add("hidden"); togglePanel("pets"); }),
     separator(),
     ...sizeItems(),
     separator(),
@@ -634,14 +634,14 @@ function openMenu() {
     // Re-reads config.yaml without a restart. The badge is the whole of the
     // feedback: a reload that worked has nothing to say, and the badge is
     // already how this menu says it did something.
-    item("Reload Config", () => {
+    item("Reload", () => {
       el.menu.classList.add("hidden");
       call("ReloadConfig");
       flashBadge("Config reloaded");
     }),
     // A window like About, and here for the same reason it is in the menu bar:
     // this menu is the other place somebody with a bug goes looking.
-    item("Report a Bug", () => { el.menu.classList.add("hidden"); call("ShowBugReport"); }),
+    item("File a Bug", () => { el.menu.classList.add("hidden"); call("ShowBugReport"); }),
     item("About", () => { el.menu.classList.add("hidden"); call("ShowAbout"); }),
     item("Quit", () => call("Quit")),
   );

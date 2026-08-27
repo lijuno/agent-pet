@@ -52,10 +52,11 @@ void petStatusSetCheck(int tag, int on);
 void petStatusClearPets(void);
 void petStatusAddPet(const char *title, int tag, int checked);
 
-// petStatusSetUpdate retitles the update item and sets whether it can be
-// pressed. The item is always visible: it reports the last check as well as an
-// available update. Disabled means there is no release page to open.
-void petStatusSetUpdate(const char *title, int enabled);
+// petStatusSetUpdate retitles the update item and sets whether it is shown and
+// whether it can be pressed. It appears only when there is something to
+// install; disabled means there is no release page behind it. What the last
+// check found, update or not, is in the Pet Status panel.
+void petStatusSetUpdate(const char *title, int enabled, int shown);
 
 // petOpenURL opens a URL in the user's browser through NSWorkspace.
 //

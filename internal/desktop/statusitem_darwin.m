@@ -86,35 +86,32 @@ void petStatusInstall(const void *png, int len, int onTop, int shown) {
     // A submenu, so the characters appear beside the menu bar menu rather
     // than in a panel next to the pet. An item with a submenu opens it instead
     // of firing its action, which is what we want here.
-    petChangeItem = addItem(menu, @"Change Pet", PET_CHANGE);
+    petChangeItem = addItem(menu, @"Change Character", PET_CHANGE);
     NSMenu *pets = [[NSMenu alloc] init];
     [pets setAutoenablesItems:NO];
     petChangeItem.submenu = pets;
-    [menu addItem:[NSMenuItem separatorItem]];
 
     NSMenuItem *top = addItem(menu, @"Always on Top", PET_ONTOP);
     [top setState:onTop ? NSControlStateValueOn : NSControlStateValueOff];
 
-    // Hidden until a check finds something. An always-present item reporting
-    // nothing is worse than no item.
-    // Always present. It reports the last check rather than appearing only
-    // when there is something to install, so the menu can answer "have I got
-    // the latest?" as well as "there is a new one".
-    // Next to About rather than beside Change Pet: it is about the whole
-    // program rather than about the character, and it is not something
-    // anybody reaches for often.
-    addItem(menu, @"Reload Config", PET_RELOAD);
+    addItem(menu, @"Reload", PET_RELOAD);
     // Beside About rather than at the bottom: both answer questions about the
     // program rather than about the character, and somebody looking for one is
     // usually looking for the other — the version in About is the first thing
     // a bug report needs.
-    addItem(menu, @"Report a Bug…", PET_REPORT);
+    addItem(menu, @"File a Bug", PET_REPORT);
     addItem(menu, @"About", PET_ABOUT);
-    petUpdateItem = addItem(menu, @"No update check yet", PET_UPDATE);
+    // Hidden until there is something to install. It used to be here always,
+    // reporting the last check — "Up to date", "Nothing published yet" — which
+    // is a line the menu carried every day to be useful on the rare one. The
+    // Pet Status panel answers that question with the time of the check beside
+    // it, which is the better place for an answer nobody needs at a glance.
+    petUpdateItem = addItem(menu, @"", PET_UPDATE);
     [petUpdateItem setEnabled:NO];
+    [petUpdateItem setHidden:YES];
     [menu addItem:[NSMenuItem separatorItem]];
 
-    addItem(menu, @"Quit Pet", PET_QUIT);
+    addItem(menu, @"Quit", PET_QUIT);
 
     petItem.menu = menu;
   });
@@ -155,11 +152,12 @@ void petStatusAddPet(const char *title, int tag, int checked) {
   });
 }
 
-void petStatusSetUpdate(const char *title, int enabled) {
+void petStatusSetUpdate(const char *title, int enabled, int shown) {
   NSString *t = [NSString stringWithUTF8String:title];
   onMain(^{
     [petUpdateItem setTitle:t];
     [petUpdateItem setEnabled:enabled ? YES : NO];
+    [petUpdateItem setHidden:shown ? NO : YES];
   });
 }
 
@@ -474,7 +472,7 @@ void petReportShow(const char *title, const char *body) {
   onMain(^{
     if (petReportWindow == nil) {
       NSRect frame = NSMakeRect(0, 0, 560, 400);
-      petReportWindow = makeInfoWindow(@"Report a Bug", frame);
+      petReportWindow = makeInfoWindow(@"File a Bug", frame);
       CGFloat w = frame.size.width - 40;
       petReportTitle = makeLabel(NSMakeRect(20, frame.size.height - 58, w, 24),
                                  [NSFont boldSystemFontOfSize:16], NO);

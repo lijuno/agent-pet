@@ -734,13 +734,16 @@ func (a *App) GetUpdate() update.Status {
 // build, not a setting: the other channel is a different application.
 func (a *App) UpdateChannel() update.Channel { return flavor.Current().Channel }
 
-// updateItemTitle is what the menu bar's update item says. Kept out of the
-// cgo file so it can be tested without a menu bar to look at.
+// updateItemTitle is what the menu bar's update item says, and whether it is
+// there at all. Kept out of the cgo file so it can be tested without a menu bar
+// to look at.
 //
-// The item is always shown. Hidden until an update existed, it meant the menu
-// could never answer "have I got the latest?" — which is the question somebody
-// opens it to ask, and the one they cannot answer any other way without a
-// terminal.
+// It appears only when there is something to install. It used to be permanent,
+// reporting the last check — "Up to date", "Nothing published yet" — on the
+// reasoning that the menu should be able to answer "have I got the latest?".
+// It can still be asked: the Pet Status panel says what the last check found
+// and how long ago it ran, which is the better answer anyway. What the menu
+// carried every day was a line that mattered on one of them.
 //
 // It reports the last result; it does not check. The daemon opens no outbound
 // connections and spawns no processes (ADR 0008), so checking happens in
@@ -749,25 +752,14 @@ func (a *App) UpdateChannel() update.Channel { return flavor.Current().Channel }
 // No relative time in the title. Nothing rebuilds this menu while it sits in
 // the menu bar, so "checked 2 minutes ago" would still say that four hours
 // later, and a label that goes quietly wrong is worse than no label.
-func updateItemTitle(st update.Status) string {
-	switch {
-	case st.Available && st.Latest != "":
-		return "Update to " + st.Latest + "…"
-	case st.Error != "":
-		// "no update" and "could not find out" are different answers and the
-		// pet does not guess between them — same rule as Status.Error itself.
-		return "Update check failed"
-	case st.CheckedAt.IsZero():
-		return "No update check yet"
-	case st.Latest == "":
-		return "Nothing published yet"
-	case st.Latest == st.Current:
-		return "Up to date"
-	default:
-		// The running build is newer than the channel offers. Normal on a
-		// prerelease, and neither an update nor "up to date".
-		return "Ahead of the channel"
+func updateItemTitle(st update.Status) (string, bool) {
+	if st.Available && st.Latest != "" {
+		return "Update to " + st.Latest + "…", true
 	}
+	// Every other state — no check yet, nothing published, up to date, ahead of
+	// the channel, and a check that failed — is a question rather than a thing
+	// to do, and questions are answered in the panel.
+	return "", false
 }
 
 // openReleaseNotes opens the page for the version on offer. The pet installs
@@ -895,7 +887,7 @@ func bugReportText(in Info, osVer, logPath string) (string, string) {
 	if name == "" {
 		name = "Agent Pet"
 	}
-	return "Report a Bug — " + name, b.String()
+	return "File a Bug — " + name, b.String()
 }
 
 // bugReportDetails is the block the Copy Details button puts on the clipboard,
@@ -1035,7 +1027,7 @@ func issueBody(in Info, osVer, logPath, cfg string) string {
 	// URL holds a few thousand characters, so the honest thing is to say where
 	// the copy to attach comes from.
 	b.WriteString("**Log**\n\n")
-	b.WriteString("Not in here — Save Report in the pet's Report a Bug window\n")
+	b.WriteString("Not in here — Save Report in the pet's File a Bug window\n")
 	b.WriteString("writes the details, the config and the last log lines to a\n")
 	b.WriteString("file, and shows it in Finder. Drag it in to attach it.\n")
 	return b.String()
@@ -1221,7 +1213,7 @@ func (a *App) appMenu() *menu.Menu {
 		wruntime.EventsEmit(a.ctx, "pet:panel", "status")
 	})
 	pet.AddSeparator()
-	pet.AddText("Change Pet…", nil, func(*menu.CallbackData) {
+	pet.AddText("Change Character…", nil, func(*menu.CallbackData) {
 		wruntime.EventsEmit(a.ctx, "pet:panel", "pets")
 	})
 	pet.AddSeparator()

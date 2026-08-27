@@ -147,7 +147,7 @@ want "the status item is installed" "$(field menu_bar)" "installed"
 # Dock icon nobody notices in review.
 want "the app keeps out of the Dock" "$(field dock)" "menu bar only"
 menu=$(field status_menu)
-for item in "Show Pet" "Pet Status" "Change Pet" "Always on Top" "Reload Config" "Report a Bug" "About" "Quit"; do
+for item in "Show Pet" "Pet Status" "Change Character" "Always on Top" "Reload" "File a Bug" "About" "Quit"; do
 	want "the menu offers $item" "$menu" "$item"
 done
 # Counters nobody asked for. They live on in `petctl status`, where somebody
@@ -186,7 +186,7 @@ post '{"shown":true}'
 sleep 0.4
 
 echo
-echo "Change Pet is a submenu of the menu bar menu"
+echo "Change Character is a submenu of the menu bar menu"
 # Start from a known character. This section used to assert on whichever pet
 # the last run — or a stray click — happened to leave active, so it passed in
 # sequence and failed on its own.
@@ -230,8 +230,19 @@ echo "Updates"
 # Stateful, like the rest of this file. A previous run leaves an update showing,
 # so the "nothing found yet" state has to be restored rather than assumed —
 # asserting on what the last run left behind passes in sequence and fails alone.
-curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json' \
-	-d '{"available":false}' >/dev/null
+#
+# Cleared by reporting the running version, not by posting available:false. A
+# result carrying no version is deliberately not remembered, so the bare form
+# leaves the last real one — 9.9.9, from the run before — in the file beside the
+# config, where the next start reads it back. That is how a fake update outlived
+# the quit this used to promise it would not.
+clear_update() {
+	cur=$(curl -sS --max-time 5 "$BASE/update" |
+		python3 -c "import sys,json;print(json.load(sys.stdin)['current'])")
+	curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json' \
+		-d "{\"latest\":\"$cur\",\"available\":false}" >/dev/null
+}
+clear_update
 sleep 0.4
 
 # The channel is a build fact, not a setting: the other channel is the other
@@ -243,11 +254,12 @@ case "$menu" in
 *) ok "the menu offers no channel picker" ;;
 esac
 
-# The item is always there and says what the last check found. It used to be
-# hidden until an update existed, which meant the menu could not answer "have I
-# got the latest?" — the question somebody opens it to ask. [off] is the dump's
-# way of saying present but not pressable: there is no release page behind it.
-want "the update item is always present" "$menu" "Nothing published yet[off]"
+# Nothing to install, nothing in the menu. The item used to be permanent and
+# report the last check — "Up to date", "Nothing published yet" — which is a
+# line the menu carried every day to be useful on the rare one. Asserted by tag
+# rather than by title because a hidden item has no title worth reading: 7 is
+# PET_UPDATE, and [hidden] is the dump's way of saying it is not on screen.
+want "no update item when there is nothing to install" "$menu" "7:[hidden][off]"
 
 # The app cannot find an update by itself — it holds no HTTP client. This is
 # petctl's half of the conversation, which is the only way one arrives.
@@ -269,15 +281,14 @@ case "$(field status_menu)" in
 *) ok "and the item becomes pressable" ;;
 esac
 
-# A check that found nothing says so, rather than going quiet. This is the
-# state the item exists for: "no update" is an answer, and before this it was
-# indistinguishable from "never looked".
-cur=$(curl -sS --max-time 5 "$BASE/update" |
-	python3 -c "import sys,json;print(json.load(sys.stdin)['current'])")
-curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json' \
-	-d "{\"latest\":\"$cur\",\"available\":false}" >/dev/null
+# And a check that finds nothing takes the item away again, rather than leaving
+# an offer standing that was true a minute ago. "Up to date" is still an answer
+# — it is in the Pet Status panel, with the time of the check beside it.
+clear_update
 sleep 0.5
-want "a check that found nothing says so" "$(field status_menu)" "Up to date[off]"
+menu=$(field status_menu)
+want "a check that finds nothing takes it away" "$menu" "7:[hidden]"
+gone "and leaves no version behind" "$menu" "Update to"
 curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json' \
 	-d '{"latest":"9.9.9","available":true}' >/dev/null
 sleep 0.5
@@ -307,11 +318,11 @@ want "and the menu still shows the real one" "$(field status_menu)" "Update to 9
 
 # Put it back on the way out as well as on the way in. Restoring at the top is
 # what lets this section run alone; clearing here is for the human afterwards,
-# whose menu bar otherwise offers "Update to 9.9.9…" until they next quit the
-# app. A stale test is a nuisance, but a product telling somebody a release
-# exists when it does not is a different kind of wrong.
-curl -sS --max-time 5 -X POST "$BASE/update" -H 'content-type: application/json' \
-	-d '{"available":false}' >/dev/null
+# whose menu bar otherwise offers "Update to 9.9.9…" — and now does so across
+# restarts, since the result is kept in a file. A stale test is a nuisance, but
+# a product telling somebody a release exists when it does not is a different
+# kind of wrong.
+clear_update
 
 echo
 echo "About is a window of its own"
@@ -335,7 +346,7 @@ sleep 0.5
 want "and closes again" "$(field about)" "closed"
 
 echo
-echo "Report a Bug says how to report one"
+echo "File a Bug says how to report one"
 post '{"panel":"bug"}'
 sleep 1
 got=$(field bug_report)

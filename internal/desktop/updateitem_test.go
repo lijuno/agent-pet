@@ -33,52 +33,73 @@ func TestUpdateItemTitle(t *testing.T) {
 	}, {
 		name: "nothing has been checked yet",
 		st:   update.Status{Current: "0.1.0"},
-		want: "No update check yet",
+		want: "",
 	}, {
 		name: "checked, and the channel has nothing on it",
 		st:   update.Status{Current: "0.1.0", CheckedAt: checked},
-		want: "Nothing published yet",
+		want: "",
 	}, {
 		name: "checked, and this is the newest there is",
 		st:   update.Status{Current: "0.2.0", Latest: "0.2.0", CheckedAt: checked},
-		want: "Up to date",
+		want: "",
 	}, {
 		name: "running a prerelease newer than the channel",
 		st:   update.Status{Current: "0.3.0-dev.1", Latest: "0.2.0", CheckedAt: checked},
-		want: "Ahead of the channel",
+		want: "",
 	}, {
 		name: "the check itself failed",
 		st:   update.Status{Current: "0.1.0", Error: "dial tcp: no route to host", CheckedAt: checked},
-		want: "Update check failed",
+		want: "",
 	}, {
-		// An error must win over a stale success, or a check that could not run
-		// leaves the previous answer on screen looking current.
-		name: "an error outranks an earlier result",
-		st:   update.Status{Current: "0.1.0", Latest: "0.1.0", Error: "timeout", CheckedAt: checked},
-		want: "Update check failed",
+		// Available with no version is not an offer. Nothing can be installed
+		// from it and the title would read "Update to …".
+		name: "available, but nothing to name",
+		st:   update.Status{Current: "0.1.0", Available: true, CheckedAt: checked},
+		want: "",
 	}} {
 		t.Run(c.name, func(t *testing.T) {
-			if got := updateItemTitle(c.st); got != c.want {
+			got, show := updateItemTitle(c.st)
+			if show != (c.want != "") {
+				t.Errorf("shown = %v, want %v", show, c.want != "")
+			}
+			if got != c.want {
 				t.Errorf("updateItemTitle() = %q, want %q", got, c.want)
 			}
 		})
 	}
 }
 
-// Whatever an agent reports, nothing it controls becomes menu markup (§26).
-// The version is validated on the way in, but the title is built by string
-// concatenation and that is the line worth pinning.
+// The item is in the menu only when there is something to install. Every other
+// state is a question — up to date, never checked, check failed — and the Pet
+// Status panel answers those with the time of the check beside them, which a
+// menu title cannot do: nothing rebuilds a menu while it sits in the menu bar.
+func TestNoUpdateMeansNoItem(t *testing.T) {
+	for _, st := range []update.Status{
+		{Current: "0.2.0", Latest: "0.2.0", CheckedAt: time.Now()},
+		{Current: "0.2.0"},
+		{Current: "0.2.0", Error: "timeout", CheckedAt: time.Now()},
+	} {
+		if _, show := updateItemTitle(st); show {
+			t.Errorf("%+v should not put an item in the menu", st)
+		}
+	}
+	up := update.Status{Current: "0.1.0", Latest: "0.2.0", Available: true, CheckedAt: time.Now()}
+	if _, show := updateItemTitle(up); !show {
+		t.Error("an available update is the one thing that should show")
+	}
+}
+
 func TestUpdateItemTitleCannotBeInjected(t *testing.T) {
 	st := update.Status{
 		Current: "0.1.0", Available: true, Latest: "0.2.0", CheckedAt: time.Now(),
 	}
-	if got := updateItemTitle(st); got != "Update to 0.2.0…" {
+	if got, _ := updateItemTitle(st); got != "Update to 0.2.0…" {
 		t.Fatalf("unexpected title %q", got)
 	}
 	if err := st.Validate(); err != nil {
 		t.Fatalf("a status this ordinary should validate: %v", err)
 	}
-	st.Latest = "0.2.0|9:Quit Pet"
+	st.Latest = "0.2.0|9:Quit"
 	if err := st.Validate(); err == nil {
 		t.Error("a version carrying menu-dump punctuation should not validate")
 	}
@@ -169,8 +190,10 @@ func TestUpdateResultSurvivesARestart(t *testing.T) {
 	if got.CheckedAt.IsZero() {
 		t.Error("the check time did not survive, so the menu still says nobody looked")
 	}
-	if title := updateItemTitle(got); title != "Up to date" {
-		t.Errorf("menu would say %q after a restart, want %q", title, "Up to date")
+	// The result survived, so the menu offers nothing after the restart — the
+	// saved 0.2.0 is what this build already is.
+	if title, show := updateItemTitle(got); show {
+		t.Errorf("the menu would offer %q after a restart", title)
 	}
 }
 
@@ -198,8 +221,10 @@ func TestLoadUpdateRederivesAgainstTheRunningBuild(t *testing.T) {
 	if got.Available {
 		t.Error("the update was taken; it must not still be on offer")
 	}
-	if title := updateItemTitle(got); title != "Up to date" {
-		t.Errorf("menu would say %q, want %q", title, "Up to date")
+	// And so the menu offers nothing: an update already installed is not one
+	// to install, which is the whole reason this is re-derived.
+	if title, show := updateItemTitle(got); show {
+		t.Errorf("the menu would still offer %q", title)
 	}
 }
 

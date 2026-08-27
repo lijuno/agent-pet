@@ -100,9 +100,9 @@ flavour it is, where its config lives, and whether the hooks are installed.
 The pet also lives in the macOS menu bar. Its icon shows the current state and
 carries the same commands. **Show Pet** is a checkbox there: it puts the pet
 away and brings it back, and bringing it back also retrieves one that has been
-dragged off the edge of the screen. **Change Pet** is a submenu listing the
+dragged off the edge of the screen. **Change Character** is a submenu listing the
 characters, so switching happens in the menu bar rather than in a panel beside
-the pet. **Report a Bug** opens a window with three buttons and a reason for
+the pet. **File a Bug** opens a window with three buttons and a reason for
 each. **Report on GitHub** opens a new issue with the version, the paths and
 your `config.yaml` already in it — you sign in, say what happened and post it,
 and nothing leaves the machine until you do. **Save Report** writes those and
@@ -157,7 +157,7 @@ firing at all.
 ```yaml
 pet:
   active: sanmao        # sanmao, peach, juanmao, maomao, damao, amiao, or your own pack
-  disabled: []          # ids to keep out of the Change Pet menu
+  disabled: []          # ids kept out of the character menu
   always_on_top: true
   scale: 1.0
   drop_shadow: true     # off if it reads as a halo on a light wallpaper
@@ -603,7 +603,7 @@ Six built-in packs ship in the binary:
 | `peach` | Peach (桃桃), a girl in a light blue skirt | long dark hair over one shoulder, peach bow, gold necklace |
 | `sanmao` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
 
-Pick one from the menu-bar item's **Change Pet** submenu, or with
+Pick one from the menu-bar item's **Change Character** submenu, or with
 `petctl pet peach`. `tools/genpets` carries a seventh species, `byte`, as a
 worked example of a species that is none of these; shipping it is one line.
 
@@ -614,12 +614,12 @@ them with:
 make pets     # python3 tools/genpets/genpets.py
 ```
 
-**Reload Config** in either menu re-reads this file without a restart, which is
+**Reload** in either menu re-reads this file without a restart, which is
 what makes editing it by hand practical: the app rewrites the file from memory
 when it quits, so an edit made while it runs is otherwise lost. Everything here
 takes effect except `server.addr`, which is bound once at startup and says so.
 
-Characters you never use can be kept out of the **Change Pet** submenu and the
+Characters you never use can be kept out of the **Change Character** submenu and the
 panel beside it with `pet.disabled` in the config, which takes a list of ids. It
 hides rather than unloads, so one named in `pet.active` is still drawn — and it
 will not hide the character on screen or the last one left, because a menu that

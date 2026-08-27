@@ -19,7 +19,7 @@ A pack is a directory of PNGs and one JSON file. No build step, no tooling.
 ```
 
 Drop the directory in, restart `petd`, and the pack appears under
-**Change Pet**. A pack whose `id` matches a built-in replaces it.
+**Change Character**. A pack whose `id` matches a built-in replaces it.
 
 ## Sprite strips
 
