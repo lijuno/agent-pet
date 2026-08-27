@@ -27,6 +27,7 @@ enum {
   // a menu click does — one callback, not two.
   PET_REPORT_COPY = 12,
   PET_REPORT_OPEN = 13,
+  PET_REPORT_SAVE = 14,
   // Items in the Change Pet submenu are PET_PICK_BASE + the pet's index in the
   // list the Go side last sent.
   PET_PICK_BASE = 100,
@@ -130,10 +131,17 @@ void petReportShow(const char *title, const char *body);
 // petReportClose hides it again.
 void petReportClose(void);
 
-// petReportCopied flips the copy button's title for a moment. A button that
-// puts something on the clipboard changes nothing anybody can see, and there
-// is no badge in a native window to say it happened.
-void petReportCopied(void);
+// petReportFlash flips one button's title for a moment and puts it back. A
+// button that writes the clipboard or a file changes nothing anybody can see,
+// and there is no badge in a native window to say it happened. The resting
+// title comes back from the button's own identifier, so a second press while
+// the first is still showing cannot make "Copied" the title it returns to.
+void petReportFlash(int tag, const char *title);
+
+// petRevealFile shows a file in the Finder, selected. Through NSWorkspace for
+// the same reason petOpenURL is: petd spawns no processes, and this asks
+// Launch Services rather than running `open`.
+void petRevealFile(const char *path);
 
 // petReportReport describes the window for the diagnostics endpoint: where it
 // is, what its buttons say, and whether its text fits. A test cannot see a

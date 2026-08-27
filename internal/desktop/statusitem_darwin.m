@@ -27,6 +27,7 @@ static NSMenuItem *petChangeItem = nil;
 static NSMenuItem *petUpdateItem = nil;
 static NSButton *petReportCopyBtn = nil;
 static NSButton *petReportOpenBtn = nil;
+static NSButton *petReportSaveBtn = nil;
 
 static NSMenuItem *addItem(NSMenu *menu, NSString *title, int tag) {
   NSMenuItem *it = [[NSMenuItem alloc] initWithTitle:title
@@ -308,7 +309,26 @@ static NSButton *makeButton(NSString *title, int tag, NSRect frame) {
   [b setTarget:petTarget];
   [b setAction:@selector(onClick:)];
   [b setTag:tag];
+  // The resting title, kept on the button itself. petReportFlash borrows the
+  // title for a second and needs somewhere to read the real one back from —
+  // somewhere a second press cannot have overwritten with "Copied".
+  [b setIdentifier:title];
   return b;
+}
+
+// reportButton finds one of the window's buttons by its tag. They are not menu
+// items, so itemWithTag: does not reach them.
+static NSButton *reportButton(int tag) {
+  if (petReportCopyBtn != nil && petReportCopyBtn.tag == tag) {
+    return petReportCopyBtn;
+  }
+  if (petReportOpenBtn != nil && petReportOpenBtn.tag == tag) {
+    return petReportOpenBtn;
+  }
+  if (petReportSaveBtn != nil && petReportSaveBtn.tag == tag) {
+    return petReportSaveBtn;
+  }
+  return nil;
 }
 
 // centreWindow puts a window in the middle of the display, every time it
@@ -448,10 +468,6 @@ static NSWindow *petReportWindow = nil;
 static NSTextField *petReportTitle = nil;
 static NSTextField *petReportBody = nil;
 
-// The title the copy button goes back to. Held here rather than written twice,
-// so the button cannot come back from "Copied" saying something else.
-static NSString *const petCopyTitle = @"Copy Details";
-
 void petReportShow(const char *title, const char *body) {
   NSString *t = [NSString stringWithUTF8String:title];
   NSString *b = [NSString stringWithUTF8String:body];
@@ -474,20 +490,25 @@ void petReportShow(const char *title, const char *body) {
       // cut off the end of the one thing this window exists to hand over.
       [[petReportBody cell] setWraps:YES];
       [petReportBody setLineBreakMode:NSLineBreakByWordWrapping];
-      petReportCopyBtn =
-          makeButton(petCopyTitle, PET_REPORT_COPY, NSMakeRect(20, 20, 150, 32));
+      petReportCopyBtn = makeButton(@"Copy Report", PET_REPORT_COPY,
+                                    NSMakeRect(20, 20, 140, 32));
+      petReportSaveBtn = makeButton(@"Save Report", PET_REPORT_SAVE,
+                                    NSMakeRect(170, 20, 140, 32));
+      // Rightmost, because it is the one that leaves the machine.
       petReportOpenBtn = makeButton(@"Report on GitHub", PET_REPORT_OPEN,
-                                    NSMakeRect(180, 20, 180, 32));
+                                    NSMakeRect(360, 20, 180, 32));
       [petReportWindow.contentView addSubview:petReportTitle];
       [petReportWindow.contentView addSubview:petReportBody];
       [petReportWindow.contentView addSubview:petReportCopyBtn];
+      [petReportWindow.contentView addSubview:petReportSaveBtn];
       [petReportWindow.contentView addSubview:petReportOpenBtn];
     }
     [petReportTitle setStringValue:t];
     [petReportBody setStringValue:b];
-    // Back to the resting title: a window reopened an hour later should not
+    // Back to the resting titles: a window reopened an hour later should not
     // still be claiming something was just copied.
-    [petReportCopyBtn setTitle:petCopyTitle];
+    [petReportCopyBtn setTitle:petReportCopyBtn.identifier];
+    [petReportSaveBtn setTitle:petReportSaveBtn.identifier];
     showWindow(petReportWindow);
   });
 }
@@ -498,16 +519,32 @@ void petReportClose(void) {
   });
 }
 
-void petReportCopied(void) {
+void petReportFlash(int tag, const char *title) {
+  NSString *t = [NSString stringWithUTF8String:title];
   onMain(^{
-    [petReportCopyBtn setTitle:@"Copied"];
+    NSButton *b = reportButton(tag);
+    if (b == nil) {
+      return;
+    }
+    [b setTitle:t];
     // Restored on a delay rather than left as it is: "Copied" is the answer to
     // the press that just happened, and a button that keeps saying it stops
     // meaning anything the second time.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.6 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-                     [petReportCopyBtn setTitle:petCopyTitle];
+                     [b setTitle:b.identifier];
                    });
+  });
+}
+
+void petRevealFile(const char *path) {
+  NSString *p = [NSString stringWithUTF8String:path];
+  onMain(^{
+    NSURL *u = [NSURL fileURLWithPath:p];
+    if (u == nil) {
+      return;
+    }
+    [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs:@[ u ]];
   });
 }
 
@@ -522,8 +559,9 @@ int petReportReport(char *buf, int cap) {
     // The button titles go out too: the copy feedback is a button title, and
     // there is nothing else a test could look at to see that it happened.
     NSString *extra =
-        [NSString stringWithFormat:@" — buttons: %@, %@ — %@",
+        [NSString stringWithFormat:@" — buttons: %@, %@, %@ — %@",
                                    [petReportCopyBtn title],
+                                   [petReportSaveBtn title],
                                    [petReportOpenBtn title], text];
     out = describeWindow(petReportWindow, extra);
   };
@@ -606,14 +644,9 @@ void petStatusClickItem(int tag) {
     }
     // Not everything clickable is in the menu. The bug-report window's buttons
     // carry tags too, and a test has no mouse to press them with.
-    if (petReportCopyBtn != nil && petReportCopyBtn.tag == tag) {
-      [NSApp sendAction:petReportCopyBtn.action
-                     to:petReportCopyBtn.target
-                   from:petReportCopyBtn];
-    } else if (petReportOpenBtn != nil && petReportOpenBtn.tag == tag) {
-      [NSApp sendAction:petReportOpenBtn.action
-                     to:petReportOpenBtn.target
-                   from:petReportOpenBtn];
+    NSButton *b = reportButton(tag);
+    if (b != nil) {
+      [NSApp sendAction:b.action to:b.target from:b];
     }
   });
 }

@@ -35,6 +35,14 @@ func showBugReport(string, string)      {}
 func closeBugReport()                   {}
 func bugReportReport() string           { return "closed" }
 func copyToClipboard(string)            {}
+func flashReportButton(int, string)     {}
+func revealFile(string)                 {}
+
+// The buttons a flash can apply to, matching the tags in statusitem_darwin.h.
+const (
+	reportCopyButton = 12
+	reportSaveButton = 14
+)
 
 // osVersion is empty off macOS. The bug report marks a field it does not know
 // rather than guessing at one.

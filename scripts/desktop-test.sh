@@ -343,12 +343,14 @@ case "$got" in
 *"0,0 from centre"*) ok "it opens in the middle of the screen" ;;
 *) bad "it opens in the middle of the screen" "$got" ;;
 esac
-want "it offers the details" "$got" "Copy Details"
+want "it offers the details" "$got" "Copy Report"
 # The paths in here are as long as this machine's home directory makes them,
 # and the log path is the reason somebody opens this window at all.
 want "nothing is cut off" "$got" "text fits"
-# Not clicked, here or in the loop above: it opens a browser, and the URL it
-# builds is covered by TestPrefilledIssueCarriesTheDetails instead.
+# Neither of these is clicked, here or in the loop above: one opens a browser
+# and the other opens the Finder. What they build — the URL and the file — is
+# covered by TestPrefilledIssueCarriesTheDetails and TestSavedReportHoldsTheFiles.
+want "a file to attach" "$got" "Save Report"
 want "and a way to post one" "$got" "Report on GitHub"
 # This puts the details on the clipboard, over whatever was there. Nothing else
 # in this suite touches anything outside the app, so it is worth saying: the

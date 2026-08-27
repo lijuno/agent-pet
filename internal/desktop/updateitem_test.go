@@ -1,9 +1,12 @@
 package desktop
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -358,5 +361,139 @@ func TestPrefilledIssueSurvivesAnAwkwardPath(t *testing.T) {
 	}
 	if !strings.Contains(u.Query().Get("body"), odd) {
 		t.Errorf("the path did not survive encoding:\n%s", u.Query().Get("body"))
+	}
+}
+
+// The prefilled issue carries the config as well as the details. It is the
+// small file of the two and the one that answers "what was it set to"; the log
+// is a megabyte before it rotates and cannot go in a URL at all.
+func TestPrefilledIssueCarriesTheConfig(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(cfg, []byte("pet:\n  scale: 1.5\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	raw := bugReportIssueURL(Info{Version: "0.3.0", ConfigPath: cfg}, "", "/d/petd.log")
+	u, err := url.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := u.Query().Get("body")
+	if !strings.Contains(body, "scale: 1.5") {
+		t.Errorf("the config did not reach the issue:\n%s", body)
+	}
+	// And says where the log is instead of pretending it is in there.
+	if !strings.Contains(body, "Save Report") {
+		t.Errorf("the issue should say how to attach the log:\n%s", body)
+	}
+}
+
+// A config big enough to burst the URL comes out of it, because GitHub refuses
+// an over-long request outright: a form with one section missing beats an
+// error page with none of it.
+//
+// The config here is comfortably small as a file and still too big as a URL,
+// which is the case worth holding: every non-ASCII byte becomes three
+// characters once encoded, and the characters that ship with this program are
+// named 三毛 and 桃桃. Sizing the check on the file would have missed it.
+func TestAnOversizedConfigLeavesTheURL(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(cfg, []byte(strings.Repeat("# 桃桃的设置\n", 200)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(cfg); len(b) > maxReportConfig {
+		t.Fatalf("this test needs a config small enough to quote, got %d bytes", len(b))
+	}
+	raw := bugReportIssueURL(Info{Version: "0.3.0", ConfigPath: cfg}, "", "/d/petd.log")
+	if len(raw) > maxIssueURL {
+		t.Errorf("the URL is %d bytes, past the %d it may be", len(raw), maxIssueURL)
+	}
+	if err := update.ValidateNotesURL(raw); err != nil {
+		t.Fatalf("the fallback is not openable: %v", err)
+	}
+	u, _ := url.Parse(raw)
+	body := u.Query().Get("body")
+	if !strings.Contains(body, "too long for this form") {
+		t.Errorf("a dropped config should say so:\n%s", body)
+	}
+	// The details are still there. Dropping the config is the small loss; a
+	// form with nothing in it would be the big one.
+	if !strings.Contains(body, "0.3.0") {
+		t.Errorf("the details went with it:\n%s", body)
+	}
+}
+
+// A config too big to quote at all says so where it would have been, in the
+// window and the file as well as the issue. Nothing here is silent.
+func TestAHugeConfigIsNotQuoted(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(cfg, []byte(strings.Repeat("x", maxReportConfig+1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := readConfigSection(cfg)
+	if !strings.Contains(got, "too big to quote") {
+		t.Errorf("an unquotable config should say so, got %q", got)
+	}
+	if strings.Contains(got, strings.Repeat("x", 100)) {
+		t.Errorf("it should not be quoted anyway")
+	}
+}
+
+// Save Report writes the file that gets dragged onto the issue — a URL can
+// prefill a form and nothing else, so this is the only route an attachment
+// has. It holds all three parts, and the log by its tail.
+func TestSavedReportHoldsTheFiles(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", dir)
+	cfg := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(cfg, []byte("pet:\n  scale: 1.5\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	log := filepath.Join(dir, "petd.log")
+	var lines []string
+	for i := 0; i < reportLogLines+50; i++ {
+		lines = append(lines, fmt.Sprintf("t=00:00:%02d level=INFO msg=event n=%d", i%60, i))
+	}
+	if err := os.WriteFile(log, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	path, err := saveBugReport(Info{Version: "0.3.0", ConfigPath: cfg}, "", log)
+	if err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("the saved report is not there: %v", err)
+	}
+	got := string(b)
+	for _, want := range []string{"0.3.0", "config.yaml", "scale: 1.5", "petd.log", "n=249"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the saved report is missing %q:\n%s", want, got)
+		}
+	}
+	// The tail, not the whole file: the last 200 of 250 lines, so the first
+	// line is gone and the last is there.
+	if strings.Contains(got, "n=0 ") || strings.Contains(got, "n=49\n") {
+		t.Errorf("the log should be quoted by its tail, not whole:\n%s", got)
+	}
+	// The clipboard gets the same text. Two builders would be two chances for
+	// the file somebody attached to disagree with the text they pasted.
+	if bundle := bugReportBundle(Info{Version: "0.3.0", ConfigPath: cfg}, "", log); bundle != got {
+		t.Errorf("the saved file and the clipboard differ")
+	}
+}
+
+// A file that cannot be read is a fact about a broken install, not a reason to
+// say nothing: a report that quietly omitted the config would read as one
+// written by somebody who could not be bothered.
+func TestAMissingFileIsReportedRatherThanOmitted(t *testing.T) {
+	got := bugReportBundle(Info{Version: "0.3.0", ConfigPath: "/nope/config.yaml"}, "", "/nope/petd.log")
+	for _, want := range []string{"could not read /nope/config.yaml", "could not read /nope/petd.log"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the report should say what it could not read, want %q:\n%s", want, got)
+		}
 	}
 }

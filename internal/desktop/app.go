@@ -884,12 +884,12 @@ func bugReportText(in Info, osVer, logPath string) (string, string) {
 	var b strings.Builder
 	b.WriteString("Something not working? Please open an issue.\n\n")
 	b.WriteString("1. Report on GitHub opens a new issue with the details\n")
-	b.WriteString("   below already in it.\n")
-	b.WriteString("2. Say what the pet did, and what you expected instead.\n")
-	b.WriteString("3. Attach the log if you can. It records events and\n")
-	b.WriteString("   errors, never the contents of your files.\n\n")
-	b.WriteString("Copy Details puts the same block on the clipboard, for a\n")
-	b.WriteString("report written somewhere else.\n\n")
+	b.WriteString("   below and your config already in it.\n")
+	b.WriteString("2. Save Report writes those and the last 200 log lines to\n")
+	b.WriteString("   a file and shows it in Finder. Drag it onto the issue —\n")
+	b.WriteString("   a link cannot attach a file, only fill the form.\n")
+	b.WriteString("3. Say what the pet did and what you expected, then post.\n\n")
+	b.WriteString("Copy Report puts the same text on the clipboard.\n\n")
 	b.WriteString(bugReportDetails(in, osVer, logPath))
 	name := in.AppName
 	if name == "" {
@@ -923,35 +923,156 @@ func bugReportDetails(in Info, osVer, logPath string) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-// bugReportIssueURL is the new-issue form with the report already in it, which
-// is what the Report on GitHub button opens.
+// What a report carries of the two files beside it. The config is quoted whole
+// because it is a few hundred bytes of settings and the whole of it is the
+// answer to "what was it set to"; the log is quoted by the tail, because the
+// end of a log is the part that was happening when whatever went wrong did.
+const (
+	maxReportConfig = 4 << 10
+	reportLogLines  = 200
+)
+
+// maxIssueURL is where a prefilled issue stops being a URL. GitHub refuses an
+// over-long request outright, and a button that lands on an error page is
+// worse than one that opens a form with a little less in it.
+const maxIssueURL = 6000
+
+// readConfigSection is config.yaml quoted into a report, or a line saying why
+// it is not.
 //
-// The details are the same block the window shows and the clipboard gets —
-// built once, used three ways — under a skeleton asking the two questions an
-// issue has to answer. GitHub fills the form and nothing more: the person
-// signs in, reads what is about to be sent and presses the button, which is
-// the only way the pet is ever party to publishing anything.
+// Silence would be the wrong answer to any of these. A config that cannot be
+// read is itself a fact about a broken install, and a report that simply left
+// it out looks like one written by somebody who could not be bothered.
+func readConfigSection(path string) string {
+	if path == "" {
+		return "(no config path)"
+	}
+	b, err := os.ReadFile(path)
+	switch {
+	case err != nil:
+		return "(could not read " + path + ": " + err.Error() + ")"
+	case len(b) > maxReportConfig:
+		return fmt.Sprintf("(%s is %d bytes — too big to quote here)", path, len(b))
+	case strings.TrimSpace(string(b)) == "":
+		return "(empty)"
+	}
+	return strings.TrimRight(string(b), "\n")
+}
+
+// readLogSection is the last lines of the log, on the same terms.
+func readLogSection(path string, lines int) string {
+	if path == "" {
+		return "(no log path)"
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "(could not read " + path + ": " + err.Error() + ")"
+	}
+	text := strings.TrimRight(string(b), "\n")
+	if strings.TrimSpace(text) == "" {
+		return "(empty)"
+	}
+	all := strings.Split(text, "\n")
+	if len(all) > lines {
+		all = all[len(all)-lines:]
+	}
+	return strings.Join(all, "\n")
+}
+
+// bugReportBundle is the whole report as plain text: the details, the config
+// and the tail of the log. Copy Report puts it on the clipboard and Save
+// Report writes it to a file — those differ in where it goes, not in what it
+// says, which is why there is one of these and not two.
+func bugReportBundle(in Info, osVer, logPath string) string {
+	var b strings.Builder
+	b.WriteString(bugReportDetails(in, osVer, logPath))
+	b.WriteString("\n\n--- config.yaml ---\n")
+	b.WriteString(readConfigSection(in.ConfigPath))
+	fmt.Fprintf(&b, "\n\n--- petd.log (last %d lines) ---\n", reportLogLines)
+	b.WriteString(readLogSection(logPath, reportLogLines))
+	return b.String() + "\n"
+}
+
+// saveBugReport writes that bundle beside the pet's own files and hands back
+// the path, for dragging onto an issue. A URL can prefill an issue and nothing
+// more: attaching a file is a drag into the editor, so the pet's part is to
+// put one somewhere it can be dragged from.
 //
-// None of this is agent-controlled. The version and the channel are build
-// constants, the OS string comes from the system, and the paths come from the
-// user's own flags and config, so §26 — which is about what an agent reports
-// becoming markup, a path or a command — has nothing to bite on here. What
-// url.Values.Encode does is the separate, ordinary safety: every value is
-// percent-encoded, so nothing in a path can end the query and start something
-// else.
-//
-// Validated before it is returned, and the plain tracker is what comes back if
-// it does not hold up. A URL this function got wrong would be one openURL
-// silently refused, and a button that does nothing is worse than a button that
-// does less.
-func bugReportIssueURL(in Info, osVer, logPath string) string {
+// Not the Desktop or Downloads, which macOS gates behind a permission prompt.
+// A prompt in the middle of reporting a bug is one more thing to go wrong, and
+// the data directory is somewhere this program already writes.
+func saveBugReport(in Info, osVer, logPath string) (string, error) {
+	dir := config.DataDir()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	// One file, overwritten. It exists to be dragged into an issue and then
+	// forgotten; a directory filling with timestamped copies of it is litter.
+	path := filepath.Join(dir, "bug-report.txt")
+	if err := os.WriteFile(path, []byte(bugReportBundle(in, osVer, logPath)), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// issueBody is the markdown a prefilled issue opens with. cfg empty means the
+// config was left out — said in the body rather than silently, so nobody
+// wonders why a file the window promised is missing.
+func issueBody(in Info, osVer, logPath, cfg string) string {
 	var b strings.Builder
 	b.WriteString("**What happened**\n\n\n")
 	b.WriteString("**What I expected**\n\n\n")
 	b.WriteString("**Details**\n\n```\n")
 	b.WriteString(bugReportDetails(in, osVer, logPath))
-	b.WriteString("\n```\n")
-	raw := update.IssuesURL + "/new?" + url.Values{"body": {b.String()}}.Encode()
+	b.WriteString("\n```\n\n")
+	b.WriteString("**config.yaml**\n\n")
+	if cfg == "" {
+		b.WriteString("(too long for this form — it is in the saved report)\n\n")
+	} else {
+		b.WriteString("```yaml\n" + cfg + "\n```\n\n")
+	}
+	// The log is named, not quoted. It is a megabyte before it rotates and a
+	// URL holds a few thousand characters, so the honest thing is to say where
+	// the copy to attach comes from.
+	b.WriteString("**Log**\n\n")
+	b.WriteString("Not in here — Save Report in the pet's Report a Bug window\n")
+	b.WriteString("writes the details, the config and the last log lines to a\n")
+	b.WriteString("file, and shows it in Finder. Drag it in to attach it.\n")
+	return b.String()
+}
+
+func issueURL(body string) string {
+	return update.IssuesURL + "/new?" + url.Values{"body": {body}}.Encode()
+}
+
+// bugReportIssueURL is the new-issue form with the report already in it, which
+// is what the Report on GitHub button opens.
+//
+// GitHub fills the form and nothing more: the person signs in, reads what is
+// about to be sent and presses the button, which is the only way the pet is
+// ever party to publishing anything.
+//
+// None of this is agent-controlled. The version and the channel are build
+// constants, the OS string comes from the system, and the paths and the config
+// come from the user's own flags and file, so §26 — which is about what an
+// agent reports becoming markup, a path or a command — has nothing to bite on.
+// What url.Values.Encode does is the separate, ordinary safety: every value is
+// percent-encoded, so nothing in a path or a config can end the query and
+// start something else.
+//
+// The config comes out again if the URL grows past what GitHub will take. It
+// is the one part of this that varies in size, and losing it is a smaller
+// failure than an error page.
+//
+// Validated before it is returned, and the plain tracker is what comes back if
+// it does not hold up. A URL this function got wrong would be one openURL
+// silently refused, and a button that does nothing is worse than one that does
+// less.
+func bugReportIssueURL(in Info, osVer, logPath string) string {
+	raw := issueURL(issueBody(in, osVer, logPath, readConfigSection(in.ConfigPath)))
+	if len(raw) > maxIssueURL {
+		raw = issueURL(issueBody(in, osVer, logPath, ""))
+	}
 	if err := update.ValidateNotesURL(raw); err != nil {
 		return update.IssuesURL
 	}
@@ -975,11 +1096,32 @@ func (a *App) OpenBugReportIssue() {
 	openURL(bugReportIssueURL(a.GetInfo(), osVersion(), config.LogFile()))
 }
 
-// CopyBugReportDetails backs the Copy Details button. Rebuilt rather than
-// remembered from the window: the version cannot change under a running
-// process, but the config path can — Reload Config is a menu item.
-func (a *App) CopyBugReportDetails() {
-	copyToClipboard(bugReportDetails(a.GetInfo(), osVersion(), config.LogFile()))
+// CopyBugReport backs the Copy Report button: the same text Save Report
+// writes, for an issue written somewhere else — or for somebody signed out of
+// GitHub, who has no form to prefill at all.
+//
+// Rebuilt at the press rather than remembered from the window: Reload Config
+// can move the paths under a running process, and the log grows while the
+// window sits open.
+func (a *App) CopyBugReport() {
+	copyToClipboard(bugReportBundle(a.GetInfo(), osVersion(), config.LogFile()))
+	flashReportButton(reportCopyButton, "Copied")
+}
+
+// SaveBugReport writes the report to a file and shows it in Finder, which is
+// the only way a file reaches a GitHub issue: attaching is a drag into the
+// editor, and no URL can do it.
+func (a *App) SaveBugReport() {
+	path, err := saveBugReport(a.GetInfo(), osVersion(), config.LogFile())
+	if err != nil {
+		// The button says so, because the window is what the user is looking
+		// at. The log gets the reason, which is no use on a button.
+		a.log.Warn("could not write the bug report", "err", err)
+		flashReportButton(reportSaveButton, "Could not save")
+		return
+	}
+	flashReportButton(reportSaveButton, "Saved")
+	revealFile(path)
 }
 
 func (a *App) Quit() { wruntime.Quit(a.ctx) }

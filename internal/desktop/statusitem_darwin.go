@@ -170,9 +170,10 @@ func (a *App) ClickStatusItem(name string) error {
 		"change": C.PET_CHANGE, "ontop": C.PET_ONTOP,
 		"quit": C.PET_QUIT, "update": C.PET_UPDATE, "about": C.PET_ABOUT,
 		"reload": C.PET_RELOAD, "bug": C.PET_REPORT,
-		// The two buttons in the bug-report window. Reachable by name for the
+		// The buttons in the bug-report window. Reachable by name for the
 		// same reason the menu items are: nothing in a test has a mouse.
 		"bug-copy": C.PET_REPORT_COPY, "bug-open": C.PET_REPORT_OPEN,
+		"bug-save": C.PET_REPORT_SAVE,
 	}
 	tag, ok := tags[name]
 	if !ok {
@@ -332,14 +333,34 @@ func showBugReport(title, body string) {
 
 func closeBugReport() { C.petReportClose() }
 
-// copyToClipboard puts the details on the pasteboard and says so on the
-// button. The two belong together — a copy nobody can see happen reads as a
-// button that does nothing.
+// copyToClipboard puts text on the pasteboard.
 func copyToClipboard(s string) {
 	c := C.CString(s)
 	defer C.free(unsafe.Pointer(c))
 	C.petCopyToPasteboard(c)
-	C.petReportCopied()
+}
+
+// Which button to flash. Named here so app.go can say which one it means
+// without importing a C constant it cannot see.
+const (
+	reportCopyButton = int(C.PET_REPORT_COPY)
+	reportSaveButton = int(C.PET_REPORT_SAVE)
+)
+
+// flashReportButton says on the button what just happened. A press that writes
+// the clipboard or a file changes nothing else anybody can see.
+func flashReportButton(tag int, title string) {
+	c := C.CString(title)
+	defer C.free(unsafe.Pointer(c))
+	C.petReportFlash(C.int(tag), c)
+}
+
+// revealFile shows a file in the Finder, which is how it gets dragged onto an
+// issue: attaching is a drag into GitHub's editor and no URL can do it.
+func revealFile(path string) {
+	c := C.CString(path)
+	defer C.free(unsafe.Pointer(c))
+	C.petRevealFile(c)
 }
 
 // osVersion is the macOS version for the report. Empty is a fine answer: the
@@ -423,7 +444,9 @@ func (a *App) handleStatusClick(tag C.int) {
 	case C.PET_REPORT:
 		a.ShowBugReport()
 	case C.PET_REPORT_COPY:
-		a.CopyBugReportDetails()
+		a.CopyBugReport()
+	case C.PET_REPORT_SAVE:
+		a.SaveBugReport()
 	case C.PET_REPORT_OPEN:
 		// The new-issue form with the report already in it. It fills the form
 		// and stops: signing in, reading it and pressing the button are the
