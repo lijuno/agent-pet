@@ -652,7 +652,7 @@ plugin/                the Claude Code plugin: the hooks, and the install and
 updates/               the channel manifests — committing one is what publishes
                        a release to everybody
 adapters/claude/       the Claude Code hook adapter
-adapters/              Codex and git adapters — Milestone 3 and later
+adapters/              Codex and git adapters — planned
 tools/genpets/         the sprite generator
 ui/dist/               the frontend, embedded in the binary
 ui/test/               its tests — open in a browser, no build step
@@ -661,13 +661,12 @@ docs/adr/              architectural decisions
 
 ### Where it stands
 
-**Milestones 1 and 2 are in** — the pet engine, the local event API, `petctl`,
-the desktop window, a pixel-art character, the Claude Code adapter and plugin,
-and over-the-air updates. The Codex adapter is Milestone 3, and statistics are
-collected but not shown — they are in memory rather than a durable store, and
-`petctl status` is where to read them;
-[ADR 0006](docs/adr/0006-milestone-1-boundaries.md) records which seam each
-deferred piece attaches to.
+Everything described above works today. **Codex support is planned**, as is a
+git `post-commit` hook, so a commit lands on the pet the way a finished task
+does. Statistics are still counted and still readable from `petctl status`, but
+they are held in memory rather than a durable store and have no panel of their
+own. [ADR 0006](docs/adr/0006-milestone-1-boundaries.md) records which seam each
+of those attaches to.
 
 If you want to work on it, [CLAUDE.md](CLAUDE.md) is the map — including a list
 of the things here that cost an hour each to discover.
