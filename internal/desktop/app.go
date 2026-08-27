@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -882,11 +883,13 @@ func (a *App) CloseAbout() { closeAbout() }
 func bugReportText(in Info, osVer, logPath string) (string, string) {
 	var b strings.Builder
 	b.WriteString("Something not working? Please open an issue.\n\n")
-	b.WriteString("1. Copy the details below — they say which build this is.\n")
-	b.WriteString("2. Open the issue tracker and say what the pet did, and\n")
-	b.WriteString("   what you expected instead.\n")
+	b.WriteString("1. Report on GitHub opens a new issue with the details\n")
+	b.WriteString("   below already in it.\n")
+	b.WriteString("2. Say what the pet did, and what you expected instead.\n")
 	b.WriteString("3. Attach the log if you can. It records events and\n")
 	b.WriteString("   errors, never the contents of your files.\n\n")
+	b.WriteString("Copy Details puts the same block on the clipboard, for a\n")
+	b.WriteString("report written somewhere else.\n\n")
 	b.WriteString(bugReportDetails(in, osVer, logPath))
 	name := in.AppName
 	if name == "" {
@@ -920,6 +923,41 @@ func bugReportDetails(in Info, osVer, logPath string) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
+// bugReportIssueURL is the new-issue form with the report already in it, which
+// is what the Report on GitHub button opens.
+//
+// The details are the same block the window shows and the clipboard gets —
+// built once, used three ways — under a skeleton asking the two questions an
+// issue has to answer. GitHub fills the form and nothing more: the person
+// signs in, reads what is about to be sent and presses the button, which is
+// the only way the pet is ever party to publishing anything.
+//
+// None of this is agent-controlled. The version and the channel are build
+// constants, the OS string comes from the system, and the paths come from the
+// user's own flags and config, so §26 — which is about what an agent reports
+// becoming markup, a path or a command — has nothing to bite on here. What
+// url.Values.Encode does is the separate, ordinary safety: every value is
+// percent-encoded, so nothing in a path can end the query and start something
+// else.
+//
+// Validated before it is returned, and the plain tracker is what comes back if
+// it does not hold up. A URL this function got wrong would be one openURL
+// silently refused, and a button that does nothing is worse than a button that
+// does less.
+func bugReportIssueURL(in Info, osVer, logPath string) string {
+	var b strings.Builder
+	b.WriteString("**What happened**\n\n\n")
+	b.WriteString("**What I expected**\n\n\n")
+	b.WriteString("**Details**\n\n```\n")
+	b.WriteString(bugReportDetails(in, osVer, logPath))
+	b.WriteString("\n```\n")
+	raw := update.IssuesURL + "/new?" + url.Values{"body": {b.String()}}.Encode()
+	if err := update.ValidateNotesURL(raw); err != nil {
+		return update.IssuesURL
+	}
+	return raw
+}
+
 // ShowBugReport opens the Report a Bug window. Bound to the frontend as well
 // as reached from the status item, so the pet's own menu and the menu bar open
 // the same one window.
@@ -929,6 +967,13 @@ func (a *App) ShowBugReport() {
 
 // CloseBugReport hides it again.
 func (a *App) CloseBugReport() { closeBugReport() }
+
+// OpenBugReportIssue backs the Report on GitHub button. Rebuilt at the press
+// for the same reason the clipboard block is: Reload Config can move the paths
+// under a running process.
+func (a *App) OpenBugReportIssue() {
+	openURL(bugReportIssueURL(a.GetInfo(), osVersion(), config.LogFile()))
+}
 
 // CopyBugReportDetails backs the Copy Details button. Rebuilt rather than
 // remembered from the window: the version cannot change under a running

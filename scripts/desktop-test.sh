@@ -347,7 +347,9 @@ want "it offers the details" "$got" "Copy Details"
 # The paths in here are as long as this machine's home directory makes them,
 # and the log path is the reason somebody opens this window at all.
 want "nothing is cut off" "$got" "text fits"
-want "and the tracker" "$got" "Open Issue Tracker"
+# Not clicked, here or in the loop above: it opens a browser, and the URL it
+# builds is covered by TestPrefilledIssueCarriesTheDetails instead.
+want "and a way to post one" "$got" "Report on GitHub"
 # This puts the details on the clipboard, over whatever was there. Nothing else
 # in this suite touches anything outside the app, so it is worth saying: the
 # button exists to write the clipboard, and a check that would not let it do

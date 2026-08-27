@@ -3,6 +3,7 @@ package desktop
 import (
 	"io"
 	"log/slog"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -298,5 +299,64 @@ func TestBugReportMarksEmptyFields(t *testing.T) {
 	// Everything but the issue URL, which is a constant and cannot be empty.
 	if got := strings.Count(details, "—"); got != 6 {
 		t.Errorf("every empty field should be marked, got %d:\n%s", got, details)
+	}
+}
+
+// Report on GitHub opens the new-issue form with the report already in it. The
+// details have to survive the trip: an issue that arrives without the version
+// costs the round trip this window exists to save.
+func TestPrefilledIssueCarriesTheDetails(t *testing.T) {
+	in := Info{
+		AppName: "Agent Pet", Version: "0.3.0", Channel: "release",
+		Addr: "127.0.0.1:9876", ConfigPath: "/c/config.yaml",
+	}
+	raw := bugReportIssueURL(in, "Version 26.5.2", "/d/logs/petd.log")
+	// Whatever else it is, it is a URL the pet is allowed to open. openURL puts
+	// it through this again and drops it silently if it fails, so a URL that
+	// does not pass here is a button that does nothing.
+	if err := update.ValidateNotesURL(raw); err != nil {
+		t.Fatalf("the pet would refuse to open its own URL: %v", err)
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if u.Path != "/lijuno/agent-pet/issues/new" {
+		t.Errorf("path = %q, want the new-issue form", u.Path)
+	}
+	body := u.Query().Get("body")
+	for _, want := range []string{
+		"0.3.0", "release", "Version 26.5.2", "/c/config.yaml", "/d/logs/petd.log",
+		"What happened", "What I expected",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the prefilled issue is missing %q:\n%s", want, body)
+		}
+	}
+	// The same block the window shows and the clipboard gets. Three copies of
+	// one thing is three chances for the pasted details to be the wrong ones.
+	if !strings.Contains(body, bugReportDetails(in, "Version 26.5.2", "/d/logs/petd.log")) {
+		t.Errorf("the issue body is not the details on show:\n%s", body)
+	}
+}
+
+// A path is somebody's to choose, and a raw one carrying & or # would end the
+// query and start something else. Everything goes through url.Values, so the
+// value comes back out of the query exactly as it went in.
+func TestPrefilledIssueSurvivesAnAwkwardPath(t *testing.T) {
+	odd := "/Users/a&b/pets#1/config.yaml?x=1"
+	raw := bugReportIssueURL(Info{Version: "0.3.0", ConfigPath: odd}, "", "/d/petd.log")
+	if err := update.ValidateNotesURL(raw); err != nil {
+		t.Fatalf("an awkward path should not make the URL unopenable: %v", err)
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if q := u.Query(); len(q) != 1 || q.Get("body") == "" {
+		t.Errorf("the path escaped its parameter: %v", q)
+	}
+	if !strings.Contains(u.Query().Get("body"), odd) {
+		t.Errorf("the path did not survive encoding:\n%s", u.Query().Get("body"))
 	}
 }

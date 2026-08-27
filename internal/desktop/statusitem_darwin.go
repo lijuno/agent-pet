@@ -425,10 +425,10 @@ func (a *App) handleStatusClick(tag C.int) {
 	case C.PET_REPORT_COPY:
 		a.CopyBugReportDetails()
 	case C.PET_REPORT_OPEN:
-		// The tracker, not a prefilled issue. A URL carrying the details would
-		// have to be built out of paths and a state name, and §26 says nothing
-		// the agent touches becomes a URL — Copy Details is how they travel.
-		openURL(update.IssuesURL)
+		// The new-issue form with the report already in it. It fills the form
+		// and stops: signing in, reading it and pressing the button are the
+		// user's, which is why this is not a submission.
+		a.OpenBugReportIssue()
 	case C.PET_RELOAD:
 		// The result goes to the log rather than to a dialog. A reload that
 		// worked has nothing to say, and one that did not is a line in the

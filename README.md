@@ -102,10 +102,11 @@ carries the same commands. **Show Pet** is a checkbox there: it puts the pet
 away and brings it back, and bringing it back also retrieves one that has been
 dragged off the edge of the screen. **Change Pet** is a submenu listing the
 characters, so switching happens in the menu bar rather than in a panel beside
-the pet. **Report a Bug** opens a window saying where a report goes and what to
-put in it, with a button that copies the version, the paths and the log
-location onto the clipboard — the pet has no crash reporter and sends nothing
-anywhere, so the details have to travel by hand. See
+the pet. **Report a Bug** opens a window saying what a report needs, and
+**Report on GitHub** opens a new issue with the version, the paths and the log
+location already filled in — you sign in, say what happened and post it, and
+nothing leaves the machine until you do. **Copy Details** puts the same block
+on the clipboard for a report written somewhere else. See
 [ADR 0005](docs/adr/0005-macos-menu-and-tray.md).
 
 The character comes in three sizes — small, medium and large — from the

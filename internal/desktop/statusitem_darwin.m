@@ -476,7 +476,7 @@ void petReportShow(const char *title, const char *body) {
       [petReportBody setLineBreakMode:NSLineBreakByWordWrapping];
       petReportCopyBtn =
           makeButton(petCopyTitle, PET_REPORT_COPY, NSMakeRect(20, 20, 150, 32));
-      petReportOpenBtn = makeButton(@"Open Issue Tracker", PET_REPORT_OPEN,
+      petReportOpenBtn = makeButton(@"Report on GitHub", PET_REPORT_OPEN,
                                     NSMakeRect(180, 20, 180, 32));
       [petReportWindow.contentView addSubview:petReportTitle];
       [petReportWindow.contentView addSubview:petReportBody];
