@@ -158,9 +158,50 @@ func maybeCheckForUpdates() {
 	go func() { _ = cmd.Wait() }()
 }
 
-// settingsPath resolves which settings.json to edit.
-func settingsPath(global bool) (string, error) {
-	if global {
+// installScope picks which of Claude Code's settings files the hooks go into.
+// Claude Code merges all three, so this is not about whether the hooks run — it
+// is about who else gets them.
+//
+// The command written in is an absolute path to the petctl binary on this
+// machine, which is meaningless in anybody else's clone. That is why a project
+// which tracks .claude/settings.json wants scopeLocal: settings.local.json is
+// the file the convention already keeps out of git, so installing the hooks
+// cannot dirty a tracked file. This repository is one such project.
+type installScope int
+
+const (
+	scopeProject installScope = iota // .claude/settings.json — shared with the repo
+	scopeLocal                       // .claude/settings.local.json — this clone only
+	scopeGlobal                      // ~/.claude/settings.json — every project
+)
+
+func (s installScope) label() string {
+	switch s {
+	case scopeLocal:
+		return "local"
+	case scopeGlobal:
+		return "global"
+	default:
+		return "project"
+	}
+}
+
+// flag is the argument that picks this scope, for messages that suggest a
+// command. Empty for the default.
+func (s installScope) flag() string {
+	switch s {
+	case scopeLocal:
+		return " --local"
+	case scopeGlobal:
+		return " --global"
+	default:
+		return ""
+	}
+}
+
+// settingsPath resolves which settings file to edit.
+func settingsPath(s installScope) (string, error) {
+	if s == scopeGlobal {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return "", err
@@ -171,32 +212,50 @@ func settingsPath(global bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(wd, ".claude", "settings.json"), nil
+	name := "settings.json"
+	if s == scopeLocal {
+		name = "settings.local.json"
+	}
+	return filepath.Join(wd, ".claude", name), nil
+}
+
+// parseInstallArgs reads the arguments of install/uninstall: one adapter name
+// and at most one scope. Separate from cmdInstall so the parsing can be tested
+// without editing anybody's settings file.
+func parseInstallArgs(verb string, rest []string) (installScope, string, error) {
+	scope := scopeProject
+	target := ""
+	for _, a := range rest {
+		switch a {
+		case "--global":
+			scope = scopeGlobal
+		case "--local":
+			scope = scopeLocal
+		case "--project":
+			scope = scopeProject
+		default:
+			if target != "" {
+				return scope, "", fmt.Errorf("unexpected argument %q", a)
+			}
+			target = a
+		}
+	}
+	if target == "" {
+		return scope, "", fmt.Errorf("usage: petctl %s claude [--project|--local|--global]", verb)
+	}
+	return scope, target, nil
 }
 
 func cmdInstall(args []string) error {
 	verb := args[0]
 	rest := args[1:]
 
-	global := false
-	target := ""
-	for _, a := range rest {
-		switch a {
-		case "--global":
-			global = true
-		case "--project":
-			global = false
-		default:
-			if target != "" {
-				return fmt.Errorf("unexpected argument %q", a)
-			}
-			target = a
-		}
+	scope, target, err := parseInstallArgs(verb, rest)
+	if err != nil {
+		return err
 	}
 	switch target {
 	case "claude":
-	case "":
-		return fmt.Errorf("usage: petctl %s claude [--project|--global]", verb)
 	case "codex":
 		// §29: say what is true rather than pretend.
 		return fmt.Errorf("the Codex adapter is Milestone 3 and is not built yet")
@@ -204,7 +263,7 @@ func cmdInstall(args []string) error {
 		return fmt.Errorf("unknown adapter %q (only `claude` exists today)", target)
 	}
 
-	path, err := settingsPath(global)
+	path, err := settingsPath(scope)
 	if err != nil {
 		return err
 	}

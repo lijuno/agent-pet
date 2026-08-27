@@ -5,10 +5,13 @@
 /build/bin/
 node_modules/
 
-# Written by `petctl install claude`. It holds an absolute path to the petctl
-# binary on this machine, which is meaningless in anyone else's clone — each
-# developer runs the install themselves.
-.claude/settings.json
+# Written by `petctl install claude --local`. It holds an absolute path to the
+# petctl binary on this machine, which is meaningless in anyone else's clone —
+# each developer runs the install themselves. `.claude/settings.json` is tracked
+# instead, because it carries the SessionStart hook that prepares a cloud
+# session; that is what --local exists for.
+.claude/settings.local.json
+.claude/settings.local.json.bak
 .claude/settings.json.bak
 
 # Wails writes generated JS bindings here.

@@ -1,4 +1,4 @@
-.PHONY: help deps dev build require-wails test-desktop petctl pets icons test test-ui vet fmt clean run-headless demo notarize release plugin-hooks plugin-validate embed-petctl version-sync states-gif
+.PHONY: help deps dev build require-wails test-desktop petctl pets icons test test-ui test-ui-headless vet fmt clean run-headless demo notarize release plugin-hooks plugin-validate embed-petctl version-sync states-gif
 BIN := bin
 
 # CHANNEL picks which of the two applications to build. They install side by
@@ -50,6 +50,7 @@ help:
 	@echo "make petctl         build the CLI into $(BIN)/"
 	@echo "make test           run the Go test suite"
 	@echo "make test-ui        open the UI tests in a browser"
+	@echo "make test-ui-headless run the same UI tests with no browser to open"
 	@echo "make test-desktop   check the menu bar and window placement (app must be running)"
 	@echo "make pets           regenerate the built-in sprite art"
 	@echo "make demo           drive the pet through a realistic session"
@@ -88,6 +89,11 @@ test:
 # cannot be seen from a test. This drives a running app and checks its answers.
 test-desktop:
 	@./scripts/desktop-test.sh
+
+# The same suite as test-ui, read by a machine instead of a person. Needs a
+# chromium; a cloud session has one and no way to open a window.
+test-ui-headless:
+	@./scripts/ui-test-headless.sh
 
 UI_TEST_PORT ?= 8899
 test-ui:
