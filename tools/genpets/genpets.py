@@ -1134,37 +1134,36 @@ def swing(i):
 # before the next blow has a single straggler dropping back. Read in a loop it
 # is a spray that never stops, which is what continuous work looks like.
 #
-# Every chip is two pixels: the light one is the leading edge and the darker one
-# behind it is where it has come from. Two are twice as easy to see, and a chip
-# with a tail has a direction — the difference between gold coming off a rock
-# and a speck of dust that happens to be yellow.
+# The gold, and when it is there.
 #
-# The tail is not a fixed offset. It is one step back towards GOLD_IMPACT, the
-# point where the head of the pick meets the stone, so every chip in the frame
-# points at the place it was struck from and the burst reads as one blow rather
-# than as weather. That is also why they go in every direction out of it and
-# not only up: gold comes off the ground and off the face of the rock as well
-# as over the top of it, and a spray that only ever climbs is a fountain.
+# It is there because the pick just landed, and for as long as that takes. The
+# four frames are one blow: she strikes, and the chips come off the ground at
+# the point the head went in — low, close, still down among the stone. She
+# lifts, and they are up and spread, the same seven chips a frame further along
+# their own paths. She lifts again and they are gone. Then the pick is on its
+# way back down and there is nothing to see, because nothing has been hit yet.
 #
-# They may be drawn over the rock, and some are on purpose. An early version
-# banned it, on the reasoning that a chip on stone has not left the stone —
-# true of a seam, which holds still, and false of a chip, which has a tail and
-# a new position every frame. What it costs is depth: the chips crossing the
-# face are in front of it, the rock is behind them, and the frame stops being
-# flat.
+# So the gold is on two frames of the four rather than all of them, and that is
+# the difference between a character working and a character standing in a
+# permanent shower of it. What keeps the other two frames from reading as a
+# woman hitting a grey stone for no reason is the heap at the foot of the rock,
+# which never moves.
 #
-# What they may not do is land on her. Thrown up the shaft they end up on the
-# blouse, and gold on red is not a chip off a rock, it is a stain.
+# Each chip is (x, y, dx, dy): where it is on the frame the blow lands, and how
+# far it has got by the next one. One table rather than two lists, because the
+# frames have to be the same seven chips — a different scatter each frame is
+# static, however much of it there is, and the eye reads the same pixel moving
+# as motion and two different pixels as noise.
 GOLD_IMPACT = (8, 33)
-GOLD_CHIPS = (
-    ((3, 20), (1, 23), (4, 18), (0, 26)),                        # topping out
-    ((2, 25), (0, 29), (4, 30)),                                 # the last ones down
-    ((6, 29), (9, 28), (11, 29), (4, 34), (3, 32), (1, 30),      # the blow lands:
-     (2, 34)),                                                   # out of the face
-                                                                 # and off the floor
-    ((5, 26), (2, 28), (10, 27), (6, 23), (0, 32)),              # spreading
+GOLD_BURST = (
+    (4, 34, -2, -5),   # along the floor, then up and away
+    (2, 35, -2, -4),
+    (5, 30, -1, -5),   # off the face of the rock
+    (10, 33, 1, -5),   # out of the cut on her side of the head
+    (11, 31, -3, -5),
+    (10, 35, 0, -5),
+    (0, 33, 0, -6),
 )
-
 
 def orebody(d, pal):
     """The rock she is working, and the gold in it.
@@ -1276,13 +1275,32 @@ def pickaxe(d, i, sh, pal, hands):
 
     # The gold, last, so nothing is drawn over it — including the rock and the
     # pick, which is what puts the chips in front of both.
-    g = pal.gold or steel_light
-    gl = pal.gold_light or steel_light
-    ix, iy = GOLD_IMPACT
-    for cx_, cy_ in GOLD_CHIPS[i % 4]:
-        px(d, cx_, cy_, gl)
-        # One step back towards the point it was struck from.
-        px(d, cx_ + (ix > cx_) - (ix < cx_), cy_ + (iy > cy_) - (iy < cy_), g)
+    #
+    # Every chip is two pixels: the light one is the leading edge and the darker
+    # one behind it is where it has come from. Two are twice as easy to see, and
+    # the tail gives it a direction. That tail is one step back towards the
+    # point where the head met the stone, so wherever a chip has got to it still
+    # points at the place it was struck from, and seven of them pointing at the
+    # same pixel read as one blow rather than as weather.
+    #
+    # They may be drawn over the rock, and some are. An earlier version banned
+    # it, reasoning that a chip on stone has not left the stone — true of a
+    # seam, which holds still, false of a chip, which has a tail and a new
+    # position every frame. What the ban cost was depth: a chip crossing the
+    # face is in front of it, and with nothing between the viewer and the stone
+    # the whole corner of the frame was flat.
+    #
+    # Nothing lands on her, though. Thrown up the shaft they end on the blouse,
+    # and gold on red is not a chip off a rock, it is a stain.
+    if i % 4 in (2, 3):
+        g = pal.gold or steel_light
+        gl = pal.gold_light or steel_light
+        ix, iy = GOLD_IMPACT
+        flown = i % 4 == 3
+        for bx, by, dx, dy in GOLD_BURST:
+            cx_, cy_ = (bx + dx, by + dy) if flown else (bx, by)
+            px(d, cx_, cy_, gl)
+            px(d, cx_ + (ix > cx_) - (ix < cx_), cy_ + (iy > cy_) - (iy < cy_), g)
 
 
 def hand(d, x, y, pal):
