@@ -1115,8 +1115,41 @@ def swing(i):
     return ((-6, 0, -11, 3),   # raised clear of the rock: the frame that has
                                # to carry the shape of the tool on its own
             (-6, 1, -11, 5),   # falling
-            (-6, 1, -10, 6),   # landed, the head in the face of the rock
+            (-6, 1, -10, 5),   # landed, the head in the face of the rock
             (-6, 0, -11, 4))[i % 4]  # lifting away again
+
+
+# GOLD_CHIPS is where the gold is this frame: one (x, y) per chip, in frame
+# order, drawn over everything else.
+#
+# Gold in the rock was the wrong place for it. A seam is the geologically
+# honest picture and it is also a stripe of yellow sitting still inside a grey
+# shape, which at this size is a pattern on a stone rather than an event. What
+# says gold is gold coming *out*: a chip is unmistakably metal the moment it
+# leaves the rock, because nothing else in the frame moves like that.
+#
+# So the four frames are one throw, not a flicker. The blow lands and the chips
+# are low, close and chunky; the next frame they are higher and further apart;
+# by the frame after they are thinning out near the top of the arc, and the one
+# before the next blow has a single straggler dropping back. Read in a loop it
+# is a spray that never stops, which is what continuous work looks like.
+#
+# All of it goes up and to the left, over the rock. Thrown up the shaft it
+# lands on her blouse, and gold on red is not a chip off a rock, it is a stain.
+#
+# Each chip is two pixels, not one: the light one is the leading edge and the
+# darker one behind it is where it has come from. Two pixels are twice as easy
+# to see, and a chip with a tail has a direction — the difference between gold
+# flying off a rock and a speck of dust that happens to be yellow.
+#
+# Nothing here may land on the rock. A chip drawn over stone is a chip that has
+# not left it, which is the picture this replaced.
+GOLD_CHIPS = (
+    ((4, 20), (1, 23)),                    # topping out, and thinning
+    ((2, 26),),                            # the last one on its way down
+    ((7, 26), (5, 28), (9, 26), (2, 26)),  # the blow lands: four, low and close
+    ((6, 23), (3, 25), (8, 25)),           # up and spreading
+)
 
 
 def orebody(d, pal):
@@ -1125,19 +1158,21 @@ def orebody(d, pal):
     Beside her rather than under her: the swing comes down to the left, and a
     seam directly below would be behind her own legs.
 
-    Two stones and no more — a rock with any more colour in it than that
-    competes with the gold, which is the only thing in this state worth looking
-    at. But *which* two matters more than how many. Drawn dark they were the
-    whole of the lower left of the frame and a person saw one thing: a black
-    lump, which is coal. The stone here is light and warm enough that the gold
-    is the brightest thing in the frame rather than the only thing that is not
-    black, and the seam is a seam — a band running through the rock and out the
-    side of it — instead of three specks lost in a shadow.
+    Two stones and no more, and light warm ones. Drawn dark they were the whole
+    of the lower left of the frame and a person saw one thing: a black lump,
+    which is coal.
+
+    No gold in it any more, either. It carried a seam for a while — the
+    geologically honest picture — and a seam is a stripe of yellow standing
+    still inside a grey shape, which reads as a pattern on a stone rather than
+    as anything happening. The gold is in the air instead, and in the heap at
+    the foot of the rock: one is what she is getting out and the other is what
+    she has got, and between them the rock is free to be nothing but the thing
+    she is hitting.
     """
     rock, edge = (146, 138, 128, 255), (94, 88, 80, 255)
     g = pal.gold or rock
     gl = pal.gold_light or rock
-    gd = pal.gold_dark or edge
 
     # Off the left edge of the frame rather than sitting inside it. A stone with
     # air all round it is a pebble somebody has put down; one that runs out of
@@ -1149,41 +1184,31 @@ def orebody(d, pal):
                (6, GROUND - 5), (8, GROUND - 3), (9, GROUND - 1), (10, GROUND)],
               fill=rock, outline=edge)
 
-    # The seam: one band, unbroken, climbing across the rock to the place the
-    # pick is working. A vein reads as metal in rock because it is continuous
-    # and the rock is not; the same pixels scattered read as dirt, which is
-    # what the first pass of this looked like.
-    for x, y in ((0, 2), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4), (4, 4), (5, 4),
-                 (5, 5), (6, 5)):
-        px(d, x, GROUND - y, g)
-    # Lit along the top of the band and shaded under it: that is what sets the
-    # seam into the rock rather than painting it on top.
-    for x, y in ((1, 4), (3, 5), (5, 6)):
-        px(d, x, GROUND - y, gl)
-    for x, y in ((2, 2), (4, 3), (6, 4)):
-        px(d, x, GROUND - y, gd)
-
-    # What she has already got out, at the foot of the rock. Two pixels, and
-    # they are the difference between a woman hitting a stone and a woman
-    # getting something for it.
-    px(d, 11, GROUND, gl)
-    px(d, 12, GROUND, g)
+    # The heap at the foot of the rock: what she has already got out. It is the
+    # one piece of gold that holds still, and it has to, because the chips in
+    # the air are only there on the frames they are thrown — without it the
+    # picture between blows is a woman hitting a grey stone for no reason.
+    for x, y, bright in ((11, 0, False), (12, 0, True), (13, 0, False),
+                         (12, 1, True)):
+        px(d, x, GROUND - y, gl if bright else g)
 
 
-def pickaxe(d, i, sh, pal):
-    """The pick, and what comes off the rock when it lands.
+def pickaxe(d, i, sh, pal, hands):
+    """The pick, the fists on it, and the gold that comes off the rock.
 
-    Drawn after the hands, so it passes in front of the grip: a handle behind
-    two fists is a stick somebody happens to be standing near.
+    In that order, and the order is the point: shaft, fists, head, gold. Under
+    the fists the shaft is a stick somebody is standing near; over them there
+    are no fists at all, only a bar across a sleeve, which is what this looked
+    like once the shaft ran at an angle and crossed both of them.
 
     The tool has to say pickaxe on its own, because nothing else in the frame
-    will say it for her. Two things do that at this size and the first version
-    had neither. One is length: a handle of five pixels held level is a stick,
-    and what makes a pick is a long shaft running down and away from the body
-    to a head well clear of the fists. The other is the head's profile — a bar
-    across the shaft with the ends swept back towards the hands, which is the
-    silhouette of a pick and of nothing else. A straight bar is a hammer and a
-    blob is a stone on a stick.
+    will say it for her, and it took three goes. A five-pixel handle held level
+    is a plank. A vertical bar of steel on the end of it is a fence post. A
+    straight bar across the shaft is a knife, and a solid block is a bucket.
+    What is left is the shape a pick actually has: a long shaft at an angle,
+    and a head that is a crescent — thick through the middle where the shaft
+    goes through it, tapering to a point at each end, and both points swept
+    back towards the hands.
     """
     # Dark steel with the light along its back, rather than the near-white the
     # head used to be. That was chosen to stand off a dark rock; against a
@@ -1205,40 +1230,40 @@ def pickaxe(d, i, sh, pal):
     d.line([butt, head], fill=wood)
     d.line([(butt[0], butt[1] + 1), (head[0], head[1] + 1)], fill=wood_dark)
 
-    # The head: a bar across the end of the shaft with both ends swept back
-    # towards the hands, which is the silhouette of a pick and of nothing else.
-    # Two columns rather than one — a single column of steel is a nail, and it
-    # was read as one.
-    # A crescent, hollow side to the shaft: the head is a curve with both ends
-    # swept back at her hands, and the shaft meets it in the middle. Squared
-    # off it was a fence post, and a straight bar across the shaft was a knife.
-    # The curve is the whole of what says pickaxe at five pixels.
+    for hx_, hy_ in hands:
+        hand(d, hx_, hy_, pal)
+
+    # The head. Seven rows of it, which is as much as there is between the
+    # bottom of her hair and the floor, and every one of them is spent on the
+    # curve: two columns through the belly so it has some mass, a single pixel
+    # at each end for the points, and the points bent back towards her.
+    #
+    # Bigger than it was on purpose. The tool is the subject of this state —
+    # the rock only has to be a rock — and a five-pixel head read as a nail.
     hxp, hyp = head
     dark = (46, 52, 64, 255)
-    for dx, dy in ((0, -2), (-1, -1), (-1, 0), (-1, 1), (0, 2)):
-        px(d, hxp + dx, hyp + dy, steel)
     for dy in (-1, 0, 1):
-        px(d, hxp - 2, hyp + dy, steel_light)   # the light along its back
+        px(d, hxp - 1, hyp + dy, steel_light)   # the lit back of the curve
+    for dy in (-2, -1, 0, 1, 2):
+        px(d, hxp, hyp + dy, steel)
+    px(d, hxp + 1, hyp - 3, steel)              # the points
+    px(d, hxp + 1, hyp + 3, steel)
     # Outlined, like everything else in the frame. Bare steel against a pale
     # rock is the same trick as bare steel against a dark one, in the other
     # direction: it vanished into the thing it was hitting.
-    for dx, dy in ((1, -3), (0, -3), (1, 3), (0, 3), (-3, 0)):
-        px(d, hxp + dx, hyp + dy, dark)
+    for dy in (-1, 0, 1):
+        px(d, hxp - 2, hyp + dy, dark)
+    px(d, hxp - 1, hyp - 2, dark)
+    px(d, hxp - 1, hyp + 2, dark)
+    px(d, hxp, hyp - 3, dark)
+    px(d, hxp, hyp + 3, dark)
 
-    if i % 4 in (2, 3):
-        # Gold off the seam on the frame it lands and the one after, and not on
-        # the two while the pick is coming back up. On all four she stands in a
-        # permanent shower of it, which is a different picture: this one is
-        # working for it.
-        #
-        # Up and away over the rock, never up and to the right. Thrown along
-        # the shaft they landed on her blouse, and gold on a red blouse is not
-        # a spark off a rock, it is a stain.
-        g = pal.gold or steel_light
-        gl = pal.gold_light or steel_light
-        for sx_, sy_ in ((-1, -4), (-4, -3)):
-            px(d, hxp + sx_, hyp + sy_, gl)
-        px(d, hxp - 3, hyp - 6, g)
+    # The gold, last, so nothing is drawn over it.
+    g = pal.gold or steel_light
+    gl = pal.gold_light or steel_light
+    for cx_, cy_ in GOLD_CHIPS[i % 4]:
+        px(d, cx_, cy_, gl)
+        px(d, cx_ + 1, cy_ + 1, g)
 
 
 def hand(d, x, y, pal):
@@ -1554,9 +1579,7 @@ def torso_front(d, s, state, i, top, bw, bh, cy, pal):
 
     elif state == "working" and s.work == "mine":
         orebody(d, pal)
-        for hx_, hy_ in hands_at(state, i, sh, hip, s.work):
-            hand(d, hx_, hy_, pal)
-        pickaxe(d, i, sh, pal)
+        pickaxe(d, i, sh, pal, hands_at(state, i, sh, hip, s.work))
 
     elif state == "working" and s.work == "write":
         desk(d, pal)
