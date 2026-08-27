@@ -1112,10 +1112,10 @@ def swing(i):
     # arm across her chest, which is how anybody swings anything two-handed at
     # something beside them, and the same tool becomes a diagonal.
     #      grip       head        what it is
-    return ((-6, 0, -11, 3),   # raised clear of the rock: the frame that has
+    return ((-6, 0, -11, 2),   # raised clear of the rock: the frame that has
                                # to carry the shape of the tool on its own
-            (-6, 1, -11, 5),   # falling
-            (-6, 1, -10, 5),   # landed, the head in the face of the rock
+            (-6, 1, -11, 4),   # falling
+            (-6, 1, -11, 6),   # landed, the point buried in the rock
             (-6, 0, -11, 4))[i % 4]  # lifting away again
 
 
@@ -1145,10 +1145,10 @@ def swing(i):
 # Nothing here may land on the rock. A chip drawn over stone is a chip that has
 # not left it, which is the picture this replaced.
 GOLD_CHIPS = (
-    ((4, 20), (1, 23)),                    # topping out, and thinning
-    ((2, 26),),                            # the last one on its way down
-    ((7, 26), (5, 28), (9, 26), (2, 26)),  # the blow lands: four, low and close
-    ((6, 23), (3, 25), (8, 25)),           # up and spreading
+    ((4, 21), (2, 22), (3, 18), (0, 25)),                       # topping out
+    ((1, 24), (3, 27), (0, 20)),                                # the last ones down
+    ((9, 28), (7, 28), (5, 29), (3, 28), (1, 27), (10, 27)),    # the blow lands
+    ((8, 25), (6, 24), (4, 26), (2, 24), (0, 28)),              # up and spreading
 )
 
 
@@ -1176,12 +1176,14 @@ def orebody(d, pal):
 
     # Off the left edge of the frame rather than sitting inside it. A stone with
     # air all round it is a pebble somebody has put down; one that runs out of
-    # the picture is the ground she is standing on. Tall and narrow rather than
-    # low and wide, too: spread across the bottom of the frame it was a ridge
-    # she was tapping at, and the seam in it had to spread with it until the
-    # gold was scattered rather than seamed.
-    d.polygon([(-1, GROUND), (-1, GROUND - 5), (1, GROUND - 7), (4, GROUND - 7),
-               (6, GROUND - 5), (8, GROUND - 3), (9, GROUND - 1), (10, GROUND)],
+    # the picture is the ground she is standing on.
+    #
+    # Low, and lower than it was. Everything in this state that is worth seeing
+    # happens above the rock — the head of the pick, and the gold in the air —
+    # and every row of stone is a row that neither of them can use. It only has
+    # to be big enough to be what she is hitting.
+    d.polygon([(-1, GROUND), (-1, GROUND - 3), (1, GROUND - 5), (4, GROUND - 5),
+               (6, GROUND - 4), (8, GROUND - 2), (9, GROUND - 1), (10, GROUND)],
               fill=rock, outline=edge)
 
     # The heap at the foot of the rock: what she has already got out. It is the
