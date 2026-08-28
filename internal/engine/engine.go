@@ -47,6 +47,11 @@ type Engine struct {
 	subs   map[int]chan Update
 	nextID int
 
+	// wake carries "an event arrived" to Run, which stops the clock entirely
+	// while the machine is at rest. Buffered and lossy: one pending token is
+	// all a resumption needs, and nothing may block Submit.
+	wake chan struct{}
+
 	// last is retained so a late subscriber gets the current picture immediately.
 	last Update
 }
@@ -70,6 +75,7 @@ func New(cfg config.Config, lib *petassets.Library, log *slog.Logger, opts ...Op
 		log:     log,
 		now:     time.Now,
 		subs:    map[int]chan Update{},
+		wake:    make(chan struct{}, 1),
 	}
 	for _, o := range opts {
 		o(e)
@@ -129,7 +135,24 @@ func (e *Engine) Submit(ev events.Event) state.Snapshot {
 	for _, s := range sinks {
 		s.Record(norm, snap)
 	}
+	e.nudge()
 	return snap
+}
+
+// nudge tells Run that something happened. Never blocks: a full buffer already
+// means Run has a resumption waiting for it.
+func (e *Engine) nudge() {
+	select {
+	case e.wake <- struct{}{}:
+	default:
+	}
+}
+
+// atRest asks whether the clock can be stopped. See state.Machine.AtRest.
+func (e *Engine) atRest() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.machine.AtRest()
 }
 
 // logEvent writes one concise line per event. §32: no prompts, no source code,
@@ -175,13 +198,33 @@ func (e *Engine) Tick() {
 }
 
 // Run drives the clock until ctx is cancelled.
+//
+// It stops the clock while the machine is at rest rather than ticking through
+// the night. A pet with no sessions and nothing forced is asleep and has no
+// deadline that could wake it, so a tick a second is 86,400 wakeups a day to
+// recompute the same answer — on a laptop, for an app that is meant to sit
+// there. Only an event can change anything from there, and an event nudges.
+//
+// The ticker is stopped rather than left running with nobody reading it: an
+// unread Ticker still fires, which is the wakeup this exists to avoid.
 func (e *Engine) Run(ctx context.Context) {
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 	for {
+		if e.atRest() {
+			t.Stop()
+			select {
+			case <-ctx.Done():
+				return
+			case <-e.wake:
+			}
+			t.Reset(time.Second)
+			continue
+		}
 		select {
 		case <-ctx.Done():
 			return
+		case <-e.wake:
 		case <-t.C:
 			e.Tick()
 		}
@@ -198,6 +241,7 @@ func (e *Engine) Force(s state.State, d time.Duration) state.Snapshot {
 	e.last = up
 	e.publishLocked(up)
 	e.mu.Unlock()
+	e.nudge()
 	return snap
 }
 

@@ -307,7 +307,7 @@ func (a *App) SetScale(scale float64) {
 	cfg := a.eng.Config()
 	cfg.Pet.Scale = scale
 	a.eng.SetConfig(cfg)
-	if err := config.Save(a.cfgPath, cfg); err != nil {
+	if err := config.SaveOwned(a.cfgPath, cfg); err != nil {
 		a.log.Warn("could not save config", "err", err)
 	}
 
@@ -515,7 +515,7 @@ func (a *App) shutdown(ctx context.Context) {
 	cfg := a.eng.Config()
 	cfg.Window.X, cfg.Window.Y = x, y
 	cfg.Pet.AlwaysOnTop = a.alwaysOnTop
-	if err := config.Save(a.cfgPath, cfg); err != nil {
+	if err := config.SaveOwned(a.cfgPath, cfg); err != nil {
 		a.log.Warn("could not save config", "err", err)
 	}
 }
@@ -587,15 +587,15 @@ func (a *App) SetPet(id string) bool {
 	_, ok := a.eng.SetPet(id)
 	if ok {
 		cfg := a.eng.Config()
-		_ = config.Save(a.cfgPath, cfg)
+		_ = config.SaveOwned(a.cfgPath, cfg)
 	}
 	return ok
 }
 
 // ReloadConfig re-reads config.yaml and applies what can be applied without a
-// restart. It is on the menu because the alternative is quitting the pet to
-// change a setting in a file the pet rewrites when it quits — which is a
-// circle somebody hits the first time they edit it by hand.
+// restart. It is on the menu so an edit takes effect without quitting; the pet
+// no longer overwrites edits it did not make, so this is a convenience rather
+// than the way out of a circle it used to be (see config.SaveOwned).
 //
 // What it cannot do is move the listener. server.addr is bound once at
 // startup; a new one takes a restart, and saying so is better than appearing
@@ -781,7 +781,7 @@ func (a *App) SetDropShadow(b bool) {
 	cfg := a.eng.Config()
 	cfg.Pet.DropShadow = b
 	a.eng.SetConfig(cfg)
-	if err := config.Save(a.cfgPath, cfg); err != nil {
+	if err := config.SaveOwned(a.cfgPath, cfg); err != nil {
 		a.log.Warn("could not save config", "err", err)
 	}
 }

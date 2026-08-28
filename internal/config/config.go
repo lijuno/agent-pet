@@ -340,6 +340,34 @@ func (c Config) sanitised() Config {
 }
 
 // Save writes the config atomically, creating parent directories.
+// SaveOwned writes back only the settings the running app decides for itself,
+// leaving every other line of the file as it is on disk.
+//
+// Not Save(path, live). The config the app holds is a copy taken when it
+// started, so writing that back replaces anything edited since with what was in
+// memory before the edit — and the app writes it on every scale change, every
+// character change and every quit. Editing config.yaml while the pet ran
+// therefore lost the edit, reliably, and the only way round it was to remember
+// to hit Reload first.
+//
+// The five below are the whole of what the menu and the window can change.
+// A new setting the UI can set belongs here, or it will not survive a quit;
+// anything else must not, or it will overwrite the file's own answer.
+//
+// A file that cannot be parsed leaves nothing to preserve, and Load has already
+// returned the defaults the app is actually running on, so this writes those.
+// That is what happened before, and petd has already said so at startup.
+func SaveOwned(path string, live Config) error {
+	onDisk, _ := Load(path)
+	onDisk.Pet.Active = live.Pet.Active
+	onDisk.Pet.AlwaysOnTop = live.Pet.AlwaysOnTop
+	onDisk.Pet.Scale = live.Pet.Scale
+	onDisk.Pet.DropShadow = live.Pet.DropShadow
+	// Not the whole Window: start_hidden is the file's to say, not the app's.
+	onDisk.Window.X, onDisk.Window.Y = live.Window.X, live.Window.Y
+	return Save(path, onDisk)
+}
+
 func Save(path string, c Config) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err

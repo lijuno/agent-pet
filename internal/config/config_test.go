@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -277,5 +278,137 @@ func TestRetiredPetIdIsCarriedForward(t *testing.T) {
 	}
 	if cfg.Pet.Active != "sanmao" {
 		t.Fatalf("a config naming the retired id should land on sanmao, got %q", cfg.Pet.Active)
+	}
+}
+
+// settled makes two configs comparable across a trip through YAML, which turns
+// a nil slice into an empty one. They mean the same thing and print the same,
+// so without this a failure message shows two identical structs.
+func settled(c Config) Config {
+	if len(c.Pet.Disabled) == 0 {
+		c.Pet.Disabled = nil
+	}
+	return c
+}
+
+// The whole point of SaveOwned: an edit made while the pet is running is still
+// there afterwards. It was not — the app wrote its startup copy back over the
+// file on every scale change, every character change and every quit.
+func TestSaveOwnedKeepsAnEditMadeWhileTheAppRan(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte(
+		"thresholds:\n  idle_after: 45s\npersonality:\n  name: Byte\npet:\n  sound: true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// What the app has held since before that edit, plus a window it moved.
+	live := Default()
+	live.Window.X, live.Window.Y = 300, 120
+
+	if err := SaveOwned(path, live); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Thresholds.IdleAfter.D() != 45*time.Second {
+		t.Errorf("idle_after is %s; the edit was overwritten", got.Thresholds.IdleAfter.D())
+	}
+	if got.Personality.Name != "Byte" {
+		t.Errorf("personality.name is %q; the edit was overwritten", got.Personality.Name)
+	}
+	if !got.Pet.Sound {
+		t.Error("pet.sound was overwritten, and nothing in the app can set it")
+	}
+	if got.Window.X != 300 || got.Window.Y != 120 {
+		t.Errorf("the window position was not saved: %d,%d", got.Window.X, got.Window.Y)
+	}
+}
+
+// Everything the menu and the window can change has to survive a quit.
+func TestSaveOwnedWritesWhatTheAppDecides(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	live := Default()
+	live.Pet.Active = "peach"
+	live.Pet.AlwaysOnTop = !live.Pet.AlwaysOnTop
+	live.Pet.Scale = 2
+	live.Pet.DropShadow = !live.Pet.DropShadow
+	live.Window.X, live.Window.Y = 11, 22
+
+	if err := SaveOwned(path, live); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(settled(got).Pet, settled(live).Pet) {
+		t.Errorf("pet settings did not survive:\n got %+v\nwant %+v", got.Pet, live.Pet)
+	}
+	if got.Window.X != 11 || got.Window.Y != 22 {
+		t.Errorf("window position did not survive: %d,%d", got.Window.X, got.Window.Y)
+	}
+}
+
+// The other half of the contract, and the one that catches a merge that grew:
+// a live config with every field changed must move exactly five of them.
+func TestSaveOwnedChangesNothingElse(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := Save(path, Default()); err != nil {
+		t.Fatal(err)
+	}
+
+	live := Default()
+	live.Pet.Active, live.Pet.Scale = "peach", 2
+	live.Pet.AlwaysOnTop, live.Pet.DropShadow = !live.Pet.AlwaysOnTop, !live.Pet.DropShadow
+	live.Window.X, live.Window.Y = 11, 22
+	// None of these may reach the file. Every one is somebody's hand edit.
+	live.Pet.Sound = !live.Pet.Sound
+	live.Pet.Disabled = []string{"peach"}
+	live.Window.StartHidden = !live.Window.StartHidden
+	live.Thresholds.IdleAfter = Duration(99 * time.Second)
+	live.Personality.Name = "Nobody"
+	live.Personality.Preset = "nonsense"
+	live.Behavior.Dialogue = !live.Behavior.Dialogue
+	live.Logging.Level = "debug"
+	live.Logging.Verbose = true
+	live.Server.Addr = "127.0.0.1:1"
+	live.Server.AllowNonLoopback = true
+	live.Update.Check = !live.Update.Check
+	live.Integrations = map[string]Toggle{"claude": {Enabled: false}}
+
+	if err := SaveOwned(path, live); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := Default()
+	want.Pet.Active, want.Pet.Scale = "peach", 2
+	want.Pet.AlwaysOnTop, want.Pet.DropShadow = live.Pet.AlwaysOnTop, live.Pet.DropShadow
+	want.Window.X, want.Window.Y = 11, 22
+	if !reflect.DeepEqual(settled(got), settled(want)) {
+		t.Errorf("SaveOwned moved something that is not the app's to move:\n got %+v\nwant %+v", got, want)
+	}
+}
+
+// The first quit on a machine that has never had a config file still has to
+// leave one holding where the pet was parked.
+func TestSaveOwnedCreatesAMissingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "config.yaml")
+	live := Default()
+	live.Window.X, live.Window.Y = 7, 8
+	if err := SaveOwned(path, live); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Window.X != 7 || got.Window.Y != 8 {
+		t.Errorf("window position is %d,%d", got.Window.X, got.Window.Y)
 	}
 }

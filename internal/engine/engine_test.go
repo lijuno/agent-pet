@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"testing"
@@ -162,5 +163,64 @@ func TestConfigReloadChangesThresholds(t *testing.T) {
 	e.Tick()
 	if got := e.Last().Snapshot.State; got != state.Sleeping {
 		t.Fatalf("the new sleep threshold should apply, got %s", got)
+	}
+}
+
+// Run stops the clock while the pet is asleep, so the wake has to be the thing
+// that starts it again. If it were not, the pet would notice the event that
+// arrived — Submit publishes by itself — and then never notice anything
+// time-based again: it would sit in whatever state that event produced for
+// good.
+//
+// The real clock, with thresholds small enough that one tick crosses them.
+// Run is the only thing here that reads the clock from another goroutine, and
+// a fake one shared with the test is a data race rather than a fixture.
+func TestAClockStoppedAtRestStartsAgainOnAnEvent(t *testing.T) {
+	lib := petassets.NewLibrary()
+	if err := lib.LoadBuiltin(fstest.MapFS{
+		"pets/a/manifest.json": {Data: []byte(manifestA)},
+	}, "pets", "/pets"); err != nil {
+		t.Fatalf("pets: %v", err)
+	}
+	cfg := config.Default()
+	cfg.Pet.Active = "a"
+	cfg.Thresholds.IdleAfter = config.Duration(time.Millisecond)
+	cfg.Thresholds.SleepingAfter = config.Duration(time.Millisecond)
+	e := New(cfg, lib, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if !e.atRest() {
+		t.Fatal("a fresh engine with no sessions should be at rest")
+	}
+	go e.Run(ctx)
+
+	ch, stop := e.Subscribe()
+	defer stop()
+	<-ch // the picture every subscriber gets immediately
+
+	// Long enough for Run to have reached the wake channel and parked on it.
+	// Nothing observable says when that happened, so this can only make the
+	// test pass without proving anything — never fail something that works.
+	time.Sleep(100 * time.Millisecond)
+	if !e.atRest() {
+		t.Fatal("the engine stopped resting before the test could start")
+	}
+
+	// An event while the clock is stopped. The engine is not resting now, and
+	// only the tick loop can carry it back to sleeping.
+	e.Submit(events.Event{Source: "claude", Event: events.SessionStarted, SessionID: "s"})
+
+	deadline := time.After(10 * time.Second)
+	for {
+		select {
+		case up := <-ch:
+			if up.Snapshot.State == state.Sleeping {
+				return
+			}
+		case <-deadline:
+			t.Fatal("the clock never started again: the pet stayed awake with a session that went quiet")
+		}
 	}
 }

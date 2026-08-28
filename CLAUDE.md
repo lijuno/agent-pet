@@ -182,10 +182,14 @@ Each of these cost an hour or more to find.
 - **A failed `make build` leaves the previous `.app` in place.** A green test
   run after a failed build tested the old binary and means nothing. Check the
   build said `Built '...'` before believing a result.
-- **`config.yaml` is rewritten from memory on shutdown.** Editing it while the
-  app runs loses the edit — unless you finish with **Reload** in the
-  menu, which re-reads the file and makes what is on screen the thing that gets
-  written back. Without that, close the app first.
+- **The app writes back only the five settings it owns** — the character, the
+  scale, always-on-top, the drop shadow and the window position — and re-reads
+  the file for everything else first. `config.SaveOwned` is the one place that
+  writes, and a setting the menu can change belongs in it or it will not
+  survive a quit. It used to write its startup copy of the whole file on every
+  scale change, every character change and every quit, so editing `config.yaml`
+  while the pet ran lost the edit; **Reload** was the way out of that circle and
+  is now only a convenience, applying an edit without a restart.
 - **Changing a default in `config.go` does not touch an existing
   `config.yaml`.** Your machine keeps the old value; test on a fresh config or
   edit both.

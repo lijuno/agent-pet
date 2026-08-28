@@ -447,3 +447,39 @@ func TestFallbackChainsTerminateAtIdle(t *testing.T) {
 		}
 	}
 }
+
+// The property the engine stops its clock on: with nothing running and nothing
+// forced, no passage of time changes the answer.
+func TestAtRestMeansTimeCannotChangeAnything(t *testing.T) {
+	c := newClock()
+	m := New(DefaultOptions())
+	if !m.AtRest() {
+		t.Fatal("a machine with no sessions is not resting")
+	}
+	// A year later, with no events at all, it still says the same thing.
+	was, _ := m.Advance(c.now())
+	c.add(365 * 24 * time.Hour)
+	got, changed := m.Advance(c.now())
+	if changed || got.State != was.State || got.State != Sleeping {
+		t.Fatalf("a resting machine moved from %s to %s on its own", was.State, got.State)
+	}
+
+	m.Apply(c.now(), events.Event{Source: "claude", Event: events.SessionStarted, SessionID: "s"})
+	if m.AtRest() {
+		t.Error("a machine with a live session is not at rest; its timers still have to run")
+	}
+}
+
+func TestForcedIsNotAtRest(t *testing.T) {
+	c := newClock()
+	m := New(DefaultOptions())
+	m.Force(c.now(), Celebrate, 10*time.Second)
+	if m.AtRest() {
+		t.Fatal("a forced state expires on a deadline, so the clock has to keep running")
+	}
+	c.add(11 * time.Second)
+	m.Advance(c.now())
+	if !m.AtRest() {
+		t.Error("once the force has expired and no session exists, nothing is left to tick")
+	}
+}
