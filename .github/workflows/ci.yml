@@ -69,6 +69,11 @@ jobs:
   ui:
     name: the UI suite, headless
     runs-on: ubuntu-latest
+    # The suite takes seconds. This is here because the first version of this
+    # job hung: a headless Chrome that blocks on dbus never returns, and a
+    # GitHub job with nothing to stop it runs for six hours before the platform
+    # kills it. The script bounds the browser itself; this bounds the job.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
