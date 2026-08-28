@@ -298,15 +298,27 @@ func (c Config) sanitised() Config {
 	if c.Pet.Active == "" {
 		c.Pet.Active = "sanmao"
 	}
-	// `momo` was Sanmao's id until she was renamed, and every config.yaml
-	// written before that still names it. Left alone, the id matches no pack
-	// and Any() quietly hands the user whichever character sorts first —
-	// a cat owner opens the app and finds a stranger in the window.
+	// Ids that shipped and were then renamed. Every config.yaml written before
+	// a rename still names the old one, and left alone it matches no pack:
+	// Any() then quietly hands the user whichever character sorts first — a
+	// cat owner opens the app and finds a stranger in the window.
 	//
 	// Rewritten on load, and the file is written back from memory on shutdown,
 	// so a config heals itself the first time the app runs.
-	if c.Pet.Active == "momo" {
-		c.Pet.Active = "sanmao"
+	retired := map[string]string{
+		"momo":  "sanmao", // an id nobody could match to a name, once there were three
+		"peach": "taotao", // the only character named in translation, not pinyin
+	}
+	if to, ok := retired[c.Pet.Active]; ok {
+		c.Pet.Active = to
+	}
+	// Disabled holds ids too, and a rename must not undo somebody's choice: a
+	// pack switched off under its old id would otherwise reappear, which reads
+	// as the app overriding the user rather than as a character changing name.
+	for i, id := range c.Pet.Disabled {
+		if to, ok := retired[id]; ok {
+			c.Pet.Disabled[i] = to
+		}
 	}
 	if c.Server.Addr == "" {
 		c.Server.Addr = flavor.Current().Addr

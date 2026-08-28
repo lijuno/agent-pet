@@ -261,23 +261,46 @@ func TestPathsAreNamedAfterTheFlavour(t *testing.T) {
 	}
 }
 
-// TestRetiredPetIdIsCarriedForward covers the one rename that has happened to a
-// shipped pack. Sanmao's id was `momo` for the app's whole life until three
-// characters made an id nobody could match to a name too expensive to keep, so
-// every config.yaml written before the rename names a pack that is no longer
+// TestRetiredPetIdIsCarriedForward covers the renames that have happened to
+// shipped packs: Sanmao's id was `momo` until three characters made an id
+// nobody could match to a name too expensive to keep, and Taotao's was `peach`
+// until she was the only character named in translation rather than pinyin.
+// Every config.yaml written before a rename names a pack that is no longer
 // there. Left alone, Any() falls back to whichever character sorts first and a
 // cat owner opens the app to find a stranger in the window.
 func TestRetiredPetIdIsCarriedForward(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "config.yaml")
-	os.WriteFile(path, []byte("pet:\n  active: momo\n"), 0o644)
+	for _, c := range []struct{ old, want string }{
+		{"momo", "sanmao"},
+		{"peach", "taotao"},
+	} {
+		path := filepath.Join(t.TempDir(), "config.yaml")
+		os.WriteFile(path, []byte("pet:\n  active: "+c.old+"\n"), 0o644)
+
+		cfg, err := Load(path)
+		if err != nil {
+			t.Fatalf("load: %v", err)
+		}
+		if cfg.Pet.Active != c.want {
+			t.Errorf("a config naming the retired id %q should land on %s, got %q", c.old, c.want, cfg.Pet.Active)
+		}
+	}
+}
+
+// A rename must not switch a character back on. Disabled holds ids like Active
+// does, and a pack turned off under its old id would otherwise reappear the
+// first time the app ran — the app overriding a choice rather than a character
+// changing name.
+func TestRetiredPetIdIsCarriedForwardInDisabled(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	os.WriteFile(path, []byte("pet:\n  active: sanmao\n  disabled: [peach, momo]\n"), 0o644)
 
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if cfg.Pet.Active != "sanmao" {
-		t.Fatalf("a config naming the retired id should land on sanmao, got %q", cfg.Pet.Active)
+	want := []string{"taotao", "sanmao"}
+	if !reflect.DeepEqual(cfg.Pet.Disabled, want) {
+		t.Errorf("disabled ids should follow their renames: got %v, want %v", cfg.Pet.Disabled, want)
 	}
 }
 
@@ -330,7 +353,7 @@ func TestSaveOwnedKeepsAnEditMadeWhileTheAppRan(t *testing.T) {
 func TestSaveOwnedWritesWhatTheAppDecides(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	live := Default()
-	live.Pet.Active = "peach"
+	live.Pet.Active = "taotao"
 	live.Pet.AlwaysOnTop = !live.Pet.AlwaysOnTop
 	live.Pet.Scale = 2
 	live.Pet.DropShadow = !live.Pet.DropShadow
@@ -360,12 +383,12 @@ func TestSaveOwnedChangesNothingElse(t *testing.T) {
 	}
 
 	live := Default()
-	live.Pet.Active, live.Pet.Scale = "peach", 2
+	live.Pet.Active, live.Pet.Scale = "taotao", 2
 	live.Pet.AlwaysOnTop, live.Pet.DropShadow = !live.Pet.AlwaysOnTop, !live.Pet.DropShadow
 	live.Window.X, live.Window.Y = 11, 22
 	// None of these may reach the file. Every one is somebody's hand edit.
 	live.Pet.Sound = !live.Pet.Sound
-	live.Pet.Disabled = []string{"peach"}
+	live.Pet.Disabled = []string{"taotao"}
 	live.Window.StartHidden = !live.Window.StartHidden
 	live.Thresholds.IdleAfter = Duration(99 * time.Second)
 	live.Personality.Name = "Nobody"
@@ -387,7 +410,7 @@ func TestSaveOwnedChangesNothingElse(t *testing.T) {
 	}
 
 	want := Default()
-	want.Pet.Active, want.Pet.Scale = "peach", 2
+	want.Pet.Active, want.Pet.Scale = "taotao", 2
 	want.Pet.AlwaysOnTop, want.Pet.DropShadow = live.Pet.AlwaysOnTop, live.Pet.DropShadow
 	want.Window.X, want.Window.Y = 11, 22
 	if !reflect.DeepEqual(settled(got), settled(want)) {

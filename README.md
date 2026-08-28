@@ -156,7 +156,7 @@ firing at all.
 
 ```yaml
 pet:
-  active: sanmao        # sanmao, peach, juanmao, maomao, damao, amiao, or your own pack
+  active: sanmao        # sanmao, taotao, juanmao, maomao, damao, amiao, or your own pack
   disabled: []          # ids kept out of the character menu
   always_on_top: true
   scale: 1.0
@@ -572,8 +572,8 @@ Six built-in packs ship in the binary:
   <img src="docs/media/states-sanmao.gif"
        alt="Sanmao, a tortoiseshell tabby, cycling through the ten states as pixel-art animations labelled with their names and frame rates."
        width="240">
-  <img src="docs/media/states-peach.gif"
-       alt="Peach, a girl with long dark hair and a white dress, cycling through the same ten states: at the laptop for working, arms up for celebrate, asleep with Z's for sleeping."
+  <img src="docs/media/states-taotao.gif"
+       alt="Taotao, a girl with long dark hair and a white dress, cycling through the same ten states: at the laptop for working, arms up for celebrate, asleep with Z's for sleeping."
        width="240">
   <img src="docs/media/states-juanmao.gif"
        alt="Juanmao, a man with curly hair and rectangular glasses, cycling through the same ten states: out on his bicycle for working, brows angled for worried, arms up for celebrate."
@@ -596,15 +596,15 @@ Six built-in packs ship in the binary:
 
 | id | | |
 |---|---|---|
-| `amiao` | Amiao (阿喵), a woman in a red blouse | a dark bob cut level, Peach's gold necklace, mining gold |
+| `amiao` | Amiao (阿喵), a woman in a red blouse | a dark bob cut level, Taotao's gold necklace, mining gold |
 | `damao` | Damao (大毛), a boy of fourteen | a great pile of hair, an olive windbreaker, out running |
 | `juanmao` | Juanmao (卷毛), a man in a charcoal tee | curly hair, rectangular glasses, a bicycle to work on |
 | `maomao` | Maomao (毛毛), a boy of seven | a short crop, round clear glasses, a pencil to work with |
-| `peach` | Peach (桃桃), a girl in a light blue skirt | long dark hair over one shoulder, peach bow, gold necklace |
 | `sanmao` | Sanmao (三毛), a tortoiseshell tabby | white bib, white socks, hazel eyes |
+| `taotao` | Taotao (桃桃), a girl in a light blue skirt | long dark hair over one shoulder, peach bow, gold necklace |
 
 Pick one from the menu-bar item's **Change Character** submenu, or with
-`petctl pet peach`. `tools/genpets` carries a seventh species, `byte`, as a
+`petctl pet taotao`. `tools/genpets` carries a seventh species, `byte`, as a
 worked example of a species that is none of these; shipping it is one line.
 
 All six provide all ten states as 40×40 pixel-art sprite strips. Regenerate

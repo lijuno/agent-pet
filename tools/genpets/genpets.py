@@ -90,7 +90,7 @@ class Palette:
     # a charcoal laptop against a charcoal chest is one shape, not two.
     shell: tuple = None
     # Trousers, and the shoes under them. A character with bare legs leaves
-    # both unset and the legs come out skin-coloured, which is what Peach wants.
+    # both unset and the legs come out skin-coloured, which is what Taotao wants.
     pants: tuple = None
     shoe: tuple = None
     # The metal of a pair of glasses. A cool grey, as dark as the outline of
@@ -135,7 +135,7 @@ class Species:
     lashes: bool = False
     accessory: str = "none"  # none | bow
     # Eyebrows the character wears in every state, drawn above whatever else
-    # the face is doing. Peach has none: her expression is carried by eyes
+    # the face is doing. Taotao has none: her expression is carried by eyes
     # three rows tall, and brows over them leave no forehead. A face with small
     # eyes behind glasses has the opposite problem and needs them.
     # Eyebrows the character wears in every state, drawn above whatever else
@@ -200,9 +200,9 @@ SANMAO = Species(
     markings="tortie",
 )
 
-PEACH = Species(
-    pid="peach",
-    name="Peach (桃桃)",
+TAOTAO = Species(
+    pid="taotao",
+    name="Taotao (桃桃)",
     description="A girl in a white top and a light blue skirt, with long dark hair and a peach bow.",
     palette=Palette(
         # Skin, hair and eyes are sampled from the reference photo and then
@@ -224,7 +224,7 @@ PEACH = Species(
         skirt=(158, 198, 234, 255),        # a light blue skirt under the white top
         jaw=(228, 186, 164, 255),          # one step under the skin, no more
         lip=(206, 116, 116, 255),
-        ribbon=(255, 172, 142, 255),   # peach, for the girl called Peach
+        ribbon=(255, 172, 142, 255),   # peach: 桃 is the fruit she is named for
         ribbon_dark=(226, 124, 104, 255),
         desk=(158, 118, 82, 255),        # warm wood, against the cool laptop
         desk_edge=(196, 154, 112, 255),
@@ -245,7 +245,7 @@ JUANMAO = Species(
     name="Juanmao (卷毛)",
     description="A man with curly hair and rectangular glasses, who works from a bicycle.",
     palette=Palette(
-        # Warmer and a shade deeper than Peach's skin, and pushed apart from
+        # Warmer and a shade deeper than Taotao's skin, and pushed apart from
         # her the same way she was pushed apart from her photograph: two
         # characters at the same desk have to be told apart at 40px, and at
         # 40px only value separates them.
@@ -265,7 +265,7 @@ JUANMAO = Species(
         frame=(74, 68, 74, 255),
         jaw=(216, 176, 148, 255),
         lip=(152, 98, 86, 255),
-        # The same wood Peach sits at. They are two people in one room, not two
+        # The same wood Taotao sits at. They are two people in one room, not two
         # drawings that happen to ship together.
         desk=(158, 118, 82, 255),
         desk_edge=(196, 154, 112, 255),
@@ -310,7 +310,7 @@ MAOMAO = Species(
         frame=(206, 218, 234, 255),
         jaw=(228, 194, 170, 255),
         lip=(196, 118, 108, 255),
-        # The same wood Peach and Juanmao's world is furnished with.
+        # The same wood Taotao and Juanmao's world is furnished with.
         desk=(158, 118, 82, 255),
         desk_edge=(196, 154, 112, 255),
         shell=(206, 212, 222, 255),    # the edge of a sheet of paper
@@ -334,7 +334,7 @@ AMIAO = Species(
     name="Amiao (阿喵)",
     description="A woman with a dark bob and a red blouse, mining gold.",
     palette=Palette(
-        # Peach grown up, and the palette says so before the haircut does: the
+        # Taotao grown up, and the palette says so before the haircut does: the
         # same face warmed and lightened a shade, and hair that is brown rather
         # than the flat black a girl's is drawn with.
         body=(246, 214, 194, 255),
@@ -352,7 +352,7 @@ AMIAO = Species(
         inner=(250, 246, 244, 255),    # a pale collar over it
         jaw=(230, 192, 172, 255),
         lip=(198, 76, 84, 255),
-        # The same necklace Peach wears, and the same three values: it is the
+        # The same necklace Taotao wears, and the same three values: it is the
         # step down from the skin that makes jewellery read at this size, not
         # the hue. Setting them is the whole of putting it on her — the chain
         # is drawn for anybody whose palette has gold in it.
@@ -428,7 +428,7 @@ BYTE = Species(
 # antenna instead of ears, a lit screen instead of a face — and the reason the
 # drawing code is parametric at all. Adding it to this list is the whole of
 # shipping it.
-SPECIES = [SANMAO, PEACH, JUANMAO, MAOMAO, DAMAO, AMIAO]
+SPECIES = [SANMAO, TAOTAO, JUANMAO, MAOMAO, DAMAO, AMIAO]
 
 
 # --------------------------------------------------------------------------
@@ -1688,7 +1688,7 @@ def hair_back(d, s, top, bw, bh, cy, pal):
 
     if s.hair == "bob":
         # Chin length, and that length is the whole of what separates her from
-        # Peach at a glance: the same face under hair that stops at the jaw
+        # Taotao at a glance: the same face under hair that stops at the jaw
         # instead of running to the waist. Short hair reads as older here for
         # the same reason long hair reads as younger, which is that at 40px a
         # silhouette is all anyone gets.
@@ -1785,7 +1785,7 @@ def hair_back(d, s, top, bw, bh, cy, pal):
         # Its top is five rows above the skull and no higher: `celebrate` lifts
         # him four, and hair that leaves the top of the window in one state out
         # of ten is hair with a bug in it. The right edge stops at the head's
-        # own, the way Peach's crown does and for her reason — that corner is
+        # own, the way Taotao's crown does and for her reason — that corner is
         # the prop column, and the Z of `sleeping` is drawn dark and drawn last,
         # so one lost in black hair leaves the state with no signal at all.
         d.ellipse([x0 - 3, top - 5, x1 + 1, top + 10], fill=pal.hair)
@@ -1937,7 +1937,7 @@ def hairline(img, s, top, bw, bh, cy, pal):
         # a mistake rather than as hair.
         rect(o, x0 - 3, top - 4, x1 + 3, top + 2, pal.hair)
         # Sideburns, the same length on both sides. Nothing about him is
-        # asymmetrical: Peach carries hers in her hair, and he was given a
+        # asymmetrical: Taotao carries hers in her hair, and he was given a
         # jumper over one shoulder for a while to carry his, but a plain
         # charcoal shirt is what he wears and symmetry is what that leaves.
         rect(o, x0, top + 2, x0 + 1, top + bh - 10, pal.hair)
@@ -2091,7 +2091,7 @@ def draw_pet(s, state, i, n):
 
     # --- the body, then the hair over it: she wears her hair forward, so it
     #     falls across the shoulder rather than behind it
-    # Peach wears her hair forward, over the shoulder, so hers goes down after
+    # Taotao wears her hair forward, over the shoulder, so hers goes down after
     # the body. A bob does not: its foot reaches the shoulders, and drawn after
     # them it lies on top of the collar and wraps round the neck. Behind the
     # body, the shoulders cover it and it falls where hair falls.

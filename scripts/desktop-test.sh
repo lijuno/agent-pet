@@ -203,7 +203,7 @@ curl -sS --max-time 5 -X POST "$BASE/pet" -H 'content-type: application/json' \
 sleep 0.6
 menu=$(field status_menu)
 want "it lists the cat" "$menu" ":>Sanmao"
-want "it lists the girl" "$menu" ">Peach"
+want "it lists the girl" "$menu" ">Taotao"
 want "it lists the man" "$menu" ">Juanmao"
 want "it lists the boy" "$menu" ">Maomao"
 want "it lists the teenager" "$menu" ">Damao"

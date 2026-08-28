@@ -175,7 +175,7 @@ func TestSpritesAreNotEmpty(t *testing.T) {
 //
 // None of these is deliberate. They are hair, sheared flat by the top of the
 // frame when a bob lifts the character, and they were found by writing this
-// rule rather than by looking — Peach and Juanmao have shipped like this since
+// rule rather than by looking — Taotao and Juanmao have shipped like this since
 // they were drawn. The rule earns its place by stopping the list growing: a
 // new character starts at zero, which is how the same fault was caught in
 // Damao's running state the day it was written.
@@ -186,9 +186,9 @@ var clippedAtTop = map[string]int{
 	"juanmao/celebrate": 17,
 	"juanmao/happy":     9,
 	"juanmao/working":   15,
-	"peach/attention":   13,
-	"peach/celebrate":   15,
-	"peach/happy":       7,
+	"taotao/attention":  13,
+	"taotao/celebrate":  15,
+	"taotao/happy":      7,
 }
 
 func TestSpritesStayInTheWindow(t *testing.T) {

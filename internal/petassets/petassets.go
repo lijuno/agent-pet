@@ -239,7 +239,7 @@ func (l *Library) List() []Pet {
 	// list — the Change Pet submenu, the panel in the window, `petctl pets` —
 	// shows names, and an id may differ from its name by more than case. One
 	// shipped pack did: `momo` displayed as Sanmao, and sorted by id the menu
-	// read Juanmao, Sanmao, Peach — alphabetical in a column nobody can see,
+	// read Juanmao, Sanmao, Taotao — alphabetical in a column nobody can see,
 	// and therefore random in the one they can. That pack has since been
 	// renamed, but nothing stops a user's own pack from doing the same.
 	//

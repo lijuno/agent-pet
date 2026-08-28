@@ -169,7 +169,7 @@ version-sync:
 # one of two characters is a README that will show one of three.
 states-gif:
 	@python3 scripts/make-states-gif.py --pet sanmao
-	@python3 scripts/make-states-gif.py --pet peach
+	@python3 scripts/make-states-gif.py --pet taotao
 	@python3 scripts/make-states-gif.py --pet juanmao
 	@python3 scripts/make-states-gif.py --pet maomao
 	@python3 scripts/make-states-gif.py --pet damao

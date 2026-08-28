@@ -12,7 +12,7 @@ working on it.
 
 Milestones 1 and 2 are in: the engine, the loopback event API, `petctl`, the
 window, the menu-bar item, and the Claude Code adapter. Six characters ship —
-Sanmao (`sanmao`), Peach (`peach`), Juanmao (`juanmao`), Maomao (`maomao`),
+Sanmao (`sanmao`), Taotao (`taotao`), Juanmao (`juanmao`), Maomao (`maomao`),
 Damao (`damao`) and Amiao (`amiao`) — and a seventh stays defined but unshipped
 in `tools/genpets` as the worked example; see the README's Characters
 section.
