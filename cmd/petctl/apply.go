@@ -104,7 +104,7 @@ func apply(c *client, m update.Manifest, o updateOpts) error {
 	}
 
 	fmt.Printf("Installing into %s\n", target)
-	if err := swap(fresh, target, stage); err != nil {
+	if err := swap(fresh, target); err != nil {
 		return err
 	}
 
@@ -514,23 +514,39 @@ func quit(c *client) error {
 		"  Quit it from the menu bar and run this again.", addr, quitWait)
 }
 
+// rename is a seam, and the only reason it exists is the path below where two
+// renames fail in a row. That path decides whether the user still has an app,
+// and there is no way to make a second rename fail from outside this function.
+var rename = os.Rename
+
 // swap puts the new bundle in place without ever leaving the user with no app.
 //
 // The old one is moved aside first and only deleted once the new one has
 // landed, so a failure halfway through is recoverable — and recovered here
 // rather than left for somebody to find.
-func swap(fresh, target, stage string) error {
-	aside := filepath.Join(stage, "previous.app")
-	if err := os.Rename(target, aside); err != nil {
+//
+// Beside the target rather than inside the staging directory, which is where it
+// used to go. apply removes that directory on the way out whatever happened, so
+// when both the install and the restore failed — the one case where the copy
+// moved aside is the only copy left — the error named a path that was deleted
+// a moment later, and the user was left with no app at all and instructions
+// pointing at nothing.
+func swap(fresh, target string) error {
+	aside := target + ".previous"
+	// An earlier run that died between the two renames leaves one of these, and
+	// a rename onto an existing directory fails.
+	_ = os.RemoveAll(aside)
+	if err := rename(target, aside); err != nil {
 		return fmt.Errorf("cannot move the installed app aside: %w", err)
 	}
-	if err := os.Rename(fresh, target); err != nil {
-		if back := os.Rename(aside, target); back != nil {
+	if err := rename(fresh, target); err != nil {
+		if back := rename(aside, target); back != nil {
 			return fmt.Errorf("could not install the update (%w) and could not put the old app back (%v)\n"+
-				"  The previous version is at %s", err, back, aside)
+				"  Your app is at %s — rename it back to %s", err, back, aside, target)
 		}
 		return fmt.Errorf("could not install the update, the previous version is back in place: %w", err)
 	}
+	_ = os.RemoveAll(aside)
 	return nil
 }
 

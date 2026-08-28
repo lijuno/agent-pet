@@ -58,6 +58,13 @@ type Server struct {
 	// OnUpdate is called when a check reports a result, so the menu bar can
 	// say so. Nil in a headless run.
 	OnUpdate func(update.Status)
+	// boundWide records that Listen was given an address that is not loopback,
+	// which only an explicit server.allow_non_loopback permits. The Host guard
+	// is off in that case: the names such an installation is dialled by are the
+	// operator's business, and the peer check above still refuses every
+	// non-loopback caller. Zero value enforces, so a Server assembled without
+	// Listen — every test, and any future embedding — is guarded by default.
+	boundWide bool
 	// upd holds what the last check found. See update.go.
 	upd updateState
 	// startedAt supports the uptime field in /healthz and `petctl doctor`.
@@ -102,6 +109,7 @@ func (s *Server) Listen(cfg config.Server) error {
 		return fmt.Errorf("listen on %s: %w", cfg.Addr, err)
 	}
 	s.ln = ln
+	s.boundWide = !config.IsLoopback(cfg.Addr)
 	return nil
 }
 
@@ -147,6 +155,12 @@ func (s *Server) withGuards(next http.Handler) http.Handler {
 			http.Error(w, "bad origin", http.StatusForbidden)
 			return
 		}
+		// ...and the Origin check alone does not see the page that dialled
+		// 127.0.0.1 under another name. See isLocalHost.
+		if !s.boundWide && !isLocalHost(r.Host) {
+			http.Error(w, "bad host", http.StatusForbidden)
+			return
+		}
 		r.Body = http.MaxBytesReader(w, r.Body, MaxBody)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		next.ServeHTTP(w, r)
@@ -173,6 +187,36 @@ func isLocalOrigin(o string) bool {
 		return false
 	}
 	host := u.Hostname()
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// isLocalHost reports whether the Host header names this machine.
+//
+// This is not the peer check repeated. A page served from a name whose DNS
+// record points at 127.0.0.1 — rebinding — is same-origin with the pet as far
+// as the browser is concerned: its peer address *is* loopback, and being
+// same-origin it sends no Origin header at all, so both guards above pass it.
+// It could then read /diagnostics, which names the config path and the data
+// directory, and post to /window to move or quit the app. The one thing such a
+// page cannot fake is the name it dialled, which arrives here in Host.
+//
+// An empty Host is allowed. Go answers an HTTP/1.1 request without one with a
+// 400 of its own before any of this runs, so an empty Host here means a
+// hand-written HTTP/1.0 client — and a browser is never that.
+func isLocalHost(h string) bool {
+	if h == "" {
+		return true
+	}
+	host := h
+	if hostOnly, _, err := net.SplitHostPort(h); err == nil {
+		host = hostOnly
+	}
+	// A bare IPv6 Host arrives bracketed and SplitHostPort leaves it that way.
+	host = strings.ToLower(strings.Trim(host, "[]"))
 	if host == "localhost" {
 		return true
 	}
