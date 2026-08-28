@@ -169,6 +169,100 @@ func TestLookalikeOriginRejected(t *testing.T) {
 	}
 }
 
+// DNS rebinding is the attack the Origin check cannot see: the page is
+// same-origin with the pet, so it sends no Origin at all, and its peer address
+// is loopback because that is what its name now resolves to. What it cannot
+// change is the name in Host.
+func TestRebindingHostRejected(t *testing.T) {
+	ts := newTestServer(t)
+	for _, path := range []string{"/diagnostics", "/state"} {
+		req, _ := http.NewRequest(http.MethodGet, ts.URL+path, nil)
+		req.Host = "pet.evil.com:9876"
+		resp, err := ts.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("GET %s from a rebound page got %d, and answered with %s",
+				path, resp.StatusCode, strings.TrimSpace(string(body)))
+		}
+	}
+	// The write side matters more than the read side: this one quits the app.
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/window", strings.NewReader(`{"status_item":"quit"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Host = "pet.evil.com:9876"
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("a rebound page could drive /window, got %d", resp.StatusCode)
+	}
+}
+
+// Every name a real caller dials, and the ones only a rebound page would.
+func TestHostIsThisMachineOrNothing(t *testing.T) {
+	allowed := []string{
+		"127.0.0.1:9876",
+		"127.0.0.1",
+		"localhost:9876",
+		"LOCALHOST:9876",
+		"[::1]:9876",
+		"[::1]",
+		"127.0.0.2:9876",
+		// Only a hand-written HTTP/1.0 client omits it; Go rejects an HTTP/1.1
+		// request with no Host before this runs.
+		"",
+	}
+	refused := []string{
+		"pet.evil.com:9876",
+		"localhost.evil.com:9876",
+		"127.0.0.1.evil.com:9876",
+		"192.168.1.10:9876",
+		"example.com",
+	}
+	for _, h := range allowed {
+		if !isLocalHost(h) {
+			t.Errorf("%q is a name this machine answers to and must be allowed", h)
+		}
+	}
+	for _, h := range refused {
+		if isLocalHost(h) {
+			t.Errorf("%q is not this machine and must be refused", h)
+		}
+	}
+}
+
+// An installation that deliberately bound something other than loopback is
+// dialled by a name only its operator knows, so the guard steps aside there —
+// and the peer check still refuses everyone off this machine.
+func TestBindingWideTurnsTheHostGuardOff(t *testing.T) {
+	s := &Server{}
+	if s.boundWide {
+		t.Fatal("a Server that was never told where it is bound must guard by default")
+	}
+	cfg := config.Server{Addr: "0.0.0.0:0", AllowNonLoopback: true}
+	if err := s.Listen(cfg); err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = s.ln.Close() })
+	if !s.boundWide {
+		t.Error("binding 0.0.0.0 should have turned the Host guard off")
+	}
+
+	loop := &Server{}
+	if err := loop.Listen(config.Server{Addr: "127.0.0.1:0"}); err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = loop.ln.Close() })
+	if loop.boundWide {
+		t.Error("binding loopback must leave the Host guard on")
+	}
+}
+
 func TestWrongMethodRejected(t *testing.T) {
 	ts := newTestServer(t)
 	resp, err := ts.Client().Get(ts.URL + "/event")

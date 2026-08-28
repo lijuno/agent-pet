@@ -103,6 +103,13 @@ boundary being defended here is the machine, not the process: the concern is a
   exactly `localhost`, a loopback IP, or the webview's own `wails:` scheme.
   The host is parsed and compared, not prefix-matched — `localhost.evil.com`
   resolves to 127.0.0.1 for anyone who registers it, and is refused.
+- A request whose `Host` is not `localhost` or a loopback IP is dropped. This
+  is the one the `Origin` check cannot make: a page served from a name whose
+  DNS record points at 127.0.0.1 — rebinding — is *same-origin* with the pet as
+  far as the browser is concerned, so it sends no `Origin` at all and its peer
+  address really is loopback. The name it dialled is the one thing it cannot
+  change. Off when `server.allow_non_loopback` bound something other than
+  loopback, where the names in play are the operator's to decide.
 
 Setting `server.allow_non_loopback` puts an unauthenticated API on your
 network. Do not set it on a machine you do not control.
