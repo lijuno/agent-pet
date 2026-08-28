@@ -1,4 +1,4 @@
-.PHONY: help deps dev build require-wails test-desktop petctl pets icons test test-ui vet fmt clean run-headless demo notarize release plugin-hooks plugin-validate embed-petctl version-sync states-gif
+.PHONY: help deps dev build require-wails test-desktop petctl pets icons test test-ui test-ui-headless vet vet-min fmt clean run-headless demo notarize release plugin-hooks plugin-validate embed-petctl version-sync states-gif
 BIN := bin
 
 # CHANNEL picks which of the two applications to build. They install side by
@@ -49,7 +49,9 @@ help:
 	@echo "make build          build the .app bundle (CHANNEL=dev for the dev app)"
 	@echo "make petctl         build the CLI into $(BIN)/"
 	@echo "make test           run the Go test suite"
+	@echo "make vet-min        vet with the Go version go.mod claims, as CI does"
 	@echo "make test-ui        open the UI tests in a browser"
+	@echo "make test-ui-headless run the same UI tests with no browser to open"
 	@echo "make test-desktop   check the menu bar and window placement (app must be running)"
 	@echo "make pets           regenerate the built-in sprite art"
 	@echo "make demo           drive the pet through a realistic session"
@@ -89,6 +91,11 @@ test:
 test-desktop:
 	@./scripts/desktop-test.sh
 
+# The same suite as test-ui, read by a machine instead of a person. Needs a
+# chromium; a cloud session has one and no way to open a window.
+test-ui-headless:
+	@./scripts/ui-test-headless.sh
+
 UI_TEST_PORT ?= 8899
 test-ui:
 	@python3 -m http.server $(UI_TEST_PORT) --bind 127.0.0.1 & \
@@ -98,6 +105,15 @@ test-ui:
 	  trap "kill $$server" INT TERM; wait $$server
 vet:
 	go vet ./...
+
+# The same vet, run by the toolchain go.mod claims rather than the one you
+# happen to have. A stdlib function added after that minimum compiles in
+# silence on a newer Go and fails the CI leg that pins the declared one —
+# t.Chdir did exactly that, and only CI said so. Downloads the toolchain once.
+GO_MIN := $(shell sed -n 's/^go //p' go.mod)
+vet-min:
+	GOTOOLCHAIN=go$(GO_MIN) go vet ./...
+	@echo "vet clean under go$(GO_MIN), which is what go.mod promises"
 fmt:
 	gofmt -w .
 pets:

@@ -11,6 +11,10 @@ node_modules/
 .claude/settings.json
 .claude/settings.json.bak
 
+# Claude Code's own per-machine file, written by its permission prompts. Never
+# shared, for the same reason.
+.claude/settings.local.json
+
 # Wails writes generated JS bindings here.
 ui/wailsjs/
 

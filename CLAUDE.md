@@ -46,12 +46,55 @@ bin/petctl doctor                 # says more than you expect
 
 Requires the Wails CLI **v2.10.2 or newer**; see the README for why.
 
+## Working in the cloud
+
+A Claude Code session on the web runs this repository on Linux, in a container
+that is cloned fresh and thrown away. Nothing prepares it for you: the first
+build compiles Wails from cold, which is about twenty seconds that look like a
+hung tool call, and `make pets` needs `pip install Pillow` first. There is
+deliberately no SessionStart hook to do that — registering one means committing
+`.claude/settings.json`, and this repository keeps that file git-ignored so
+`petctl install claude` can write a path that means nothing on anybody else's
+machine into it.
+
+What runs there is most of the project:
+
+```bash
+go test ./...          # all of it, including internal/desktop
+go vet ./... && gofmt -l .
+make vet-min           # the same vet under the Go version go.mod claims
+make pets              # deterministic, and the sprite rules test guards it
+make test-ui-headless  # the whole UI suite, 63 tests, no window
+```
+
+`make vet-min` is not optional before pushing Go. The container ships a newer
+toolchain than `go.mod` declares, and a stdlib function added after that minimum
+compiles here without a word — `t.Chdir` did, and the first thing that said so
+was CI failing on the matrix leg that pins the declared version.
+
+What cannot, and cannot be made to: `make build`, because the app is
+darwin/universal and the menu-bar item is Objective-C through cgo, and
+`make test-desktop`, because it drives a running app's menu bar. So **a change
+to `internal/desktop`, to the Wails wiring, or to anything in a menu handler is
+unfinished until it has been built and run on a Mac.** The Go suite will not
+catch a crash in a menu callback — one shipped that way — and in the cloud the
+build that would have caught it never ran. CI on `macos-latest` compiles the
+bundle, which is the backstop, not a substitute.
+
+One consequence worth knowing before it costs you an hour: `internal/desktop`
+compiles on Linux only because the Objective-C lives behind `_darwin` files.
+A test that touches something declared in one of those belongs in
+`app_darwin_test.go` beside it. Put it in `app_test.go` and `go test ./...`
+stops building for everybody working in the cloud, with an error about an
+undefined symbol that says nothing about why.
+
 ## Three test suites, and what each needs
 
 ```bash
-make test          # Go. Engine, state machine, event API, adapter, placement, updater.
-make test-ui       # Opens a browser. Runs against the real ui/dist/index.html.
-make test-desktop  # Needs the app running. Menu bar, window placement, updates.
+make test             # Go. Engine, state machine, event API, adapter, placement, updater.
+make test-ui          # Opens a browser. Runs against the real ui/dist/index.html.
+make test-ui-headless # The same suite through headless chromium, for a machine.
+make test-desktop     # Needs the app running. Menu bar, window placement, updates.
 ```
 
 Run all three before committing anything that touches the window or the menu
@@ -81,7 +124,10 @@ can tell is wrong. Anything else about the drawing rather than the drawn
 belongs beside it.
 
 `make test-ui` serves the repo and opens `ui/test/index.html`, which loads the
-real UI into an iframe per test. `make test-desktop` drives a running app
+real UI into an iframe per test. `make test-ui-headless` serves the same page to
+headless chromium and reads the summary out of the DOM, which is the only way to
+run it where there is no window to open — the page has always published
+`window.__results` for exactly that. `make test-desktop` drives a running app
 through `POST /window` — the only way to check a menu is not clipped in the
 corner of a screen, since nothing may read a macOS menu bar without
 accessibility access, which is refused here.
@@ -109,6 +155,7 @@ tools/genpets/         the sprite generator. All art is generated.
 ui/dist/index.html     the whole frontend, one file
 ui/test/               its tests
 scripts/desktop-test.sh
+scripts/ui-test-headless.sh
 ```
 
 Releasing a signed build — the Apple setup, what the signing script does and
@@ -167,7 +214,11 @@ Each of these cost an hour or more to find.
   width.
 - **The hooks are installed in this repo's `.claude/settings.json`,** so your
   own Claude Code session drives the pet while you work. A session in
-  `petctl status` you did not create is probably you.
+  `petctl status` you did not create is probably you. That file stays
+  git-ignored: it holds an absolute path to petctl on this machine, and a
+  tracked copy would both leak that path and be overwritten — silently, because
+  git treats an ignored file as expendable — the first time anybody checked out
+  a branch that carried one.
 - **Signing a release does not offer it to anybody.** `make release` leaves
   `updates/<channel>.json` uncommitted on purpose; the commit is the release.
   Expect `petctl update --check` to report nothing published until then, and do
