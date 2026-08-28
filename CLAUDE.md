@@ -196,6 +196,16 @@ Each of these cost an hour or more to find.
 - **The UI test runner and its iframes are cache-busted deliberately.** Without
   it the browser serves a stale `index.html` and the suite passes against a
   file no longer on disk. It did exactly that, twice.
+- **Headless Chrome on macOS renders the page and then does not exit.**
+  Confirmed on Chrome 151 under `--headless`, `--headless=old` and
+  `--headless=new`: the whole DOM is written, then the process sits there. So
+  `scripts/ui-test-headless.sh` waits for the *output* and kills the browser,
+  and judges a candidate by whether the marker appeared rather than by whether
+  it exited — judging on exit rejected every browser on this platform, with the
+  message that it could not render a page. Its bound used to delegate to
+  coreutils `timeout`, which a stock Mac does not have, and the fallback ran
+  unbounded: the bound was a no-op on the one platform this app ships to, and
+  `make test-ui-headless` hung with no output at all rather than failing.
 - **`make test-desktop` is stateful.** Sections set the character and
   visibility they expect first, because asserting on what the last run left
   behind passes in sequence and fails alone.

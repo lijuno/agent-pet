@@ -25,27 +25,75 @@ flags="--headless --no-sandbox --disable-gpu --disable-dev-shm-usage
 	--disable-sync --disable-default-apps --disable-extensions
 	--password-store=basic --use-mock-keychain"
 
-# Every browser call is bounded, so one that hangs costs seconds and says so
-# rather than sitting there. `timeout` is coreutils: on a Mac it is gtimeout, or
-# it is missing altogether, and a local run manages without one.
-tmo=""
-for t in timeout gtimeout; do
-	if command -v "$t" >/dev/null 2>&1; then
-		tmo=$t
-		break
-	fi
-done
-bound() { # bound SECONDS command...
-	local secs=$1
-	shift
-	if [ -n "$tmo" ]; then "$tmo" "$secs" "$@"; else "$@"; fi
-}
-
 # Under $HOME, not /tmp. Ubuntu ships chromium as a snap, and snap confinement
 # cannot see /tmp — so the browser cannot write its profile, and it does not say
 # so, it hangs.
 profile=$(mktemp -d "${HOME:-/tmp}/.agent-pet-uitest-XXXXXX")
 trap 'rm -rf "$profile"' EXIT
+
+# The browser is killed rather than waited for, because a headless Chrome is not
+# reliably a program that ends. Chrome 151 on macOS writes the whole DOM and
+# then sits there forever, so every "wait for it to exit" here used to be a
+# wait with no end: the earlier version delegated to coreutils `timeout`, which
+# a stock Mac does not have, and the fallback was to run unbounded. The bound
+# was therefore a no-op on the one platform this app ships to.
+#
+# So nothing waits on the process. dump_to waits for the *output* — which is
+# the thing actually wanted — and kills the browser once it has it.
+stop_browser() { # stop_browser PID
+	kill -9 "$1" 2>/dev/null || true
+	# The helpers outlive the parent often enough to matter: they hold the
+	# profile directory the EXIT trap is about to remove.
+	pkill -9 -P "$1" 2>/dev/null || true
+	# No `wait` here. Reaping a job that died of a signal is what makes bash
+	# announce "Killed: 9", and it writes that to the shell's own stderr, so
+	# redirecting the builtin does not silence it — a green run came out
+	# looking like a crash. The job is disowned at launch instead, which stops
+	# bash tracking it; killing it is enough, and the shell reaps it anyway.
+}
+
+# dump_to FILE SECONDS COMMAND... — run COMMAND with stdout on FILE and return
+# once FILE has stopped growing, or the browser ended by itself. Non-zero only
+# if SECONDS passed with the file still changing (or still empty).
+#
+# Into a file rather than $( ). Chrome's zygote and renderer children inherit
+# the pipe, and a command substitution waits for every writer to let go of it,
+# so one lingering child hangs the script with the browser itself already gone.
+dump_to() {
+	local out=$1 secs=$2
+	shift 2
+	: >"$out"
+	"$@" >"$out" 2>/dev/null &
+	local pid=$! prev=-1 stable=0 i=0 cur
+	disown "$pid" 2>/dev/null || true
+	local limit=$((secs * 4))
+	while [ "$i" -lt "$limit" ]; do
+		if ! kill -0 "$pid" 2>/dev/null; then
+			stop_browser "$pid"
+			return 0
+		fi
+		# `|| cur=0` because set -e would take a failed substitution as the
+		# end of the run, and a size that cannot be read is a size of zero.
+		cur=$(wc -c <"$out" 2>/dev/null | tr -d ' ') || cur=0
+		cur=${cur:-0}
+		# Six quarter-seconds of a file that is not growing. The DOM arrives
+		# in one write, so this is settling time, not transfer time.
+		if [ "$cur" -gt 0 ] && [ "$cur" = "$prev" ]; then
+			stable=$((stable + 1))
+		else
+			stable=0
+		fi
+		if [ "$stable" -ge 6 ]; then
+			stop_browser "$pid"
+			return 0
+		fi
+		prev=$cur
+		sleep 0.25
+		i=$((i + 1))
+	done
+	stop_browser "$pid"
+	return 1
+}
 
 # renders reports whether a browser can actually produce a DOM.
 #
@@ -54,16 +102,17 @@ trap 'rm -rf "$profile"' EXIT
 # and the chromium returned nothing at all until the job hit its limit. Two
 # seconds spent here is the difference between a suite that runs and a job
 # nobody can explain.
+#
+# What is asked of a candidate is the marker, and only the marker. Asking it to
+# exit as well rejected every browser on a Mac — Chrome renders the page
+# perfectly there and then declines to leave.
 marker="agent-pet-smoke-ok"
 renders() {
-	local out
 	# shellcheck disable=SC2086 # $flags is meant to be word-split
-	out=$(bound 30 "$1" $flags --user-data-dir="$profile/smoke" \
-		--dump-dom "data:text/html,<b>$marker</b>" 2>/dev/null) || return 1
-	case "$out" in
-	*"$marker"*) return 0 ;;
-	esac
-	return 1
+	dump_to "$profile/smoke.html" 20 "$1" $flags \
+		--user-data-dir="$profile/smoke" \
+		--dump-dom "data:text/html,<b>$marker</b>" || true
+	grep -q "$marker" "$profile/smoke.html" 2>/dev/null
 }
 
 # Google Chrome before chromium: on a runner the first is a real installation
@@ -97,6 +146,9 @@ port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); pr
 # the real UI into.
 python3 -m http.server "$port" --bind 127.0.0.1 >/dev/null 2>&1 &
 server=$!
+# Disowned for the same reason as the browser: the trap kills it, and a tracked
+# job dying of a signal prints "Terminated" over the suite's own result.
+disown "$server" 2>/dev/null || true
 trap 'kill $server 2>/dev/null || true; rm -rf "$profile"' EXIT
 
 for _ in $(seq 1 50); do
@@ -104,16 +156,13 @@ for _ in $(seq 1 50); do
 	sleep 0.1
 done
 
-# Into a file rather than $( ). Chrome's zygote and renderer children inherit
-# the pipe, and a command substitution waits for every writer to let go of it,
-# so one lingering child hangs the script with the browser itself already gone.
 dump="$profile/dom.html"
 # shellcheck disable=SC2086 # $flags is meant to be word-split
-if ! bound 120 "$chrome" $flags \
+if ! dump_to "$dump" 120 "$chrome" $flags \
 	--user-data-dir="$profile/run" \
 	--virtual-time-budget=60000 \
-	--dump-dom "http://127.0.0.1:$port/ui/test/index.html" >"$dump" 2>/dev/null; then
-	echo "the browser did not finish within the time allowed; it wrote $(wc -c <"$dump") bytes" >&2
+	--dump-dom "http://127.0.0.1:$port/ui/test/index.html"; then
+	echo "the browser never settled on an answer; it wrote $(wc -c <"$dump") bytes" >&2
 	exit 1
 fi
 
