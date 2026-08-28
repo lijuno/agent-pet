@@ -240,13 +240,14 @@ Each of these cost an hour or more to find.
 - **`petctl update` re-execs a copy of itself out of the bundle** before
   touching it, passing `os.Args` through. A new flag works automatically; a
   flag read from somewhere other than `os.Args` will silently not survive.
-- **Both channels have been published to, and neither is where you would
-  guess.** Release is on 0.2.1 and dev is on 0.2.0-dev.6 — dev is *behind*
-  release, because 0.2.0-dev.6 is a prerelease of 0.2.0. A build from `master`
-  is 0.2.1, so it reads as up to date against release and ahead of the channel
-  against dev. Both are correct and neither is a fault. Check
-  `updates/*.json` rather than this line: it has been wrong once already, and
-  it goes stale every time a manifest is committed.
+- **The dev channel can be *behind* the release channel, and that is not a
+  fault.** A prerelease sorts before the version it is a prerelease of, so with
+  release on X and dev on X-dev.N, dev is the older of the two. A build from
+  `master` then reads as up to date against release and ahead of the channel
+  against dev. Both answers are correct.
+  This line used to name the two versions. It was wrong twice — every manifest
+  commit moves them — so it no longer tries: run
+  `grep '"version"' updates/*.json` for what is true today.
   The 404-means-nothing-published path still exists and still has a test; it is
   just no longer what you will see.
 - **The Wails single-instance lock is keyed by bundle identifier.** With a
