@@ -525,3 +525,13 @@ func (m *Machine) snapshot(now time.Time) Snapshot {
 
 // Current returns the visible state without advancing time.
 func (m *Machine) Current() State { return m.current }
+
+// AtRest reports that no amount of time alone can change what this machine
+// says. With no sessions, Tick has nothing to expire and Resolve returns
+// Sleeping whatever the clock reads; with nothing forced, there is no deadline
+// left either. Only an event can move it, so the caller driving the clock can
+// stop until one arrives.
+//
+// Conservative in the safe direction: a machine that is resting but says
+// otherwise only costs a tick that would have done nothing.
+func (m *Machine) AtRest() bool { return len(m.sessions) == 0 && m.forced == "" }
