@@ -1,13 +1,15 @@
 name: CI
 
-# macOS only. The menu-bar item is Objective-C compiled through cgo and the
-# window is Wails' WebKit view, so there is nothing to learn from a Linux
-# runner that a compile error on macOS would not say first.
+# The Go suite runs on macOS. The menu-bar item is Objective-C compiled through
+# cgo and the window is Wails' WebKit view, so there is nothing to learn from a
+# Linux runner that a compile error on macOS would not say first.
 #
-# This covers the Go suite. It does not cover `make test-ui`, which needs a
-# browser, or `make test-desktop`, which needs the app running and drives its
-# menu bar. A green tick here does not mean a menu handler works — one shipped
-# broken that way. See CLAUDE.md.
+# The UI suite runs on Linux, because what it needs is a browser rather than a
+# Mac. It is the same suite `make test-ui` opens in yours.
+#
+# What is still not covered is `make test-desktop`, which needs the app running
+# and drives its menu bar. A green tick here does not mean a menu handler works
+# — one shipped broken that way. See CLAUDE.md.
 
 on:
   push:
@@ -59,6 +61,22 @@ jobs:
       # occasionally, unreproducibly wrong.
       - name: go test
         run: go test -race ./...
+
+  # No Go, no Wails, no cache: this serves ui/dist/index.html to a headless
+  # browser and reads the summary out of the page. It is the only automated
+  # check the frontend has, which matters more than it used to — a session
+  # working on this repository in the cloud cannot run the app at all.
+  ui:
+    name: the UI suite, headless
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The runner image ships Google Chrome; the script finds it on PATH, the
+      # same way it finds a chromium on a developer's machine. If a future image
+      # drops it, this fails saying exactly that rather than passing quietly.
+      - name: make test-ui-headless
+        run: make test-ui-headless
 
   build:
     name: build the app bundle
