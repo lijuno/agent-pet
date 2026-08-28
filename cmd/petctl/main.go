@@ -144,8 +144,8 @@ Usage:
   petctl pet <id>
   petctl watch
   petctl update [--check] [--json]
-  petctl install claude [--project|--local|--global]
-  petctl uninstall claude [--project|--local|--global]
+  petctl install claude [--project|--global]
+  petctl uninstall claude [--project|--global]
   petctl version
 
 Options:
@@ -174,10 +174,7 @@ Events:
   git_commit error heartbeat
 
 Adapters:
-  install writes hooks into .claude/settings.json. --local writes
-  .claude/settings.local.json instead, which git ignores by convention — use it
-  in a project that tracks its settings.json, since the hook holds an absolute
-  path to petctl on this machine. --global writes ~/.claude for every project.
+  install writes hooks into .claude/settings.json (--global for ~/.claude).
   "petctl hook claude" is what those hooks run; it is not meant to be typed.
 
 Examples:
@@ -523,38 +520,36 @@ func cmdDoctor(c *client) error {
 func reportAdapters() {
 	fmt.Println()
 	fmt.Println("  Claude Code hooks")
-	// All three, because Claude Code merges all three: a pet that is silent
-	// while the hooks sit in the scope this loop does not read is a fault
-	// nobody can see from here.
-	for _, scope := range []installScope{scopeProject, scopeLocal, scopeGlobal} {
-		path, err := settingsPath(scope)
+	for _, scope := range []struct {
+		label  string
+		global bool
+	}{{"project", false}, {"global", true}} {
+		path, err := settingsPath(scope.global)
 		if err != nil {
 			continue
 		}
 		data, err := os.ReadFile(path)
 		if os.IsNotExist(err) {
-			fmt.Printf("    · %-8s not installed (%s)\n", scope.label(), path)
+			fmt.Printf("    · %-8s not installed (%s)\n", scope.label, path)
 			continue
 		}
 		if err != nil {
-			fmt.Printf("    %s %-8s cannot read %s: %v\n", cross, scope.label(), path, err)
+			fmt.Printf("    %s %-8s cannot read %s: %v\n", cross, scope.label, path, err)
 			continue
 		}
 		n, err := claude.Installed(data)
 		switch {
 		case err != nil:
-			fmt.Printf("    %s %-8s %s is not valid JSON\n", cross, scope.label(), path)
+			fmt.Printf("    %s %-8s %s is not valid JSON\n", cross, scope.label, path)
 		case n == 0:
-			fmt.Printf("    · %-8s not installed (%s)\n", scope.label(), path)
+			fmt.Printf("    · %-8s not installed (%s)\n", scope.label, path)
 		case n == len(claude.Hooks):
-			fmt.Printf("    %s %-8s %d hooks installed\n", tick, scope.label(), n)
+			fmt.Printf("    %s %-8s %d hooks installed\n", tick, scope.label, n)
 		default:
 			// A partial install is the interesting failure: a hand-edited file
-			// leaves the pet blind to whichever events went missing. Name the
-			// scope in the fix: run without the flag and the repair lands in a
-			// different file from the damage.
-			fmt.Printf("    %s %-8s only %d of %d hooks installed — run `petctl install claude%s` again\n",
-				warn, scope.label(), n, len(claude.Hooks), scope.flag())
+			// leaves the pet blind to whichever events went missing.
+			fmt.Printf("    %s %-8s only %d of %d hooks installed — run `petctl install claude` again\n",
+				warn, scope.label, n, len(claude.Hooks))
 		}
 	}
 }

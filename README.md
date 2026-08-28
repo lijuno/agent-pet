@@ -70,8 +70,6 @@ into it, so it cannot go stale when the app moves. There is also
 
    ```bash
    petctl install claude       # this project;  --global for every project
-   petctl install claude --local   # ...and this clone only, if the project
-                                   # tracks its .claude/settings.json
    ```
 
 Then start a **new** Claude Code session — hooks are read at startup, so the

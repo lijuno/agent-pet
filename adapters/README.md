@@ -14,17 +14,11 @@ Claude Code adapter will work, since hooks are shell commands.
 
 ```bash
 petctl install claude              # .claude/settings.json in the current project
-petctl install claude --local      # .claude/settings.local.json, this clone only
 petctl install claude --global     # ~/.claude/settings.json, every project
 petctl uninstall claude
 ```
 
-The three differ only in which file they land in — Claude Code merges all of
-them. `--local` exists because the hook holds an absolute path to petctl on
-*this* machine: a project that tracks its `settings.json` wants that path in the
-file git ignores, not in the one everybody clones.
-
-Install patches the settings file in place: it preserves every other setting and
+Install patches `settings.json` in place: it preserves every other setting and
 every hook the user wrote, keeps a `.bak` of what it replaced, writes
 atomically, and refuses outright to touch a file it could not parse. Removal
 prunes the groups it added and leaves a file identical to the one it started

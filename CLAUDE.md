@@ -49,11 +49,13 @@ Requires the Wails CLI **v2.10.2 or newer**; see the README for why.
 ## Working in the cloud
 
 A Claude Code session on the web runs this repository on Linux, in a container
-that is cloned fresh and thrown away. `.claude/hooks/session-start.sh` prepares
-it — the module cache, a warm build cache, Pillow — and prints what the box can
-and cannot do. It is a **SessionStart** hook registered in
-`.claude/settings.json`, which is tracked; the pet's own hooks go in
-`settings.local.json`, which is not (see the note further down).
+that is cloned fresh and thrown away. Nothing prepares it for you: the first
+build compiles Wails from cold, which is about twenty seconds that look like a
+hung tool call, and `make pets` needs `pip install Pillow` first. There is
+deliberately no SessionStart hook to do that — registering one means committing
+`.claude/settings.json`, and this repository keeps that file git-ignored so
+`petctl install claude` can write a path that means nothing on anybody else's
+machine into it.
 
 What runs there is most of the project:
 
@@ -154,7 +156,6 @@ ui/dist/index.html     the whole frontend, one file
 ui/test/               its tests
 scripts/desktop-test.sh
 scripts/ui-test-headless.sh
-.claude/hooks/         session-start.sh, which prepares a cloud container
 ```
 
 Releasing a signed build — the Apple setup, what the signing script does and
@@ -211,20 +212,13 @@ Each of these cost an hour or more to find.
   not the display — origin already past the menu bar and a left Dock. Using
   the display size as a bound lets a window hang off by exactly the Dock's
   width.
-- **The pet's own hooks go in `.claude/settings.local.json`,** which git
-  ignores — `petctl install claude --local`. Install them and your own Claude
-  Code session drives the pet while you work; a session in `petctl status` you
-  did not create is probably you. Not `settings.json`: that one is tracked now
-  and carries the SessionStart hook, and the pet's hooks name an absolute path
-  to petctl on your machine.
-- **The checkout that made `settings.json` tracked took your copy with it.**
-  It was git-ignored before, and git treats an ignored file as expendable — so
-  a `.claude/settings.json` holding an existing `petctl install claude` was
-  overwritten silently: no error, no prompt, no `.bak`. The pet then reacts to
-  nothing and the file it used to be configured in looks fine. `petctl doctor`
-  reports all three scopes empty; `petctl install claude --local` puts it back,
-  in the file this cannot happen to again. One time only, on the machine that
-  had the hooks installed before the change.
+- **The hooks are installed in this repo's `.claude/settings.json`,** so your
+  own Claude Code session drives the pet while you work. A session in
+  `petctl status` you did not create is probably you. That file stays
+  git-ignored: it holds an absolute path to petctl on this machine, and a
+  tracked copy would both leak that path and be overwritten — silently, because
+  git treats an ignored file as expendable — the first time anybody checked out
+  a branch that carried one.
 - **Signing a release does not offer it to anybody.** `make release` leaves
   `updates/<channel>.json` uncommitted on purpose; the commit is the release.
   Expect `petctl update --check` to report nothing published until then, and do
