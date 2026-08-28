@@ -59,11 +59,14 @@ type Server struct {
 	// say so. Nil in a headless run.
 	OnUpdate func(update.Status)
 	// boundWide records that Listen was given an address that is not loopback,
-	// which only an explicit server.allow_non_loopback permits. The Host guard
-	// is off in that case: the names such an installation is dialled by are the
-	// operator's business, and the peer check above still refuses every
-	// non-loopback caller. Zero value enforces, so a Server assembled without
-	// Listen — every test, and any future embedding — is guarded by default.
+	// which only an explicit server.allow_non_loopback permits. It turns off
+	// both guards that assume this pet is only ever spoken to from its own
+	// machine: the peer address check, and the Host check. Which names such an
+	// installation answers to, and who may reach it, are the operator's to
+	// decide — SECURITY.md says plainly what setting it costs.
+	//
+	// Zero value enforces both, so a Server assembled without Listen — every
+	// test, and anything that embeds one later — is guarded by default.
 	boundWide bool
 	// upd holds what the last check found. See update.go.
 	upd updateState
@@ -142,12 +145,18 @@ func (s *Server) Close() error {
 // withGuards applies the transport-level protections to every route.
 func (s *Server) withGuards(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Reject requests that did not arrive over loopback even if the
-		// listener somehow ended up bound more widely.
-		if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-			if ip := net.ParseIP(host); ip != nil && !ip.IsLoopback() {
-				http.Error(w, "loopback only", http.StatusForbidden)
-				return
+		// Reject requests that did not arrive over loopback, in case the
+		// listener ended up bound more widely by accident. Not when it was
+		// bound that way on purpose: server.allow_non_loopback is how somebody
+		// running the agent on another machine points its hooks at this pet
+		// (ADR 0002), and refusing every caller it lets in made the setting a
+		// listener nobody could reach.
+		if !s.boundWide {
+			if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+				if ip := net.ParseIP(host); ip != nil && !ip.IsLoopback() {
+					http.Error(w, "loopback only", http.StatusForbidden)
+					return
+				}
 			}
 		}
 		// A browser on some other page must not be able to poke the pet.

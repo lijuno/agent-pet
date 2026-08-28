@@ -46,7 +46,11 @@ const quitWait = 15 * time.Second
 // launchWait is how long the new app is given to come up and report its
 // version. Notarized first launches are slower than later ones — Gatekeeper is
 // checking the signature.
-const launchWait = 30 * time.Second
+//
+// A var only so the tests can shorten it: two of the three ways this can end
+// are decided by the deadline expiring, and thirty seconds each is not a test
+// anybody runs.
+var launchWait = 30 * time.Second
 
 func apply(c *client, m update.Manifest, o updateOpts) error {
 	// The copy this may be running from is needed until the work is done — see

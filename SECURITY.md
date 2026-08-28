@@ -97,8 +97,11 @@ boundary being defended here is the machine, not the process: the concern is a
 
 - The listener binds `127.0.0.1` and refuses any other address unless
   `server.allow_non_loopback` is set explicitly in the config file.
-- Every request is dropped if its peer address is not a loopback IP, even if
-  the listener somehow ended up bound more widely.
+- Every request is dropped if its peer address is not a loopback IP, in case
+  the listener ended up bound more widely by accident. Binding it that way
+  *deliberately* is what `server.allow_non_loopback` is for, and that setting
+  turns this check off along with the `Host` check below — otherwise it would
+  open a listener and then refuse everyone who could reach it.
 - A request carrying an `Origin` is dropped unless that origin's host is
   exactly `localhost`, a loopback IP, or the webview's own `wails:` scheme.
   The host is parsed and compared, not prefix-matched — `localhost.evil.com`
@@ -110,6 +113,12 @@ boundary being defended here is the machine, not the process: the concern is a
   address really is loopback. The name it dialled is the one thing it cannot
   change. Off when `server.allow_non_loopback` bound something other than
   loopback, where the names in play are the operator's to decide.
+
+The peer check and the `Host` check are the two that assume this pet is only
+ever spoken to from its own machine, and `server.allow_non_loopback` turns off
+both together. Nothing else changes: the `Origin` check still stands, bodies are
+still capped, fields still strictly decoded, metadata still sanitised, and no
+endpoint takes a path or a command.
 
 Setting `server.allow_non_loopback` puts an unauthenticated API on your
 network. Do not set it on a machine you do not control.

@@ -37,6 +37,22 @@ func newTestServer(t *testing.T) *httptest.Server {
 	return ts
 }
 
+// newGuardedServer is a Server with an engine and no listener, for driving
+// withGuards directly — the peer address is a fact about the connection, and
+// httptest.Server always makes it loopback.
+func newGuardedServer(t *testing.T) *Server {
+	t.Helper()
+	lib := petassets.NewLibrary()
+	fsys := fstest.MapFS{"pets/test/manifest.json": {Data: []byte(manifest)}}
+	if err := lib.LoadBuiltin(fsys, "pets", "/pets"); err != nil {
+		t.Fatalf("pets: %v", err)
+	}
+	cfg := config.Default()
+	cfg.Pet.Active = "test"
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	return New(engine.New(cfg, lib, log), log)
+}
+
 func post(t *testing.T, ts *httptest.Server, path, body string) (*http.Response, string) {
 	t.Helper()
 	req, err := http.NewRequest(http.MethodPost, ts.URL+path, strings.NewReader(body))
@@ -233,6 +249,36 @@ func TestHostIsThisMachineOrNothing(t *testing.T) {
 		if isLocalHost(h) {
 			t.Errorf("%q is not this machine and must be refused", h)
 		}
+	}
+}
+
+// The peer check is the backstop for a listener bound wide by accident. A
+// caller from off this machine gets nothing by default...
+func TestPeerOffThisMachineIsRefused(t *testing.T) {
+	s := newGuardedServer(t)
+	req := httptest.NewRequest(http.MethodGet, "/state", nil)
+	req.RemoteAddr = "10.0.0.5:51000"
+	rec := httptest.NewRecorder()
+	s.withGuards(s.mux).ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("a caller from 10.0.0.5 got %d", rec.Code)
+	}
+}
+
+// ...and everything, once somebody has said so in the config file. Without
+// this, server.allow_non_loopback bound an address and then refused every
+// machine that could reach it, which is a setting that does nothing.
+func TestAllowNonLoopbackLetsThatMachineIn(t *testing.T) {
+	s := newGuardedServer(t)
+	s.boundWide = true
+	req := httptest.NewRequest(http.MethodGet, "/state", nil)
+	req.RemoteAddr = "10.0.0.5:51000"
+	req.Host = "pet.lan:9876"
+	rec := httptest.NewRecorder()
+	s.withGuards(s.mux).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("the pet refused the network it was told to listen on: %d %s",
+			rec.Code, strings.TrimSpace(rec.Body.String()))
 	}
 }
 
