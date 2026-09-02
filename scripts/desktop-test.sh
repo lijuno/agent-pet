@@ -502,6 +502,44 @@ for corner in "0,0 top-left" "$((uw - ww)),0 top-right" \
 	done
 done
 
+echo
+echo "The window hands its transparent margin back"
+# ADR 0009. The window is a rectangle much larger than the character and used to
+# take mouse events across all of it. What can be checked from here is the
+# region the app believes in; whether a click reached the Finder is not knowable
+# without looking at the screen, which nothing here may do.
+post '{"panel":"close"}'
+sleep 0.4
+region=$(field hit_region)
+case "$region" in
+off*)
+	skip "the region is the character, not the window" "click_through is off in config.yaml"
+	;;
+*)
+	base=$(field window_base)
+	want "the region is smaller than the window" "$region" "at 90,56"
+	case "$region" in
+	*"$base"*) bad "the region is not the whole window" "region $region covers the whole $base window" ;;
+	*) ok "the region is not the whole window" ;;
+	esac
+
+	# A panel is as clickable as the character, or the menu could not be used.
+	post '{"panel":"status"}'
+	sleep 0.5
+	withpanel=$(field hit_region)
+	case "$withpanel" in
+	*" + "*) ok "an open panel joins the region" ;;
+	*) bad "an open panel joins the region" "expected two rects, got: $withpanel" ;;
+	esac
+	post '{"panel":"close"}'
+	sleep 0.4
+	case "$(field hit_region)" in
+	*" + "*) bad "closing the panel gives its rect back" "still two rects" ;;
+	*) ok "closing the panel gives its rect back" ;;
+	esac
+	;;
+esac
+
 # Leave the pet as it was found: on screen, with nothing open.
 post '{"panel":"close"}'
 post '{"shown":true}'

@@ -43,6 +43,15 @@ type Pet struct {
 	// PNG frames themselves and stays either way — hence the narrow name.
 	DropShadow bool `yaml:"drop_shadow"`
 	Sound      bool `yaml:"sound"`
+	// ClickThrough hands the transparent margin around the character back to
+	// whatever is behind the window: without it the window takes mouse events
+	// across its whole rectangle, which is 108 to 60 points either side of the
+	// character and 56 above. See ADR 0009.
+	//
+	// A setting rather than a certainty because the failure mode is not a
+	// wrong pixel, it is a pet that cannot be picked up, and the machinery is
+	// a pair of native event monitors that nothing in `go test` can reach.
+	ClickThrough bool `yaml:"click_through"`
 	// Disabled names packs to keep out of the pickers — the Change Pet
 	// submenu, the panel in the window, `petctl pets`. Four characters ship
 	// and somebody who wants two of them should not have to read past the
@@ -169,11 +178,12 @@ func (d *Duration) UnmarshalYAML(n *yaml.Node) error {
 func Default() Config {
 	return Config{
 		Pet: Pet{
-			Active:      "sanmao",
-			AlwaysOnTop: true,
-			Scale:       1.0,
-			DropShadow:  true,
-			Sound:       false,
+			Active:       "sanmao",
+			AlwaysOnTop:  true,
+			Scale:        1.0,
+			DropShadow:   true,
+			Sound:        false,
+			ClickThrough: true,
 		},
 		Behavior: Behavior{Dialogue: true, XP: true, ClickFocusesAgent: false},
 		Window:   Window{X: -1, Y: -1},

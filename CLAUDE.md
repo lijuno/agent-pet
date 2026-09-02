@@ -222,6 +222,14 @@ Each of these cost an hour or more to find.
   the main thread, and emitting an event ends in `evaluateJavaScript`, which
   segfaults from there. `goStatusClick` hands off to a goroutine for this
   reason.
+- **And the reverse: `OnStartup` is not on the main thread.** Wails runs it on
+  a goroutine, so AppKit called straight from `App.startup` traps —
+  `signal arrived during cgo execution`, with a stack that names your function
+  and `frontend.Run.func1` and explains nothing else. `clickthrough_darwin.m`
+  hops every entry point onto the main queue with `dispatch_async` for this
+  reason, and copies anything Go owns *before* the hop, since Go is free to
+  reuse that memory the moment the call returns. Read this and the line above
+  as one rule: native code either runs on the main thread or arranges to.
 - **Wails window coordinates are relative to the screen's `visibleFrame`,**
   not the display — origin already past the menu bar and a left Dock. Using
   the display size as a bound lets a window hang off by exactly the Dock's

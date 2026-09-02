@@ -52,6 +52,20 @@ type App struct {
 	overlay    rect
 	hasOverlay bool
 
+	// The window as it currently is, and where the character sits in it.
+	// curW/curH follow the growth an overlay causes, so the hit region does
+	// not have to consult `grown` — which the frontend thread writes without
+	// this lock. petX and petSide are the placement the last overlay chose;
+	// zero and "" mean the character is centred at the foot of the window,
+	// which is where it sits whenever no overlay is open. See ADR 0009.
+	curW, curH int
+	petX       int
+	petSide    string
+
+	// clickThrough is whether the window hands its transparent margin back.
+	// Read on the frontend thread only, set once at startup.
+	clickThrough bool
+
 	// hidden mirrors the window's visibility, so the Hide checkbox can
 	// report it. Wails has no "is the window visible" call to ask.
 	hidden bool
@@ -74,6 +88,8 @@ func NewApp(eng *engine.Engine, log *slog.Logger, cfgPath, addr string) *App {
 		alwaysOnTop: cfg.Pet.AlwaysOnTop,
 		baseW:       w,
 		baseH:       h,
+		curW:        w,
+		curH:        h,
 		hidden:      cfg.Window.StartHidden,
 	}
 }
@@ -83,21 +99,33 @@ func NewApp(eng *engine.Engine, log *slog.Logger, cfgPath, addr string) *App {
 // below. main.go opens the window at this size and OpenOverlay grows it from
 // here.
 func WindowSize(scale float64) (int, int) {
-	if scale <= 0 {
-		scale = 1
-	}
-	// 40px frames drawn at 3x, times the user's scale — this mirrors the
-	// frontend's own sizing in renderAnimation.
-	sprite := int(40 * 3 * scale)
-	// bubbleRoom keeps a two-line bubble on screen even with the pet pushed to
-	// the very top of the display.
-	const bubbleRoom = 56
-	const shadow = 8
+	sprite := spriteSize(scale)
 	w := 300
 	if sprite+80 > w {
 		w = sprite + 80
 	}
 	return w, sprite + bubbleRoom + shadow
+}
+
+// bubbleRoom keeps a two-line bubble on screen even with the pet pushed to the
+// very top of the display. shadow is the gap under the character, which the
+// frontend spends as `#pet { bottom: 8px }`.
+//
+// Named rather than inlined because the hit region has to know where the
+// character sits inside the window, and a second copy of 8 would be a second
+// thing to get wrong. See ADR 0009.
+const (
+	bubbleRoom = 56
+	shadow     = 8
+)
+
+// spriteSize is the drawn size of the character: 40px frames at 3x, times the
+// user's scale. This mirrors the frontend's own sizing in renderAnimation.
+func spriteSize(scale float64) int {
+	if scale <= 0 {
+		scale = 1
+	}
+	return int(40 * 3 * scale)
 }
 
 func (a *App) startup(ctx context.Context) {
@@ -109,6 +137,16 @@ func (a *App) startup(ctx context.Context) {
 	}
 	wruntime.WindowSetAlwaysOnTop(ctx, a.alwaysOnTop)
 	a.startTray(ctx)
+
+	// The transparent margin is handed back to whatever is behind the window,
+	// unless the setting says otherwise. See ADR 0009. The region is pushed
+	// before the monitors start so there is never a moment where the window
+	// ignores everything, including the character.
+	if cfg.Pet.ClickThrough {
+		a.clickThrough = true
+		a.publishHitRegion()
+		startClickThrough()
+	}
 
 	// Forward engine updates to the webview. The subscription is lossy by
 	// design; the frontend only ever needs the latest picture.
@@ -256,6 +294,15 @@ func (a *App) OpenOverlay(ow, oh int) Placement {
 	// edge a resize anchors to, which is a platform detail.
 	wruntime.WindowSetSize(a.ctx, r.W, r.H)
 	wruntime.WindowSetPosition(a.ctx, r.X, r.Y)
+
+	// The hit region is computed from these rather than from the window,
+	// because asking Wails for its geometry from a mouse callback is exactly
+	// the kind of main-thread call that has crashed this app before.
+	a.mu.Lock()
+	a.curW, a.curH = r.W, r.H
+	a.petX, a.petSide = p.PetX, p.Side
+	a.mu.Unlock()
+	a.publishHitRegion()
 	return p
 }
 
@@ -267,6 +314,18 @@ func (a *App) CloseOverlay() {
 	wruntime.WindowSetSize(a.ctx, a.baseW, a.baseH)
 	wruntime.WindowSetPosition(a.ctx, a.baseX, a.baseY)
 	a.grown = false
+
+	a.mu.Lock()
+	a.curW, a.curH = a.baseW, a.baseH
+	a.petX, a.petSide = 0, ""
+	// The overlay is gone, so the rectangle it occupied is not part of the hit
+	// region any more. Left set, the window went on taking clicks over a panel
+	// that had closed — which is the dead zone this feature exists to remove,
+	// reintroduced in the shape of the last menu the user opened. It also made
+	// /diagnostics report a stale position as though something were still open.
+	a.overlay, a.hasOverlay = rect{}, false
+	a.mu.Unlock()
+	a.publishHitRegion()
 }
 
 // Sizes are the presets offered in the menu. Free-form scales still work in
@@ -312,6 +371,7 @@ func (a *App) SetScale(scale float64) {
 	}
 
 	a.resizeTo(scale)
+	a.publishHitRegion()
 	a.push()
 }
 
@@ -400,9 +460,13 @@ func (a *App) MoveWindow(x, y int) error {
 // the answer back.
 func (a *App) ReportOverlay(left, top, width, height int) {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	a.overlay = rect{X: left, Y: top, W: width, H: height}
 	a.hasOverlay = width > 0 && height > 0
+	a.mu.Unlock()
+
+	// The panel is part of the region, so the region changes when it lands.
+	// Published outside the lock: publishHitRegion takes it again.
+	a.publishHitRegion()
 }
 
 // overlayReport describes the last overlay's position on screen, and whether
@@ -448,6 +512,7 @@ func (a *App) DesktopDiagnostics() map[string]string {
 		return out
 	}
 	out["overlay"] = a.overlayReport()
+	out["hit_region"] = a.hitRegionReport()
 	out["status_menu"] = a.StatusMenu()
 	// A native window is one a test has no other way to see: it is not in the
 	// webview and nothing may read a real menu or window without accessibility
@@ -507,6 +572,13 @@ func (a *App) screenSize() (int, int) {
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	// Stop watching the cursor first: the monitors outlive the window
+	// otherwise, and a monitor that fires against a window being torn down is
+	// a crash with nothing useful in the trace.
+	if a.clickThrough {
+		stopClickThrough()
+	}
+
 	// Save where the character is, not where a grown window happens to start.
 	a.CloseOverlay()
 

@@ -1,6 +1,6 @@
 # ADR 0009 — Click-through by rectangle union
 
-Status: proposed
+Status: accepted
 
 The window is a frameless transparent rectangle, and every pixel of it takes
 mouse events — including the pixels that show nothing. At the default scale the
@@ -65,8 +65,13 @@ clickable and not, several times a second. Worse, a click could land in a hole
 that was solid in the frame the eye last registered. Precision the user cannot
 predict is not precision.
 
-A rectangle around a 120-point character, inset by a point or two, captures
-effectively all of the benefit and behaves the same way in every frame.
+A rectangle around a 120-point character captures effectively all of the
+benefit and behaves the same way in every frame.
+
+It is the sprite box exactly, not an inset of it. The box has transparent
+corners and an inset would reclaim a few more points, but the cost of being
+wrong in that direction is a character that cannot be picked up, and there is no
+single number that is right for a cat, a bicycle and a pickaxe.
 
 ### The geometry is computed in Go, from state that already exists
 
@@ -106,11 +111,33 @@ holds no policy. Three things it does have to get right:
   moves when a drag starts on the character. If the flag flips while the cursor
   is briefly outside the region during a drag, the user drops the pet.
 
-**An assumption to check before building anything:** that a mouse-moved global
-monitor does not require accessibility access. Keyboard monitors do; mouse
-monitors are believed not to. If that is wrong, constraint 4 kills this design
-outright and the fallback is the window-shrinking described below. Check it
-first, with the smallest possible program, before writing the rest.
+**The assumption this rested on, now checked.** A mouse-moved global monitor
+does not require accessibility access. Keyboard monitors do; mouse ones do not.
+This was tested twice: first with a throwaway program, which established that
+the monitor is fed by AppKit's own dispatch and needs `[NSApp run]` rather than
+a hand-spun `NSRunLoop` — two earlier attempts saw nothing and it was the run
+loop, not a permission — and then in the app itself, which uses no accessibility
+API, has never prompted for one, and is not in the Accessibility list. Moving
+the cursor onto the character and back into the margin flips the window between
+taking clicks and passing them through. The design stands.
+
+### Everything native hops to the main queue, because startup is not on it
+
+Wails runs `OnStartup` on a goroutine. The first working version called
+`addGlobalMonitorForEventsMatchingMask:` straight from it and trapped
+immediately — `signal arrived during cgo execution`, in `startClickThrough`,
+under `frontend.Run.func1`. AppKit is main-thread-only and NSEvent monitors are
+no exception.
+
+So every entry point in the cgo file is a `dispatch_async` onto the main queue
+and nothing else. The region is copied before that hop rather than inside it:
+the caller owns that memory, and Go is free to reuse it the moment the call
+returns, which is long before a queued block runs.
+
+This is the second entry in this repository's list of ways the main thread will
+kill the app, after "never call the Wails runtime from a native menu callback".
+It is worth reading them as one rule: anything native either runs on the main
+thread or arranges to.
 
 ### It ships behind a setting, off no earlier than it has been driven by hand
 
@@ -142,6 +169,13 @@ to be large exactly when a bubble is up.
 **A new failure mode replaces an old one.** If the monitors die or the region is
 computed wrongly, the symptom is either the dead zone returning or a pet that
 cannot be dragged. The setting is the escape hatch, and the reason there is one.
+
+**A closed overlay has to leave the region.** `CloseOverlay` did not clear the
+overlay rectangle — nothing had needed it to, because the field existed only for
+diagnostics. Left in, the window went on taking clicks over a panel that was no
+longer there: the dead zone this feature removes, reintroduced in the shape of
+the last menu the user opened. Found by the desktop check below rather than by
+reading, which is the argument for having written it.
 
 **A mouse-moved monitor fires often.** The work per event must stay at a few
 rectangle comparisons. Nothing about this may allocate or lock.

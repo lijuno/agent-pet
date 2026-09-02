@@ -157,6 +157,7 @@ firing at all.
 ```yaml
 pet:
   active: sanmao        # sanmao, taotao, juanmao, maomao, damao, amiao, or your own pack
+  click_through: true   # hand the transparent margin around the pet back to the desktop
   disabled: []          # ids kept out of the character menu
   always_on_top: true
   scale: 1.0
@@ -305,14 +306,14 @@ the order the causes actually occur:
   the character is also not meant to do anything: double-click pets it, and
   right-click opens the menu.
 
-- **Clicks beside the pet going nowhere?** Expected, in the sense that it is not
-  your machine — but it is not intended either. The window is a rectangle wider
-  and taller than the character, and it takes mouse events across all of it,
-  including the transparent margin: 108 points either side at the smallest size,
-  60 at the largest, and 56 above the character at every size. Moving a little
-  further out lands the click.
-  [ADR 0009](docs/adr/0009-click-through-by-rectangle-union.md) is the fix, once
-  it is built.
+- **Clicks beside the pet going nowhere?** Fixed. The window is a
+  rectangle much wider and taller than the character, and it used to take mouse
+  events across all of it — 108 points either side at the smallest size, 60 at
+  the largest, 56 above at every size. It now takes them only over the character
+  and over an open panel, and hands the rest to whatever is behind. If an older
+  build is doing it, moving a little further out lands the click. See
+  [ADR 0009](docs/adr/0009-click-through-by-rectangle-union.md); `pet.click_through`
+  turns it off.
 
 Do not disable Gatekeeper, strip quarantine attributes, or re-sign the bundle to
 make something work. If macOS rejects a release, that is a finding worth
