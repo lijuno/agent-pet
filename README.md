@@ -300,8 +300,19 @@ the order the causes actually occur:
   ```
 
 - **Invisible, but reacting?** It may be off-screen or hidden; unticking **Hide** in
-  the menu bar retrieves it. The window is deliberately transparent and
-  click-through in places, so "I cannot click it" is expected.
+  the menu bar retrieves it. The window is deliberately transparent, so a pet
+  parked over a busy wallpaper can be genuinely hard to find. A single click on
+  the character is also not meant to do anything: double-click pets it, and
+  right-click opens the menu.
+
+- **Clicks beside the pet going nowhere?** Expected, in the sense that it is not
+  your machine — but it is not intended either. The window is a rectangle wider
+  and taller than the character, and it takes mouse events across all of it,
+  including the transparent margin: 108 points either side at the smallest size,
+  60 at the largest, and 56 above the character at every size. Moving a little
+  further out lands the click.
+  [ADR 0009](docs/adr/0009-click-through-by-rectangle-union.md) is the fix, once
+  it is built.
 
 Do not disable Gatekeeper, strip quarantine attributes, or re-sign the bundle to
 make something work. If macOS rejects a release, that is a finding worth
