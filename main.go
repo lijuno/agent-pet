@@ -260,7 +260,18 @@ func newLogger(cfg config.Config) (*slog.Logger, func()) {
 		Level: level,
 		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
 			if a.Key == slog.TimeKey {
-				return slog.String("t", a.Value.Time().Format("15:04:05"))
+				// Dated, because this file outlives the day it was written on:
+				// it is appended to across runs and only rotates at a megabyte,
+				// so a week of sessions sit in it end to end. With a bare clock
+				// time, lines from five days ago read as this afternoon's — the
+				// times even appear to run backwards at the seam — and an
+				// afternoon went into diagnosing an app that had stopped on a
+				// day nobody was looking at.
+				//
+				// No space in the layout: slog quotes a value containing one,
+				// and `t=2026-09-02T18:07:17` greps and sorts where
+				// `t="2026-09-02 18:07:17"` does neither.
+				return slog.String("t", a.Value.Time().Format("2006-01-02T15:04:05"))
 			}
 			return a
 		},
